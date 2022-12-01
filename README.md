@@ -6,11 +6,9 @@
 
 ## Features
 
-- Lowercase alphabet
-- Uppercase alphabet
-- 2 Structures with collisions
-- Possibility of changing the color of individual letters
-- Tutorial:  [Click Here](https://www.youtube.com/watch?v=OFNpN5RanzE)
+- Possibility to change clothes with other player
+- Showcase:  [Click Here](https://www.youtube.com/watch?v=OFNpN5RanzE)
+- Cfx : [Click Here](https://www.youtube.com/watch?v=OFNpN5RanzE)
 
 ## DMCA Protection Certificate
 ![image](https://cdn.discordapp.com/attachments/1045063739738705940/1045114937862787092/image.png)
