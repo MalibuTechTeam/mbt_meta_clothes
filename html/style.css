@@ -1,0 +1,103 @@
+@import url("https://fonts.googleapis.com/css?family=Poppins&display=swap");
+
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+/* General Body */
+
+body {
+  /* background-color: #252525; */
+  text-align: center;
+  font-family: "Oswald", sans-serif;
+}
+
+#main-div {
+    display: none;
+    width: 70%;
+    margin-left: 15%;
+    margin-top: 5%;
+}
+
+path,
+polygon {
+  fill-opacity: 0;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: dash 1.3s forwards;
+}
+
+.circle {
+  position: absolute;
+  left: 32.5%;
+  transform: translate();
+  width: 500px;
+  animation: infinite-spinning 4s;
+}
+
+@keyframes dash {
+  50% {
+    stroke-dashoffset: 0;
+    fill-opacity: 0;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    fill-opacity: 0.8;
+  }
+}
+
+@keyframes infinite-spinning {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.st1 {
+  fill: #252525;
+  stroke: #252525;
+  stroke-miterlimit: 10;
+}
+.st2 {
+  fill: #000;
+  stroke: #252525;
+  stroke-miterlimit: 10;
+}
+.st3 {
+  fill: #252525;
+  stroke: #252525;
+  stroke-miterlimit: 10;
+}
+
+.st30 {
+  fill: #252525;
+  stroke: #252525;
+  stroke-miterlimit: 10;
+}
+.st31 {
+  fill: #252525;
+  stroke: #252525;
+  stroke-miterlimit: 10;
+}
+
+.st20:hover {
+  fill: #fff;
+} 
+
+path {
+  fill-opacity: 0.9;
+}
+
+path:hover {
+  fill-opacity: 1;
+}
+
+tr,
+th,
+td {
+  position: absolute;
+}
