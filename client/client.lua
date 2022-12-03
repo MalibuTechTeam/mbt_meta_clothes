@@ -5,7 +5,7 @@ local isUiBusy = false
 
 if MBT.Framework == 'ESX' then
     ESX = exports['es_extended']:getSharedObject()
-elseif MBT.Framework == 'QBCORE' then
+elseif MBT.Framework == 'QB' then
     QBCore = exports['qb-core']:GetCoreObject()
 elseif MBT.Framework == 'OX' then
     local file = ('imports/%s.lua'):format(IsDuplicityVersion() and 'server' or 'client')
