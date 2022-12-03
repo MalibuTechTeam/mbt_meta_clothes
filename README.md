@@ -2,6 +2,8 @@
   <img src="https://dunb17ur4ymx4.cloudfront.net/wysiwyg/1131066/1fe58a9651a48982397fb7d9ec82bfd4aa26d036.png" width="500"/>
 </div>
 
+MBT Meta Clothes take advantage of ox_inventory metadata feature giving you the possibility to turn your clothes into unique items. Undress yourself using a clean and simple NUI and have fun swapping your outfits with your friends!
+
 ### Dependencies:
 * [ox_inventory](https://github.com/overextended/ox_inventory)
 * [ox_lib](https://github.com/overextended/ox_lib)
