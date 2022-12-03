@@ -1,7 +1,7 @@
 MBT = {}
 MBT.Debug = false
 
-MBT.Language = "IT"
+MBT.Language = "EN"
 
 MBT.Framework = "OX" -- OX/ESX/QB
 
@@ -119,6 +119,8 @@ MBT.NotifyHandler = function(text, type)
         text = "Lorem Ipsum"
         type = "error" / "info" / "warning"
     ]]
-    exports.mbt_notification:Notify({ msg = text, title = "Clothes", style = "dark", type = type or "error",
-        icon = "fa-solid fa-campground", position = "bottom-right", duration = 5000, sound = type or "error" })
+
+   -- Put your notify here 
+   -- Notify({ msg = text, title = "Clothes", style = "dark", type = type or "error", icon = "fa-solid fa-campground", position = "bottom-right", duration = 5000, sound = type or "error" })
+
 end
