@@ -3,6 +3,17 @@ local currLang = MBT.Labels[MBT.Language]
 local playerSex
 local isUiBusy = false
 
+if MBT.Framework == 'ESX' then
+    ESX = exports['es_extended']:getSharedObject()
+elseif MBT.Framework == 'QBCORE' then
+    QBCore = exports['qb-core']:GetCoreObject()
+elseif MBT.Framework == 'OX' then
+    local file = ('imports/%s.lua'):format(IsDuplicityVersion() and 'server' or 'client')
+    local import = LoadResourceFile('ox_core', file)
+    local chunk = assert(load(import, ('@@ox_core/%s'):format(file)))
+    chunk()
+end
+
 RegisterNUICallback('handleDress', function(data, cb)
     if data.Index == 8 then handleTorsoUndress() else handleUndress(data.Index) end
     cb(1)
