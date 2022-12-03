@@ -15,9 +15,7 @@ $(function() {
       if (item.action === "ui") {
           display(item.status);
       } else if (item.action === "sendUiState") {
-          // console.log("item.status " + item.status)
           isUiBusy = item.status;
-          // console.log("sendUiState " + isUiBusy)
       }
   });
 
@@ -30,11 +28,8 @@ $(function() {
   });
 
   handleUndress = function(index) {
-      // console.log("Index " + index);
-      // console.log("isUiBusy " + isUiBusy);
       if (!isUiBusy) {
           isUiBusy = true;
-          // console.log("isUiBusy Check Passed!!!" + isUiBusy);
           $.post(
               `https://mbt_meta_clothes/handleDress`,
               JSON.stringify({
@@ -45,8 +40,6 @@ $(function() {
   };
 
   handleProps = function(index) {
-      // console.log("Index " + index);
-      // console.log("isUiBusy " + isUiBusy);
       if (!isUiBusy) {
           isUiBusy = true;
           $.post(
