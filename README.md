@@ -4,9 +4,13 @@
 
 ### Dependencies:
 * [ox_inventory](https://github.com/overextended/ox_inventory)
+* [ox_lib](https://github.com/overextended/ox_lib)
 
 ### ⚠️Important:
 Add to your items the following ones (customize the settings to fit your needs) DO NOT CHANGE THE ITEMS NAME!
+The resource has been tested ONLY on Ox Core and ESX
+Remember to check and change if needed the ```Default``` clothes in ```MBT.Drawables``` and ```MBT.Props ```
+
 
 ## ox_inventory/data/items.lua
 
@@ -192,10 +196,11 @@ end)
 - QB Core compatible
 - Optimized for low CPU usage
 - Customizable labels
+- Customizable notify system
 
 ### Media:
-- Showcase:  [Click Here](https://www.youtube.com/watch?v=OFNpN5RanzE)
-- Cfx : [Click Here](https://www.youtube.com/watch?v=OFNpN5RanzE)
+- Showcase:  [Click Here](https://www.youtube.com/watch?v=TSCrxiJaWdg)
+- Cfx : [Click Here]()
 
 ## DMCA Protection Certificate
 ![image](https://cdn.discordapp.com/attachments/1045063739738705940/1045114937862787092/image.png)
