@@ -1,6 +1,17 @@
 local ox_inventory = exports.ox_inventory
 local currLang = MBT.Labels[MBT.Language]
 
+if MBT.Framework == 'ESX' then
+    ESX = exports['es_extended']:getSharedObject()
+elseif MBT.Framework == 'QB' then
+    QBCore = exports['qb-core']:GetCoreObject()
+elseif MBT.Framework == 'OX' then
+    local file = ('imports/%s.lua'):format(IsDuplicityVersion() and 'server' or 'client')
+    local import = LoadResourceFile('ox_core', file)
+    local chunk = assert(load(import, ('@@ox_core/%s'):format(file)))
+    chunk()
+end
+
 RegisterServerEvent('mbt_metaclothes:giveDress')
 AddEventHandler('mbt_metaclothes:giveDress', function(data)
     local _source = source
