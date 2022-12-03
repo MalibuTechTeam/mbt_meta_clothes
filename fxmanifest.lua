@@ -24,12 +24,11 @@ shared_scripts {
 }
 
 server_scripts {
-    '@oxmysql/lib/MySQL.lua',
-    '@ox_core/imports/server.lua',
     "server/*.lua"
 }
 
 client_scripts {
-    '@ox_core/imports/client.lua',
     "client/*.lua"
 }
+
+dependencies { "ox_lib", "ox_inventory" }
