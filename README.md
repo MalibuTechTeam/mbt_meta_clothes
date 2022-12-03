@@ -2,11 +2,198 @@
   <img src="https://dunb17ur4ymx4.cloudfront.net/wysiwyg/1131066/1fe58a9651a48982397fb7d9ec82bfd4aa26d036.png" width="500"/>
 </div>
 
----
+### Dependencies:
+* [ox_inventory](https://github.com/overextended/ox_inventory)
+
+### ⚠️Important:
+Add to your items the following ones (customize the settings to fit your needs) DO NOT CHANGE THE ITEMS NAME!
+
+## ox_inventory/data/items.lua
+
+```
+['topdress'] = {
+		label 		= 'Top Dress',
+		description = 'YOUR_DESCRIPTION',
+		weight 		= 100,
+		stack 		= true,
+		close 		= true,
+		client = {
+			anim = { dict = 'clothingshirt', clip = 'try_shirt_positive_d', flag = 51 },
+			usetime = 1200,
+		}
+	},
+  ['jacket'] = {
+		label 		= 'Jacket',
+		description = 'YOUR_DESCRIPTION',
+		weight 		= 100,
+		stack 		= true,
+		close 		= true,
+		client = {
+			anim = { dict = 'clothingshirt', clip = 'try_shirt_positive_d', flag = 51 },
+			usetime = 1200,
+		}
+	},
+  ['trousers'] = {
+		label 		= 'Trousers',
+		description = 'YOUR_DESCRIPTION',
+		weight 		= 100,
+		stack 		= true,
+		close 		= true,
+		client = {
+			anim = { dict = 're@construction', clip = 'out_of_breath', flag = 51 },
+			usetime = 1200,
+		}
+	},
+  ['shoes'] = {
+		label 		= 'Shoes',
+		description = 'YOUR_DESCRIPTION',
+		weight 		= 100,
+		stack 		= true,
+		close 		= true,
+		client = {
+			anim = { dict = 'random@domestic', clip = 'pickup_low', flag = 0 },
+			usetime = 1200,
+		}
+	},
+  ['hat'] = {
+		label 		= 'Hat',
+		description = 'YOUR_DESCRIPTION',
+		weight 		= 100,
+		stack 		= true,
+		close 		= true,
+		client = {
+			anim = { dict = 'missheist_agency2ahelmet', clip = 'take_off_helmet_stand', flag = 51 },
+			usetime = 1200,
+		}
+	},
+  ['glasses'] = {
+		label 		= 'Glasses',
+		description = 'YOUR_DESCRIPTION',
+		weight 		= 100,
+		stack 		= true,
+		close 		= true,
+		client = {
+			anim = { dict = 'clothingspecs', clip = 'take_off', flag = 51 },
+			usetime = 1200,
+		}
+	},
+  ['earaccess'] = {
+		label 		= 'Ear Accessories',
+		description = 'YOUR_DESCRIPTION',
+		weight 		= 100,
+		stack 		= true,
+		close 		= true,
+		client = {
+			anim = { dict = 'mp_cp_stolen_tut', clip = 'b_think', flag = 51 },
+			usetime = 1200,
+		}
+	}
+  
+```
+## ox_inventory/modules/items/client.lua
+
+```
+Item('topdress', function(data, slot)
+	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
+	if PlayerData.sex ~= slot.metadata.sex then 
+    -- Trigger your notify here
+    -- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]
+	end
+
+	ox_inventory:useItem(data, function(data)
+		if data then
+			TriggerEvent("mbt_metaclothes:applyKitDress", slot.metadata)
+		end
+	end)
+end)
+
+Item('trousers', function(data, slot)
+	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
+	if PlayerData.sex ~= slot.metadata.sex then
+	  	-- Trigger your notify here
+    -- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]     
+	end
+  
+	ox_inventory:useItem(data, function(data)
+		if data then
+			TriggerEvent("mbt_metaclothes:applyDress", slot.metadata)
+		end
+	end)
+end)
+
+Item('shoes', function(data, slot)
+	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
+	if PlayerData.sex ~= slot.metadata.sex then
+		-- Trigger your notify here
+    -- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]    
+	end
+  
+	ox_inventory:useItem(data, function(data)
+		if data then
+			print(slot.metadata.drawable)
+			TriggerEvent("mbt_metaclothes:applyDress", slot.metadata)
+		end
+	end)
+end)
+
+Item('hat', function(data, slot)
+	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
+	if PlayerData.sex ~= slot.metadata.sex then
+		-- Trigger your notify here
+    -- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]   
+	end
+  
+	ox_inventory:useItem(data, function(data)
+		if data then
+			print(slot.metadata.drawable)
+			TriggerEvent("mbt_metaclothes:applyProps", slot.metadata)
+		end
+	end)
+end)
+
+Item('glasses', function(data, slot)
+	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
+	if PlayerData.sex ~= slot.metadata.sex then
+		-- Trigger your notify here
+    -- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]      
+	end
+  
+	ox_inventory:useItem(data, function(data)
+		if data then
+			-- print(slot.metadata.drawable)
+			TriggerEvent("mbt_metaclothes:applyProps", slot.metadata)
+		end
+	end)
+end)
+
+Item('earaccess', function(data, slot)
+	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
+	if PlayerData.sex ~= slot.metadata.sex then
+		-- Trigger your notify here
+    -- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]      
+	end
+  
+	ox_inventory:useItem(data, function(data)
+		if data then
+			-- print(slot.metadata.drawable)
+			TriggerEvent("mbt_metaclothes:applyProps", slot.metadata)
+		end
+	end)
+end)
+```
+
+
 
 ## Features
 
-- Possibility to change clothes with other player
+- Turn clothes into items and swap them with your friends
+- ESX compatible (Tested with ESX Legacy)
+- Ox Core compatible
+- QB Core compatible
+- Optimized for low CPU usage
+- Customizable labels
+
+### Media:
 - Showcase:  [Click Here](https://www.youtube.com/watch?v=OFNpN5RanzE)
 - Cfx : [Click Here](https://www.youtube.com/watch?v=OFNpN5RanzE)
 
