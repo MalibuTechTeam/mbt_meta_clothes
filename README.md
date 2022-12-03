@@ -8,7 +8,9 @@
 
 ### ⚠️Important:
 Add to your items the following ones (customize the settings to fit your needs) DO NOT CHANGE THE ITEMS NAME!
+<br/>
 The resource has been tested ONLY on Ox Core and ESX
+<br />
 Remember to check and change if needed the ```Default``` clothes in ```MBT.Drawables``` and ```MBT.Props ```
 
 
