@@ -158,9 +158,6 @@ end
 function isAbleToUndress(data)
     local isAble = true
     local playerSex = getPedSex(cache.ped or PlayerPedId()) 
-    print("playerSex ", playerSex)
-    print("data.Index ", data.Index)
-
     local isWearingDefault = tableContainsValue({table = MBT[data.Type][data.Index]["Default"][playerSex], value = data.Drawable})
     
     if isTable(MBT[data.Type][data.Index]["Default"][playerSex]) then
@@ -179,8 +176,6 @@ function isAbleToUndress(data)
 end
 
 function setDefaultVariation(data)
-    print(" Check index ", data.Index)
-    print("Check istab ", MBT.Drawables[data.Index]["Default"][data.Sex])
     local drawable = MBT.Drawables[data.Index]["Default"][data.Sex]
     if isTable(MBT.Drawables[data.Index]["Default"][data.Sex]) then
         drawable = randomizeDress(MBT.Drawables[data.Index]["Default"][data.Sex])
