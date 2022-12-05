@@ -138,7 +138,6 @@ Item('shoes', function(data, slot)
   
 	ox_inventory:useItem(data, function(data)
 		if data then
-			print(slot.metadata.drawable)
 			TriggerEvent("mbt_metaclothes:applyDress", slot.metadata)
 		end
 	end)
@@ -153,7 +152,6 @@ Item('hat', function(data, slot)
   
 	ox_inventory:useItem(data, function(data)
 		if data then
-			print(slot.metadata.drawable)
 			TriggerEvent("mbt_metaclothes:applyProps", slot.metadata)
 		end
 	end)
@@ -207,6 +205,6 @@ end)
 - Cfx : [Click Here](https://forum.cfx.re/t/free-esx-qb-ox-mbt-meta-clothes/4961827)
 
 ## DMCA Protection Certificate
-![image](https://cdn.discordapp.com/attachments/1045063739738705940/1045114937862787092/image.png)
+![image](https://media.discordapp.net/attachments/1045063739738705940/1049386591359074354/image.png)
 
 ##### Copyright © 2022 Malibú Tech. All rights reserved.
