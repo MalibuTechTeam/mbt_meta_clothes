@@ -8,7 +8,7 @@ author "Malibù Tech Team"
 
 description "mbt_meta_clothes"
 
-version "1.0.0"
+version "1.0.1"
 
 ui_page "html/index.html"
 files {
