@@ -1,3 +1,7 @@
+local ox_appearance = GetResourceState('ox_appearance'):find('start')
+local fivem_appearance = GetResourceState('fivem_appearance'):find('start')
+local qb_clothing = GetResourceState('qb-clothing'):find('start')
+
 local mbt_inventory  = exports["ox_inventory"]
 local currLang = MBT.Labels[MBT.Language]
 local playerSex
@@ -16,11 +20,13 @@ end
 
 RegisterNUICallback('handleDress', function(data, cb)
     if data.Index == 8 then handleTorsoUndress() else handleUndress(data.Index) end
+    saveOutfitCache()
     cb(1)
 end)
  
 RegisterNUICallback('handleProps', function(data, cb)
     handleProps(data.Index)
+    saveOutfitCache()
     cb(1)
 end)
  
@@ -46,6 +52,17 @@ RegisterNetEvent('mbt_metaclothes:applyProps')
 AddEventHandler('mbt_metaclothes:applyProps', function(data)
     SetPedPropIndex(cache.ped or PlayerPedId(), data.index, data.drawable, data.texture, true) 
 end)
+
+function saveOutfitCache()
+    local appearance = exports['fivem-appearance']:getPedAppearance(cache.ped)
+    if ox_appearance then
+        TriggerServerEvent('ox_appearance:save', appearance)
+    elseif fivem_appearance and MBT.Framework == 'ESX' then
+        TriggerServerEvent('esx_skin:save', appearance)
+    elseif qb_clothing and MBT.Framework == 'QB' then
+        -- IMPLEMENT HERE LOGIC FOR SAVE CLOTHING FOR QBCore
+    end
+end
 
 function handleProps(propIndex)
     local playerSex = getPedSex(cache.ped or PlayerPedId()) 
