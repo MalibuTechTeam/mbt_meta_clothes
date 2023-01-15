@@ -95,7 +95,29 @@ Remember to check and change if needed the ```Default``` clothes in ```MBT.Drawa
 			anim = { dict = 'mp_cp_stolen_tut', clip = 'b_think', flag = 51 },
 			usetime = 1200,
 		}
-	}
+	},
+  ['chain'] = {
+		label 		= 'Torso Accessories',
+		description     = 'Torso Accessories',
+		weight 		= 100,
+		stack 		= true,
+		close 		= true,
+		client = {
+			anim = { dict = 'clothingtie', clip = 'try_tie_positive_a', flag = 51 },
+			usetime = 2500,
+		}
+	},
+  ['watch'] = {
+		label 		= 'Watch',
+		description     = 'Watch',
+		weight 		= 100,
+		stack 		= true,
+		close 		= true,
+		client = {
+			anim = { dict = 'nmt_3_rcm-10', clip = 'cs_nigel_dual-10', flag = 51 },
+			usetime = 900,
+		}
+	},
   
 ```
 ## ox_inventory/modules/items/client.lua
@@ -104,8 +126,8 @@ Remember to check and change if needed the ```Default``` clothes in ```MBT.Drawa
 Item('topdress', function(data, slot)
 	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
 	if PlayerData.sex ~= slot.metadata.sex then 
-    -- Trigger your notify here
-    -- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]
+    		-- Trigger your notify here
+    		-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]
 	end
 
 	ox_inventory:useItem(data, function(data)
@@ -119,7 +141,7 @@ Item('trousers', function(data, slot)
 	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
 	if PlayerData.sex ~= slot.metadata.sex then
 	  	-- Trigger your notify here
-    -- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]     
+    		-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]     
 	end
   
 	ox_inventory:useItem(data, function(data)
@@ -133,7 +155,7 @@ Item('shoes', function(data, slot)
 	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
 	if PlayerData.sex ~= slot.metadata.sex then
 		-- Trigger your notify here
-    -- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]    
+    		-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]    
 	end
   
 	ox_inventory:useItem(data, function(data)
@@ -143,11 +165,39 @@ Item('shoes', function(data, slot)
 	end)
 end)
 
+Item('chain', function(data, slot)
+	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
+	if PlayerData.sex ~= slot.metadata.sex then
+	  	-- Trigger your notify here
+    		-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]     
+	end
+  
+	ox_inventory:useItem(data, function(data)
+		if data then
+			TriggerEvent("mbt_metaclothes:applyDress", slot.metadata)
+		end
+	end)
+end)
+
+Item('watch', function(data, slot)
+	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
+	if PlayerData.sex ~= slot.metadata.sex then
+		-- Trigger your notify here
+   		-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]   
+	end
+  
+	ox_inventory:useItem(data, function(data)
+		if data then
+			TriggerEvent("mbt_metaclothes:applyProps", slot.metadata)
+		end
+	end)
+end)
+
 Item('hat', function(data, slot)
 	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
 	if PlayerData.sex ~= slot.metadata.sex then
 		-- Trigger your notify here
-    -- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]   
+   		-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]   
 	end
   
 	ox_inventory:useItem(data, function(data)
@@ -161,7 +211,7 @@ Item('glasses', function(data, slot)
 	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
 	if PlayerData.sex ~= slot.metadata.sex then
 		-- Trigger your notify here
-    -- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]      
+    		-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]      
 	end
   
 	ox_inventory:useItem(data, function(data)
@@ -176,7 +226,7 @@ Item('earaccess', function(data, slot)
 	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
 	if PlayerData.sex ~= slot.metadata.sex then
 		-- Trigger your notify here
-    -- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]      
+    		-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]      
 	end
   
 	ox_inventory:useItem(data, function(data)
@@ -186,6 +236,8 @@ Item('earaccess', function(data, slot)
 		end
 	end)
 end)
+
+
 ```
 
 
