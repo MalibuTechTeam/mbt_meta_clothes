@@ -57,7 +57,7 @@ function saveOutfitCache()
     if ox_appearance then
         TriggerServerEvent('ox_appearance:save', appearance)
     elseif fivem_appearance and MBT.Framework == 'ESX' then
-        TriggerServerEvent('esx_skin:save', appearance)
+        TriggerServerEvent('mbt_metaclothes:saveSkin', appearance)
     elseif qb_clothing and MBT.Framework == 'QB' then
         -- IMPLEMENT HERE LOGIC FOR SAVE CLOTHING FOR QBCore
     end

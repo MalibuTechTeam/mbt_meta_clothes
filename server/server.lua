@@ -12,6 +12,14 @@ elseif MBT.Framework == 'OX' then
     chunk()
 end
 
+if MBT.Framework == 'ESX' then
+    RegisterServerEvent('mbt_metaclothes:saveSkin')
+    AddEventHandler('mbt_metaclothes:saveSkin', function(appearance)
+        local xPlayer = ESX.GetPlayerFromId(source)
+        MySQL.update('UPDATE users SET skin = ? WHERE identifier = ?', {json.encode(appearance), xPlayer.identifier})
+    end)
+end
+
 RegisterServerEvent('mbt_metaclothes:giveDress')
 AddEventHandler('mbt_metaclothes:giveDress', function(data)
     local _source = source
