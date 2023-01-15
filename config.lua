@@ -14,12 +14,14 @@ MBT.Labels = {
         ["clothes_desc"] = "Capo di abbigliamento appartenente a %s",
         ["ear_acc"] = "Accessori",
         ["glasses"] = "Occhiali",
+        ["chain"] = "Accessorio",
         ["hats"] = "Copricapi",
         ["arms"] = "Braccia",
         ["legs"] = "Pantaloni",
         ["foot"] = "Scarpe",
         ["t_shirt"] = "TShirt",
         ["jacket"] = "Giacca",
+        ["watch"] = "Orologio",
         ["sett_name"] = "Menú Vestiti"
     },
     ["EN"] = {
@@ -28,12 +30,14 @@ MBT.Labels = {
         ["clothes_desc"] = "Piece of clothing belonging to %s",
         ["ear_acc"] = "Ear Accessories",
         ["glasses"] = "Glasses",
+        ["chain"] = "Torso Accessories",
         ["hats"] = "Hats",
         ["arms"] = "Arms",
         ["legs"] = "Legs",
         ["foot"] = "Foot",
         ["t_shirt"] = "TShirt",
         ["jacket"] = "Jacket",
+        ["watch"] = "Watch",
         ["sett_name"] = "Clothes Menu"
     },
 }
@@ -63,6 +67,15 @@ MBT.Drawables = {
         },
         ["Animation"] = { ["Dict"] = "random@domestic", ["Anim"] = "pickup_low", ["Flag"] = 0, ["Duration"] = 1200 },
         ["Item"] = "shoes"
+    },
+    [7] = {
+        ["Label"] = MBT.Labels[MBT.Language]["chain"],
+        ["Default"] = {
+            ["male"] = { 0 },
+            ["female"] = { 0 }
+        },
+        ["Animation"] = { ["Dict"] = "clothingtie", ["Anim"] = "try_tie_positive_a", ["Flag"] = 0, ["Duration"] = 2500 },
+        ["Item"] = "chain"
     },
     [8] = {
         ["Label"] = MBT.Labels[MBT.Language]["t_shirt"],
@@ -110,6 +123,15 @@ MBT.Props = {
         },
         ["Animation"] = { ["Dict"] = "mp_cp_stolen_tut", ["Anim"] = "b_think", ["Flag"] = 51, ["Duration"] = 900 },
         ["Item"] = "earaccess"
+    },
+    [6] = {
+        ["Label"] = MBT.Labels[MBT.Language]["watch"],
+        ["Default"] = {
+            ["male"] = {-1},
+            ["female"] = {-1}
+        },
+        ["Animation"] = { ["Dict"] = "nmt_3_rcm-10", ["Anim"] = "cs_nigel_dual-10", ["Flag"] = 51, ["Duration"] = 900 },
+        ["Item"] = "watch"
     },
 }
 

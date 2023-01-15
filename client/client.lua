@@ -42,7 +42,6 @@ end)
 
 RegisterNetEvent('mbt_metaclothes:applyKitDress')
 AddEventHandler('mbt_metaclothes:applyKitDress', function(data)
-    json.encode(data, {indent=true})
     for k,v in pairs(data) do
         SetPedComponentVariation(cache.ped or PlayerPedId(), v.index, v.drawable, v.texture, v.palette) 
     end
@@ -314,6 +313,5 @@ if MBT.Debug then
         print("GetPedPropTextureIndex ", GetPedPropTextureIndex(cache.ped or PlayerPedId(), propToCheck))
         print("GetPedPaletteVariation ", GetPedPaletteVariation(cache.ped or PlayerPedId(), propToCheck))
     end, false)
-
 end
 
