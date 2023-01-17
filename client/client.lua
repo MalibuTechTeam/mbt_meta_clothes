@@ -1,5 +1,5 @@
 local ox_appearance = GetResourceState('ox_appearance'):find('start')
-local fivem_appearance = GetResourceState('fivem_appearance'):find('start')
+local fivem_appearance = GetResourceState('fivem-appearance'):find('start')
 local qb_clothing = GetResourceState('qb-clothing'):find('start')
 
 local mbt_inventory  = exports["ox_inventory"]
