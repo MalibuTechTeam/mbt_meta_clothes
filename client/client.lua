@@ -1,11 +1,13 @@
 local ox_appearance = GetResourceState('ox_appearance'):find('start')
 local fivem_appearance = GetResourceState('fivem-appearance'):find('start')
+local illenium_appearance = GetResourceState('illenium-appearance'):find('start')
 local qb_clothing = GetResourceState('qb-clothing'):find('start')
 
 local mbt_inventory  = exports["ox_inventory"]
 local currLang = MBT.Labels[MBT.Language]
 local playerSex
 local isUiBusy = false
+local appearance
 
 if MBT.Framework == 'ESX' then
     ESX = exports['es_extended']:getSharedObject()
@@ -38,26 +40,44 @@ end)
 RegisterNetEvent('mbt_metaclothes:applyDress')
 AddEventHandler('mbt_metaclothes:applyDress', function(data)
     SetPedComponentVariation(cache.ped or PlayerPedId(), data.index, data.drawable, data.texture, data.palette) 
+    saveOutfitCache() 
 end)
 
 RegisterNetEvent('mbt_metaclothes:applyKitDress')
 AddEventHandler('mbt_metaclothes:applyKitDress', function(data)
     for k,v in pairs(data) do
-        SetPedComponentVariation(cache.ped or PlayerPedId(), v.index, v.drawable, v.texture, v.palette) 
+        SetPedComponentVariation(cache.ped or PlayerPedId(), v.index, v.drawable, v.texture, v.palette)
+        saveOutfitCache()  
     end
 end)
 
 RegisterNetEvent('mbt_metaclothes:applyProps')
 AddEventHandler('mbt_metaclothes:applyProps', function(data)
-    SetPedPropIndex(cache.ped or PlayerPedId(), data.index, data.drawable, data.texture, true) 
+    SetPedPropIndex(cache.ped or PlayerPedId(), data.index, data.drawable, data.texture, true)
+    saveOutfitCache()  
 end)
 
 function saveOutfitCache()
-    local appearance = exports['fivem-appearance']:getPedAppearance(cache.ped)
+
+    local function saveSkinIllenium()
+        local pedComponents = exports['illenium-appearance']:getPedComponents(cache.ped)
+        local pedProps = exports['illenium-appearance']:getPedProps(cache.ped)
+    
+        exports['illenium-appearance']:setPedComponents(cache.ped, pedComponents)
+        exports['illenium-appearance']:setPedProps(cache.ped,pedProps)
+    
+        appearance = exports['illenium-appearance']:getPedAppearance(cache.ped)
+        TriggerServerEvent("illenium-appearance:server:saveAppearance", appearance)
+    end
+
     if ox_appearance then
+        appearance = exports['fivem-appearance']:getPedAppearance(cache.ped)
         TriggerServerEvent('ox_appearance:save', appearance)
     elseif fivem_appearance and MBT.Framework == 'ESX' then
+        appearance = exports['fivem-appearance']:getPedAppearance(cache.ped)
         TriggerServerEvent('mbt_metaclothes:saveSkin', appearance)
+    elseif illenium_appearance and MBT.Framework == 'ESX' then
+        saveSkinIllenium()
     elseif qb_clothing and MBT.Framework == 'QB' then
         -- IMPLEMENT HERE LOGIC FOR SAVE CLOTHING FOR QBCore
     end
