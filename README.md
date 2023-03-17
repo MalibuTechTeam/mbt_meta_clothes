@@ -247,7 +247,7 @@ end)
 - Turn clothes into items and swap them with your friends
 - ESX compatible (Tested with ESX Legacy)
 - Ox Core compatible
-- QB Core compatible
+- QB Core compatible(if you have ox_inventory)
 - Optimized for low CPU usage
 - Customizable labels
 - Customizable notify system
