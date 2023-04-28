@@ -13,15 +13,13 @@ elseif MBT.Framework == 'OX' then
 end
 
 if MBT.Framework == 'ESX' then
-    RegisterServerEvent('mbt_metaclothes:saveSkin')
-    AddEventHandler('mbt_metaclothes:saveSkin', function(appearance)
+    RegisterNetEvent('mbt_metaclothes:saveSkin', function(appearance)
         local xPlayer = ESX.GetPlayerFromId(source)
         MySQL.update('UPDATE users SET skin = ? WHERE identifier = ?', {json.encode(appearance), xPlayer.identifier})
     end)
 end
 
-RegisterServerEvent('mbt_metaclothes:giveDress')
-AddEventHandler('mbt_metaclothes:giveDress', function(data)
+RegisterNetEvent('mbt_metaclothes:giveDress', function(data)
     local _source = source
     local xPlayer = (MBT.Framework == "OX" and Ox.GetPlayer(_source)) or (MBT.Framework == "ESX" and ESX.GetPlayerFromId(_source)) or (MBT.Framework == "QB" and QBCore.Functions.GetPlayer(_source))
     if xPlayer then
@@ -30,8 +28,7 @@ AddEventHandler('mbt_metaclothes:giveDress', function(data)
     end
 end)
 
-RegisterServerEvent('mbt_metaclothes:giveDressKit')
-AddEventHandler('mbt_metaclothes:giveDressKit', function(data)
+RegisterNetEvent('mbt_metaclothes:giveDressKit', function(data)
     local _source = source
     local xPlayer = (MBT.Framework == "OX" and Ox.GetPlayer(_source)) or (MBT.Framework == "ESX" and ESX.GetPlayerFromId(_source)) or (MBT.Framework == "QB" and QBCore.Functions.GetPlayer(_source))
 
@@ -53,8 +50,7 @@ AddEventHandler('mbt_metaclothes:giveDressKit', function(data)
 
 end)
 
-RegisterServerEvent('mbt_metaclothes:giveProp')
-AddEventHandler('mbt_metaclothes:giveProp', function(data)
+RegisterNetEvent('mbt_metaclothes:giveProp', function(data)
     local _source = source
 
     local xPlayer = (MBT.Framework == "OX" and Ox.GetPlayer(_source)) or (MBT.Framework == "ESX" and ESX.GetPlayerFromId(_source)) or (MBT.Framework == "QB" and QBCore.Functions.GetPlayer(_source))

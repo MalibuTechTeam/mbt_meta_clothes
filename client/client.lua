@@ -8,9 +8,29 @@ local currLang = MBT.Labels[MBT.Language]
 local playerSex
 local isUiBusy = false
 local appearance
+local playerClothes = {}
+local playerWearing = { Drawables = {}, Props = {} }
+
+function updatePlayerClothes()
+    local playerPed = cache.ped or PlayerPedId()
+
+    for k,v in pairs(MBT.Drawables) do
+        playerWearing["Drawables"][k] = GetPedDrawableVariation(playerPed, k)
+    end
+    
+    for k,v in pairs(MBT.Props) do
+        playerWearing["Props"][k] = GetPedPropIndex(playerPed, k)
+    end
+end
 
 if MBT.Framework == 'ESX' then
     ESX = exports['es_extended']:getSharedObject()
+
+    AddEventHandler('esx:loadingScreenOff', function()
+        while not ESX.IsPlayerLoaded() do Wait(200) end
+        updatePlayerClothes()
+    end)
+
 elseif MBT.Framework == 'QB' then
     QBCore = exports['qb-core']:GetCoreObject()
 elseif MBT.Framework == 'OX' then
@@ -19,6 +39,14 @@ elseif MBT.Framework == 'OX' then
     local chunk = assert(load(import, ('@@ox_core/%s'):format(file)))
     chunk()
 end
+
+AddEventHandler('onResourceStart', function(resourceName)
+	if (GetCurrentResourceName() == resourceName) then
+		if NetworkIsPlayerActive(PlayerId()) then
+            updatePlayerClothes()
+		end
+	end
+end)
 
 RegisterNUICallback('handleDress', function(data, cb)
     if data.Index == 8 then handleTorsoUndress() else handleUndress(data.Index) end
@@ -57,8 +85,47 @@ AddEventHandler('mbt_metaclothes:applyProps', function(data)
     saveOutfitCache()  
 end)
 
-function saveOutfitCache()
+function handleTopDress(data)
+    local canWear = true
 
+    for k,v in pairs(data.index) do
+        if type(v) == "table" and k ~= "Arms" then
+            if not tableContainsValue({table = MBT[data.type][v.index]["Default"][data.pedSex], value = playerWearing["Drawables"][v.index]}) then
+                canWear = false
+                break
+            end
+        end
+    end
+
+    return canWear
+end
+
+RegisterNetEvent('mbt_metaclothes:checkDress')
+AddEventHandler('mbt_metaclothes:checkDress', function(data)
+    data.pedSex = data.sex == "m" and "male" or "female"
+    local currentTopDress = {}
+    local isDefault = true
+
+    updatePlayerClothes()
+
+    if type(data.index) =="table" and data.index["Arms"] then
+        isDefault = handleTopDress(data)
+    else
+        assert(MBT[data.type][data.index]["Default"][data.pedSex] and type(MBT[data.type][data.index]["Default"][data.pedSex]) == "table", "Invalid value or wrong type for key " ..data.index)
+        
+        if not tableContainsValue({table = MBT[data.type][data.index]["Default"][data.pedSex], value = playerWearing[data.type][data.index]}) then
+            isDefault = false
+        end
+    
+    end
+    
+    assert(data.cb ,"The callback does not exist or is not a function, check your item declaration")
+
+    data.cb(isDefault)
+end)
+
+function saveOutfitCache()
+    
     local function saveSkinIllenium()
         local pedComponents = exports['illenium-appearance']:getPedComponents(cache.ped)
         local pedProps = exports['illenium-appearance']:getPedProps(cache.ped)
@@ -109,55 +176,55 @@ function handleProps(propIndex)
 end
 
 function handleTorsoUndress()
-    local playerSex = getPedSex(cache.ped or PlayerPedId()) 
-    local Arms = {Index = 3, Drawable = GetPedDrawableVariation(cache.ped or PlayerPedId(), 3)}
-    local Tshirt = {Index = 8, Drawable = GetPedDrawableVariation(cache.ped or PlayerPedId(), 8)}
-    local Jacket = {Index = 11, Drawable = GetPedDrawableVariation(cache.ped or PlayerPedId(), 11)}
+    local playerSex = getPedSex(cache.ped or PlayerPedId())
 
     local topDressData = {
         Item = "topdress",
         Sex = playerSex,
         Kit = {
             Arms = {
-                Index = Arms.Index,
-                Drawable = Arms.Drawable,
-                Texture  = GetPedTextureVariation(cache.ped or PlayerPedId(), Arms.Index),
-                Palette =  GetPedPaletteVariation(cache.ped or PlayerPedId(), Arms.Index)
+                Index = 3,
+                Drawable = GetPedDrawableVariation(cache.ped or PlayerPedId(), 3),
+                Texture  = GetPedTextureVariation(cache.ped or PlayerPedId(), 3),
+                Palette =  GetPedPaletteVariation(cache.ped or PlayerPedId(), 3)
             },
             Tshirt = {
-                Index = Tshirt.Index,
-                Drawable = Tshirt.Drawable,
-                Texture  = GetPedTextureVariation(cache.ped or PlayerPedId(), Tshirt.Index),
-                Palette =  GetPedPaletteVariation(cache.ped or PlayerPedId(), Tshirt.Index)
+                Index = 8,
+                Drawable = GetPedDrawableVariation(cache.ped or PlayerPedId(), 8),
+                Texture  = GetPedTextureVariation(cache.ped or PlayerPedId(), 8),
+                Palette =  GetPedPaletteVariation(cache.ped or PlayerPedId(), 8),
+                isAnimated = true
             },
             Jacket = {
-                Index = Jacket.Index,
-                Drawable = Jacket.Drawable,
-                Texture  = GetPedTextureVariation(cache.ped or PlayerPedId(), Jacket.Index),
-                Palette =  GetPedPaletteVariation(cache.ped or PlayerPedId(), Jacket.Index)
+                Index = 11,
+                Drawable = GetPedDrawableVariation(cache.ped or PlayerPedId(), 11),
+                Texture  = GetPedTextureVariation(cache.ped or PlayerPedId(), 11),
+                Palette =  GetPedPaletteVariation(cache.ped or PlayerPedId(), 11)
             }
         }
     }
 
-    if isAbleToUndress({Type = "Drawables", Index = Tshirt.Index, Drawable = Tshirt.Drawable}) then
+    if isAbleToUndress({Type = "Drawables", Index = topDressData["Kit"]["Tshirt"]["Index"], Drawable = topDressData["Kit"]["Tshirt"]["Drawable"]}) then
+
         setDefaultVariation({
             isAnimated = true,
             Player = cache.ped or PlayerPedId(),
             Sex = playerSex,
-            Index = Tshirt.Index
+            Index = topDressData["Kit"]["Tshirt"]["Index"]
         })
         setDefaultVariation({
             isAnimated = false,
             Player = cache.ped or PlayerPedId(),
             Sex = playerSex,
-            Index = Arms.Index
+            Index = topDressData["Kit"]["Arms"]["Index"]
         })
         setDefaultVariation({
             isAnimated = false,
             Player = cache.ped or PlayerPedId(),
             Sex = playerSex,
-            Index = Jacket.Index
+            Index = topDressData["Kit"]["Jacket"]["Index"]
         })
+      
         TriggerServerEvent("mbt_metaclothes:giveDressKit", topDressData)
     else
         MBT.NotifyHandler(currLang["nothing_to_unwear"], "error")  
@@ -333,5 +400,15 @@ if MBT.Debug then
         print("GetPedPropTextureIndex ", GetPedPropTextureIndex(cache.ped or PlayerPedId(), propToCheck))
         print("GetPedPaletteVariation ", GetPedPaletteVariation(cache.ped or PlayerPedId(), propToCheck))
     end, false)
+    
+    RegisterCommand("pcloth", function(source, args) 
+        for k,v in pairs(playerWearing["Drawables"]) do
+            print(k, v)
+        end
+        for k,v in pairs(playerWearing["Props"]) do
+            print(k, v)
+        end
+    end, false)
+   
 end
 
