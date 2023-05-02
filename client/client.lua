@@ -3,42 +3,12 @@ local fivem_appearance = GetResourceState('fivem-appearance'):find('start')
 local illenium_appearance = GetResourceState('illenium-appearance'):find('start')
 local qb_clothing = GetResourceState('qb-clothing'):find('start')
 
-local mbt_inventory  = exports["ox_inventory"]
 local currLang = MBT.Labels[MBT.Language]
 local playerSex
 local isUiBusy = false
 local appearance
 local playerClothes = {}
 local playerWearing = { Drawables = {}, Props = {} }
-
-function updatePlayerClothes()
-    local playerPed = cache.ped or PlayerPedId()
-
-    for k,v in pairs(MBT.Drawables) do
-        playerWearing["Drawables"][k] = GetPedDrawableVariation(playerPed, k)
-    end
-    
-    for k,v in pairs(MBT.Props) do
-        playerWearing["Props"][k] = GetPedPropIndex(playerPed, k)
-    end
-end
-
-if MBT.Framework == 'ESX' then
-    ESX = exports['es_extended']:getSharedObject()
-
-    AddEventHandler('esx:loadingScreenOff', function()
-        while not ESX.IsPlayerLoaded() do Wait(200) end
-        updatePlayerClothes()
-    end)
-
-elseif MBT.Framework == 'QB' then
-    QBCore = exports['qb-core']:GetCoreObject()
-elseif MBT.Framework == 'OX' then
-    local file = ('imports/%s.lua'):format(IsDuplicityVersion() and 'server' or 'client')
-    local import = LoadResourceFile('ox_core', file)
-    local chunk = assert(load(import, ('@@ox_core/%s'):format(file)))
-    chunk()
-end
 
 AddEventHandler('onResourceStart', function(resourceName)
 	if (GetCurrentResourceName() == resourceName) then
@@ -85,6 +55,18 @@ AddEventHandler('mbt_metaclothes:applyProps', function(data)
     saveOutfitCache()  
 end)
 
+function updatePlayerClothes()
+    local playerPed = cache.ped or PlayerPedId()
+
+    for k,v in pairs(MBT.Drawables) do
+        playerWearing["Drawables"][k] = GetPedDrawableVariation(playerPed, k)
+    end
+    
+    for k,v in pairs(MBT.Props) do
+        playerWearing["Props"][k] = GetPedPropIndex(playerPed, k)
+    end
+end
+
 function handleTopDress(data)
     local canWear = true
 
@@ -116,11 +98,9 @@ AddEventHandler('mbt_metaclothes:checkDress', function(data)
         if not tableContainsValue({table = MBT[data.type][data.index]["Default"][data.pedSex], value = playerWearing[data.type][data.index]}) then
             isDefault = false
         end
-    
     end
-    
-    assert(data.cb ,"The callback does not exist or is not a function, check your item declaration")
 
+    assert(data.cb ,"The callback does not exist or is not a function, check your item declaration")
     data.cb(isDefault)
 end)
 
@@ -361,7 +341,6 @@ end, false)
 RegisterKeyMapping('toggleUndress', currLang["sett_name"], 'keyboard', MBT.MenuKey)
 
 if MBT.Debug then
-    
     RegisterCommand("setprop", function(source, args) 
         local propToSet = tonumber(args[1]) or 0
         local propDrawToSet = tonumber(args[2]) or 0
@@ -409,6 +388,5 @@ if MBT.Debug then
             print(k, v)
         end
     end, false)
-   
 end
 

@@ -1,11 +1,20 @@
 MBT = {}
-MBT.Debug = false
 
-MBT.Language = "EN"
+MBT.Debug     = false
+MBT.Language  = "EN"
+MBT.Framework = "ESX" -- OX/ESX/QB
+MBT.MenuKey   = "J"
 
-MBT.Framework = "OX" -- OX/ESX/QB
+MBT.NotifyHandler = function(text, type)
+    --[[
+        text = "Lorem Ipsum"
+        type = "error" / "info" / "warning"
+    ]]
 
-MBT.MenuKey = "J"
+   -- Put your notify here 
+   -- Notify({ msg = text, title = "Clothes", style = "dark", type = type or "error", icon = "fa-solid fa-campground", position = "bottom-right", duration = 5000, sound = type or "error" })
+
+end
 
 MBT.Labels = {
     ["IT"] = {
@@ -134,15 +143,3 @@ MBT.Props = {
         ["Item"] = "watch"
     },
 }
-
-
-MBT.NotifyHandler = function(text, type)
-    --[[
-        text = "Lorem Ipsum"
-        type = "error" / "info" / "warning"
-    ]]
-
-   -- Put your notify here 
-   -- Notify({ msg = text, title = "Clothes", style = "dark", type = type or "error", icon = "fa-solid fa-campground", position = "bottom-right", duration = 5000, sound = type or "error" })
-
-end
