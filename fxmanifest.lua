@@ -15,19 +15,24 @@ dependencies {
 	'/onesync'
 }
 
-ui_page "html/index.html"
+ui_page "web/index.html"
 
 files {
-    "html/index.html",
-    "html/style.css",
-    "html/index.js",
+    "web/index.html",
+    "web/style.css",
+    "web/index.js",
 }
 
 shared_scripts {
     '@ox_lib/init.lua',
     "config.lua",
-    "bridge/**/client.lua",
-    "bridge/**/server.lua",
+    "modules/bridge/**/client.lua",
+    "modules/bridge/**/server.lua",
+    "modules/functions/**/client.lua"
+}
+
+client_scripts {
+    "client/*.lua"
 }
 
 server_scripts {
@@ -35,6 +40,4 @@ server_scripts {
     "server/*.lua"
 }
 
-client_scripts {
-    "client/*.lua"
-}
+
