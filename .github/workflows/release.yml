@@ -54,8 +54,8 @@ jobs:
         run: |
           mkdir -p ./temp/mbt_meta_clothes
           cp ./{README.md,config.lua,fxmanifest.lua} ./temp/mbt_meta_clothes
-          cp -r ./{web,modules} ./temp/mbt_meta_clothes
-          cd ./temp && zip -r ../mbt_malisling.zip ./mbt_meta_clothes
+          cp -r ./{web,modules,item_image} ./temp/mbt_meta_clothes
+          cd ./temp && zip -r ../mbt_meta_clothes.zip ./mbt_meta_clothes
 
       - name: Create Release
         uses: "marvinpinto/action-automatic-releases@v1.2.1"

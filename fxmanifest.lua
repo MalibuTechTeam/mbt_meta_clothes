@@ -24,20 +24,18 @@ files {
 }
 
 shared_scripts {
-    '@ox_lib/init.lua',
+    -- '@ox_lib/init.lua',
     "config.lua",
+}
+
+client_scripts{
     "modules/bridge/**/client.lua",
+    "modules/functions/**/client.lua",
+    "modules/core/**/client.lua",
+}
+
+server_scripts{
+    "modules/core/**/server.lua",
     "modules/bridge/**/server.lua",
-    "modules/functions/**/client.lua"
+    "modules/functions/**/server.lua"
 }
-
-client_scripts {
-    "client/*.lua"
-}
-
-server_scripts {
-    '@oxmysql/lib/MySQL.lua',
-    "server/*.lua"
-}
-
-
