@@ -26,26 +26,26 @@ end)
 
 RegisterNetEvent('mbt_metaclothes:applyDress')
 AddEventHandler('mbt_metaclothes:applyDress', function(data)
-    SetPedComponentVariation(PlayerPedId() or PlayerPedId(), data.index, data.drawable, data.texture, data.palette) 
+    SetPedComponentVariation(PlayerPedId(), data.index, data.drawable, data.texture, data.palette) 
     saveOutfit() 
 end)
 
 RegisterNetEvent('mbt_metaclothes:applyKitDress')
 AddEventHandler('mbt_metaclothes:applyKitDress', function(data)
     for k,v in pairs(data) do
-        SetPedComponentVariation(PlayerPedId() or PlayerPedId(), v.index, v.drawable, v.texture, v.palette)
+        SetPedComponentVariation(PlayerPedId(), v.index, v.drawable, v.texture, v.palette)
         saveOutfit()  
     end
 end)
 
 RegisterNetEvent('mbt_metaclothes:applyProps')
 AddEventHandler('mbt_metaclothes:applyProps', function(data)
-    SetPedPropIndex(PlayerPedId() or PlayerPedId(), data.index, data.drawable, data.texture, true)
+    SetPedPropIndex(PlayerPedId(), data.index, data.drawable, data.texture, true)
     saveOutfit()  
 end)
 
 RegisterCommand("toggleUndress", function()
-    if IsPedOnFoot(PlayerPedId() or PlayerPedId()) and not IsPedDeadOrDying(PlayerPedId() or PlayerPedId(), false) and not IsPedCuffed(PlayerPedId() or PlayerPedId()) then
+    if IsPedOnFoot(PlayerPedId()) and not IsPedDeadOrDying(PlayerPedId(), false) and not IsPedCuffed(PlayerPedId()) then
         SetNuiFocus(true, true)
         SendNUIMessage({action = "ui", status = true})
     end
@@ -61,9 +61,9 @@ if MBT.Debug then
         print("Prop check ", propDrawToSet)
 
         if propToSet == -1 then
-            ClearPedProp(PlayerPedId() or PlayerPedId(), 0)
+            ClearPedProp(PlayerPedId(), 0)
         else
-            SetPedPropIndex(PlayerPedId() or PlayerPedId(), 0, propToSet, propDrawToSet, true)
+            SetPedPropIndex(PlayerPedId(), 0, propToSet, propDrawToSet, true)
         end
     end, false)
 
@@ -72,25 +72,25 @@ if MBT.Debug then
         local drawIndex = tonumber(args[2])
         local texture = tonumber(args[3]) or 0
         local palette = tonumber(args[4]) or 0
-        SetPedComponentVariation(PlayerPedId() or PlayerPedId(), drawToSet, drawIndex, texture, palette) 
+        SetPedComponentVariation(PlayerPedId(), drawToSet, drawIndex, texture, palette) 
     end, false)
 
     RegisterCommand("getdraw", function(source, args) 
         local drawToCheck = tonumber(args[1]) or 0
         print("Drawable check ", drawToCheck)
     
-        print(MBT.Drawables[drawToCheck]["Label"]..": ", GetPedDrawableVariation(PlayerPedId() or PlayerPedId(), drawToCheck))
-        print("GetPedTextureVariation ", GetPedTextureVariation(PlayerPedId() or PlayerPedId(), drawToCheck))
-        print("GetPedPaletteVariation ", GetPedPaletteVariation(PlayerPedId() or PlayerPedId(), drawToCheck))
+        print(MBT.Drawables[drawToCheck]["Label"]..": ", GetPedDrawableVariation(PlayerPedId(), drawToCheck))
+        print("GetPedTextureVariation ", GetPedTextureVariation(PlayerPedId(), drawToCheck))
+        print("GetPedPaletteVariation ", GetPedPaletteVariation(PlayerPedId(), drawToCheck))
     end, false)
 
     RegisterCommand("getprop", function(source, args) 
         local propToCheck = tonumber(args[1]) or 0
         print("Prop check ", propToCheck)
         
-        print(MBT.Props[propToCheck]["Label"]..": ", GetPedPropIndex(PlayerPedId() or PlayerPedId(), propToCheck))
-        print("GetPedPropTextureIndex ", GetPedPropTextureIndex(PlayerPedId() or PlayerPedId(), propToCheck))
-        print("GetPedPaletteVariation ", GetPedPaletteVariation(PlayerPedId() or PlayerPedId(), propToCheck))
+        print(MBT.Props[propToCheck]["Label"]..": ", GetPedPropIndex(PlayerPedId(), propToCheck))
+        print("GetPedPropTextureIndex ", GetPedPropTextureIndex(PlayerPedId(), propToCheck))
+        print("GetPedPaletteVariation ", GetPedPaletteVariation(PlayerPedId(), propToCheck))
     end, false)
     
     RegisterCommand("pcloth", function(source, args) 
