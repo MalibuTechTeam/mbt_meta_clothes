@@ -34,19 +34,19 @@ AddEventHandler('mbt_metaclothes:checkDress', function(data)
 end)
 
 local function saveSkinIllenium()
-    local pedComponents = exports['illenium-appearance']:getPedComponents(cache.ped)
-    local pedProps = exports['illenium-appearance']:getPedProps(cache.ped)
+    local pedComponents = exports['illenium-appearance']:getPedComponents(PlayerPedId())
+    local pedProps = exports['illenium-appearance']:getPedProps(PlayerPedId())
 
-    exports['illenium-appearance']:setPedComponents(cache.ped, pedComponents)
-    exports['illenium-appearance']:setPedProps(cache.ped,pedProps)
+    exports['illenium-appearance']:setPedComponents(PlayerPedId(), pedComponents)
+    exports['illenium-appearance']:setPedProps(PlayerPedId(),pedProps)
 
-    appearance = exports['illenium-appearance']:getPedAppearance(cache.ped)
+    appearance = exports['illenium-appearance']:getPedAppearance(PlayerPedId())
     TriggerServerEvent("illenium-appearance:server:saveAppearance", appearance)
 end
 
 function saveOutfit()
     if isFivemAppearance then 
-        appearance = exports['fivem-appearance']:getPedAppearance(cache.ped)
+        appearance = exports['fivem-appearance']:getPedAppearance(PlayerPedId())
         TriggerServerEvent('mbt_metaclothes:saveSkin', appearance)
     end
 

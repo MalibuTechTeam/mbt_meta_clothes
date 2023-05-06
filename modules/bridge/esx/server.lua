@@ -11,7 +11,7 @@ function giveDress(data)
     local xPlayer = ESX.GetPlayerFromId(source)
     if xPlayer then
         local playerIdentity = xPlayer.getName()
-        exports.ox_inventory:AddItem(xPlayer.source, data.Item, 1 , {description = MBT.Labels[MBT.Language]["clothes_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, palette = data.Palette})
+        exports.ox_inventory:AddItem(xPlayer.source, data.Item, 1 , {description = MBT.Labels["clothes_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, palette = data.Palette})
     end
 end
 
@@ -19,7 +19,7 @@ function giveDressKit(data)
     local xPlayer = ESX.GetPlayerFromId(source)
     if xPlayer then
         local playerIdentity = xPlayer.getName()
-        local metadata = {description = MBT.Labels[MBT.Language]["clothes_desc"]:format(playerIdentity), sex = data.Sex}
+        local metadata = {description = MBT.Labels["clothes_desc"]:format(playerIdentity), sex = data.Sex}
 
         for k,v in pairs(data.Kit) do
             metadata[tostring(k)] = {}
@@ -38,6 +38,6 @@ function giveProp(data)
     local xPlayer = ESX.GetPlayerFromId(source)
     if xPlayer then
         local playerIdentity = xPlayer.getName()
-        exports.ox_inventory:AddItem(xPlayer.source, data.Item, 1 , {description = MBT.Labels[MBT.Language]["props_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture})
+        exports.ox_inventory:AddItem(xPlayer.source, data.Item, 1 , {description = MBT.Labels["props_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture})
     end
 end
