@@ -6,18 +6,21 @@ local isQBInventory = GetResourceState('qb-inventory'):find('start')
 local isOXInventory = GetResourceState('ox_inventory'):find('start')
 
 function giveDress(data)
-    local xPlayer = QBCore.Functions.GetPlayer(source)
-    if xPlayer then
-        local playerIdentity = xPlayer.PlayerData.name
-        ox_inventory:AddItem(source, data.Item, 1 , {description = currLang["clothes_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, palette = data.Palette})
+    local player = QBCore.Functions.GetPlayer(source)
+    if player then
+        local playerIdentity = player.PlayerData.name
+        if isOXInventory then exports.ox_inventory:AddItem(source, data.Item, 1 , {description = MBT.Labels["clothes_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, palette = data.Palette}); return end
+        if isQBInventory then player.Functions.AddItem(data.Item, 1, false, {description = MBT.Labels["clothes_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, palette = data.Palette}); TriggerEvent("inventory:client:ItemBox", QBCore.Shared.Items[data.Item], "add"); return end
+        assert((MBT.CustomInventory) == "function", printWarning())
+        MBT.CustomInventory(data.Item, {description = MBT.Labels["clothes_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, palette = data.Palette})
     end
 end
 
 function giveDressKit(data)
-    local xPlayer = QBCore.Functions.GetPlayer(source)
-    if xPlayer then
-        local playerIdentity = xPlayer.PlayerData.name
-        local metadata = {description = currLang["clothes_desc"]:format(playerIdentity), sex = data.Sex}
+    local player = QBCore.Functions.GetPlayer(source)
+    if player then
+        local playerIdentity = player.PlayerData.name
+        local metadata = {description = MBT.Labels["clothes_desc"]:format(playerIdentity), sex = data.Sex}
 
         for k,v in pairs(data.Kit) do
             metadata[tostring(k)] = {}
@@ -28,14 +31,25 @@ function giveDressKit(data)
         end
 
         Wait(100)
-        ox_inventory:AddItem(source, data.Item, 1, metadata)
+        if isOXInventory then ox_inventory:AddItem(player.PlayerData.source, data.Item, 1, metadata) return end
+        if isQBInventory then player.Functions.AddItem(data.Item, 1, false, metadata); TriggerEvent("inventory:client:ItemBox", QBCore.Shared.Items[data.Item], "add"); return end
+        assert((MBT.CustomInventory) == 'function', printWarning())
+        MBT.CustomInventory(data.Item, metadata)
     end
 end
 
 function giveProp(data)
-    local xPlayer = QBCore.Functions.GetPlayer(source)
-    if xPlayer then
-        local playerIdentity = xPlayer.PlayerData.name
-        ox_inventory:AddItem(source, data.Item, 1 , {description = currLang["props_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture})
+    local player = QBCore.Functions.GetPlayer(source)
+    if player then
+        local playerIdentity = player.PlayerData.name
+        if isOXInventory then ox_inventory:AddItem(player.PlayerData.source, data.Item, 1 , {description = MBT.Labels["props_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture}) return end
+        if isQBInventory then player.Functions.AddItem(data.Item, 1, false, {description = MBT.Labels["props_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture}); TriggerEvent("inventory:client:ItemBox", QBCore.Shared.Items[data.Item], "add"); return end
+        assert((MBT.CustomInventory) == 'function', printWarning())
+        MBT.CustomInventory(data.Item, {description = MBT.Labels["props_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture})
     end
+end
+
+function printWarning()
+    print("~r~ You are using a different type of inventory, please remember to fill the custom events on the config.If you have problems contact us on Discord: https://discord.gg/tqk3kAEr4f")
+    return
 end
