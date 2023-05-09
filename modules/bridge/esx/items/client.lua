@@ -1,7 +1,7 @@
-if GetResourceState('qb-core') ~= 'started' then return end
+if GetResourceState('es_extended') ~= 'started' then return end
 if GetResourceState('ox_inventory') ~= 'started' then return end
 
-QBCore = exports['qb-core']:GetCoreObject()
+ESX = exports.es_extended:getSharedObject()
 
 Drawables = {'topdress', 'trousers', 'shoes', 'chain'}
 Props     = {'watch', 'hat', 'glasses', 'earaccess'}
@@ -9,8 +9,8 @@ Props     = {'watch', 'hat', 'glasses', 'earaccess'}
 for i = 1, #Drawables do
     if Drawables[i] == 'topdress' then
         exports(Drawables[i], function(data, slot)
-            local playerSex = QBCore.Functions.GetPlayerData().charinfo.gender
-            local sexLabel = playerSex == 0 and "male" or "female"
+            local playerSex = ESX.PlayerData.sex
+            local sexLabel = playerSex == "m" and "male" or "female"
 
             if sexLabel ~= slot.metadata.sex then
                 MBT.NotifyHandler(MBT.Labels["wrong_sex"]..sexLabel, "error")        
@@ -36,8 +36,8 @@ for i = 1, #Drawables do
         end)
     else
         exports(Drawables[i], function(data, slot)
-            local playerSex = QBCore.Functions.GetPlayerData().charinfo.gender
-            local sexLabel = playerSex == 0 and "male" or "female"
+            local playerSex = ESX.PlayerData.sex
+            local sexLabel = playerSex == "m" and "male" or "female"
 
             if sexLabel ~= slot.metadata.sex then
                 MBT.NotifyHandler(MBT.Labels["wrong_sex"]..sexLabel, "error")     
@@ -66,8 +66,8 @@ end
 
 for i = 1, #Props do
     exports(Props[i], function(data, slot)
-        local playerSex = QBCore.Functions.GetPlayerData().charinfo.gender
-        local sexLabel = playerSex == 0 and "male" or "female"
+        local playerSex = ESX.PlayerData.sex
+        local sexLabel = playerSex == "m" and "male" or "female"
        
         if sexLabel ~= slot.metadata.sex then
             MBT.NotifyHandler(MBT.Labels["wrong_sex"]..sexLabel, "error")     

@@ -36,7 +36,9 @@ MBT.Labels = {
     ["t_shirt"] = "TShirt",
     ["jacket"] = "Jacket",
     ["watch"] = "Watch",
-    ["sett_name"] = "Clothes Menu"
+    ["sett_name"] = "Clothes Menu",
+    ["wrong_sex"] = "This piece of clothing is not for ",
+    ["undress"] = "You must first undress",
 }
 
 MBT.Drawables = {
