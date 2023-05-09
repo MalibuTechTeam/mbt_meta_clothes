@@ -2,11 +2,7 @@
   <img src="https://dunb17ur4ymx4.cloudfront.net/wysiwyg/1131066/1fe58a9651a48982397fb7d9ec82bfd4aa26d036.png" width="500"/>
 </div>
 
-MBT Meta Clothes take advantage of ox_inventory metadata feature giving you the possibility to turn your clothes into unique items. Undress yourself using a clean and simple NUI and have fun swapping your outfits with your friends!
-
-### Dependencies:
-* [ox_inventory](https://github.com/overextended/ox_inventory)
-* [ox_lib](https://github.com/overextended/ox_lib)
+MBT Meta Clothes take advantage of inventory metadata feature giving you the possibility to turn your clothes into unique items. Undress yourself using a clean and simple NUI and have fun swapping your outfits with your friends!
 
 ### ⚠️Important:
 Add to your items the following ones (customize the settings to fit your needs) DO NOT CHANGE THE ITEMS NAME!
@@ -19,7 +15,7 @@ Remember to check and change if needed the ```Default``` clothes in ```MBT.Drawa
 ## ox_inventory/data/items.lua
 
 ```
-['topdress'] = {
+	['topdress'] = {
 		label 		= 'Top Dress',
 		description = 'YOUR_DESCRIPTION',
 		weight 		= 100,
@@ -28,20 +24,11 @@ Remember to check and change if needed the ```Default``` clothes in ```MBT.Drawa
 		client = {
 			anim = { dict = 'clothingshirt', clip = 'try_shirt_positive_d', flag = 51 },
 			usetime = 1200,
-		}
+			export = 'mbt_meta_clothes.topdress'
+		},
 	},
-  ['jacket'] = {
-		label 		= 'Jacket',
-		description = 'YOUR_DESCRIPTION',
-		weight 		= 100,
-		stack 		= true,
-		close 		= true,
-		client = {
-			anim = { dict = 'clothingshirt', clip = 'try_shirt_positive_d', flag = 51 },
-			usetime = 1200,
-		}
-	},
-  ['trousers'] = {
+
+  	['trousers'] = {
 		label 		= 'Trousers',
 		description = 'YOUR_DESCRIPTION',
 		weight 		= 100,
@@ -50,9 +37,11 @@ Remember to check and change if needed the ```Default``` clothes in ```MBT.Drawa
 		client = {
 			anim = { dict = 're@construction', clip = 'out_of_breath', flag = 51 },
 			usetime = 1200,
+			export = 'mbt_meta_clothes.trousers'
 		}
 	},
-  ['shoes'] = {
+
+  	['shoes'] = {
 		label 		= 'Shoes',
 		description = 'YOUR_DESCRIPTION',
 		weight 		= 100,
@@ -61,9 +50,11 @@ Remember to check and change if needed the ```Default``` clothes in ```MBT.Drawa
 		client = {
 			anim = { dict = 'random@domestic', clip = 'pickup_low', flag = 0 },
 			usetime = 1200,
+			export = 'mbt_meta_clothes.shoes'
 		}
 	},
-  ['hat'] = {
+
+  	['hat'] = {
 		label 		= 'Hat',
 		description = 'YOUR_DESCRIPTION',
 		weight 		= 100,
@@ -72,9 +63,11 @@ Remember to check and change if needed the ```Default``` clothes in ```MBT.Drawa
 		client = {
 			anim = { dict = 'missheist_agency2ahelmet', clip = 'take_off_helmet_stand', flag = 51 },
 			usetime = 1200,
+			export = 'mbt_meta_clothes.hat'
 		}
 	},
-  ['glasses'] = {
+
+  	['glasses'] = {
 		label 		= 'Glasses',
 		description = 'YOUR_DESCRIPTION',
 		weight 		= 100,
@@ -83,9 +76,11 @@ Remember to check and change if needed the ```Default``` clothes in ```MBT.Drawa
 		client = {
 			anim = { dict = 'clothingspecs', clip = 'take_off', flag = 51 },
 			usetime = 1200,
+			export = 'mbt_meta_clothes.glasses'
 		}
 	},
-  ['earaccess'] = {
+
+  	['earaccess'] = {
 		label 		= 'Ear Accessories',
 		description = 'YOUR_DESCRIPTION',
 		weight 		= 100,
@@ -94,254 +89,42 @@ Remember to check and change if needed the ```Default``` clothes in ```MBT.Drawa
 		client = {
 			anim = { dict = 'mp_cp_stolen_tut', clip = 'b_think', flag = 51 },
 			usetime = 1200,
+			export = 'mbt_meta_clothes.earaccess'
 		}
 	},
-  ['chain'] = {
+
+  	['chain'] = {
 		label 		= 'Torso Accessories',
-		description = 'Torso Accessories',
+		description = 'YOUR_DESCRIPTION',
 		weight 		= 100,
 		stack 		= true,
 		close 		= true,
 		client = {
 			anim = { dict = 'clothingtie', clip = 'try_tie_positive_a', flag = 51 },
 			usetime = 2500,
+			export = 'mbt_meta_clothes.chain'
 		}
 	},
-  ['watch'] = {
+
+  	['watch'] = {
 		label 		= 'Watch',
-		description = 'Watch',
+		description = 'YOUR_DESCRIPTION',
 		weight 		= 100,
 		stack 		= true,
 		close 		= true,
 		client = {
 			anim = { dict = 'nmt_3_rcm-10', clip = 'cs_nigel_dual-10', flag = 51 },
 			usetime = 900,
+			export = 'mbt_meta_clothes.watch'
 		}
 	},
   
 ```
-## ox_inventory/modules/items/client.lua
-
-```
-Item('topdress', function(data, slot)
-	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
-	if PlayerData.sex ~= slot.metadata.sex then 
-    	-- Trigger your notify here
-    	-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]
-	end
-
-	TriggerEvent("mbt_metaclothes:checkDress", {
-		type = "Drawables",
-		index = slot.metadata,
-		sex = PlayerData.sex,
-		cb = function(canDress)
-			if not canDress then
-				-- Trigger your notify here
-				return 
-			end 
-			
-			ox_inventory:useItem(data, function(data)
-				if data then
-					TriggerEvent("mbt_metaclothes:applyKitDress", slot.metadata)
-				end
-			end)
-		end
-	})
-end)
-
-Item('trousers', function(data, slot)
-	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
-	if PlayerData.sex ~= slot.metadata.sex then
-	  	-- Trigger your notify here
-    	-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]     
-	end
-  
-	TriggerEvent("mbt_metaclothes:checkDress", {
-		type = "Drawables",
-		index = slot.metadata.index, 
-		sex = PlayerData.sex,
-		cb = function(canDress)
-			if not canDress then
-				-- Trigger your notify here
-				return 
-			end 
-			
-			ox_inventory:useItem(data, function(data)
-				if data then
-					TriggerEvent("mbt_metaclothes:applyDress", slot.metadata)
-				end
-			end)
-		end
-	})
-end)
-
-Item('shoes', function(data, slot)
-	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
-	if PlayerData.sex ~= slot.metadata.sex then
-		-- Trigger your notify here
-    	-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]    
-	end
-	
-	TriggerEvent("mbt_metaclothes:checkDress", {
-		type = "Drawables",
-		index = slot.metadata.index, 
-		sex = PlayerData.sex,
-		cb = function(canDress)
-			if not canDress then
-				-- Trigger your notify here
-				return 
-			end 
-			
-			ox_inventory:useItem(data, function(data)
-				if data then
-					TriggerEvent("mbt_metaclothes:applyDress", slot.metadata)
-				end
-			end)
-		end
-	})
-end)
-
-Item('chain', function(data, slot)
-	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
-	if PlayerData.sex ~= slot.metadata.sex then
-	  	-- Trigger your notify here
-    	-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]     
-	end
-  
-	TriggerEvent("mbt_metaclothes:checkDress", {
-		type = "Props",
-		index = slot.metadata.index, 
-		sex = PlayerData.sex,
-		cb = function(canDress)
-			if not canDress then
-				-- Trigger your notify here
-				return 
-			end 
-			
-			ox_inventory:useItem(data, function(data)
-				if data then
-					TriggerEvent("mbt_metaclothes:applyProps", slot.metadata)
-				end
-			end)
-		end
-	})
-end)
-
-Item('watch', function(data, slot)
-	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
-	if PlayerData.sex ~= slot.metadata.sex then
-		-- Trigger your notify here
-   		-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]   
-	end
-  
-	TriggerEvent("mbt_metaclothes:checkDress", {
-		type = "Props",
-		index = slot.metadata.index, 
-		sex = PlayerData.sex,
-		cb = function(canDress)
-			if not canDress then
-				-- Trigger your notify here
-				return 
-			end 
-			
-			ox_inventory:useItem(data, function(data)
-				if data then
-					TriggerEvent("mbt_metaclothes:applyProps", slot.metadata)
-				end
-			end)
-		end
-	})
-end)
-
-Item('hat', function(data, slot)
-	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
-	if PlayerData.sex ~= slot.metadata.sex then
-		-- Trigger your notify here
-   		-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]   
-	end
-  
-	TriggerEvent("mbt_metaclothes:checkDress", {
-		type = "Props",
-		index = slot.metadata.index, 
-		sex = PlayerData.sex,
-		cb = function(canDress)
-			if not canDress then
-				-- Trigger your notify here
-				return 
-			end 
-			
-			ox_inventory:useItem(data, function(data)
-				if data then
-					TriggerEvent("mbt_metaclothes:applyProps", slot.metadata)
-				end
-			end)
-		end
-	})
-end)
-
-Item('glasses', function(data, slot)
-	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
-	if PlayerData.sex ~= slot.metadata.sex then
-		-- Trigger your notify here
-    	-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]      
-	end
-  
-	TriggerEvent("mbt_metaclothes:checkDress", {
-		type = "Props",
-		index = slot.metadata.index, 
-		sex = PlayerData.sex,
-		cb = function(canDress)
-			if not canDress then
-				-- Trigger your notify here
-				return 
-			end 
-			
-			ox_inventory:useItem(data, function(data)
-				if data then
-					TriggerEvent("mbt_metaclothes:applyProps", slot.metadata)
-				end
-			end)
-		end
-	})
-end)
-
-Item('earaccess', function(data, slot)
-	local sexLabel = { ["m"] = "man", ["f"] = "woman"}
-	if PlayerData.sex ~= slot.metadata.sex then
-		-- Trigger your notify here
-    	-- Text: This piece of clothing is not for "..sexLabel[PlayerData.sex]      
-	end
-  
-	TriggerEvent("mbt_metaclothes:checkDress", {
-		type = "Props",
-		index = slot.metadata.index, 
-		sex = PlayerData.sex,
-		cb = function(canDress)
-			if not canDress then
-				-- Trigger your notify here
-				return 
-			end 
-			
-			ox_inventory:useItem(data, function(data)
-				if data then
-					TriggerEvent("mbt_metaclothes:applyProps", slot.metadata)
-				end
-			end)
-		end
-	})
-end)
-
-
-```
-
-
 
 ## Features
 
 - Turn clothes into items and swap them with your friends
-- ESX compatible (Tested with ESX Legacy)
-- Ox Core compatible
-- QB Core compatible(if you have ox_inventory)
+- ESX,OX, QB compatible
 - Optimized for low CPU usage
 - Customizable labels
 - Customizable notify system
