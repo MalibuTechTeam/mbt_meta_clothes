@@ -28,9 +28,16 @@ AddEventHandler('mbt_metaclothes:checkDress', function(data)
             isDefault = false
         end
     end
+    
+    if isDefault then
+        local dressType    = data.itemInfo.type or data.itemInfo.metadata.type
 
-    assert(data.cb ,"The callback does not exist or is not a function, check your item declaration")
-    data.cb(isDefault)
+        if dressType == 'Drawable' then TriggerEvent("mbt_metaclothes:applyDress", data.itemInfo.metadata) end
+        if dressType == 'Prop'     then TriggerEvent("mbt_metaclothes:applyProps", data.itemInfo.metadata) end
+        if dressType == 'DressKit' then TriggerEvent("mbt_metaclothes:applyKitDress", data.itemInfo) end
+    else
+        MBT.NotifyHandler(MBT.Labels["undress"], "error")    
+    end
 end)
 
 local function saveSkinIllenium()
