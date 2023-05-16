@@ -34,6 +34,7 @@ client_scripts{
 }
 
 server_scripts{
+    "@oxmysql/lib/MySQL.lua",
     "modules/functions/**/server.lua",
     "modules/bridge/**/server.lua",
     "modules/core/**/server.lua",
