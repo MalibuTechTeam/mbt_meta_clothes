@@ -15,12 +15,7 @@ QBCore.Functions.CreateUseableItem('topdress', function(source, item)
         return
     end
 
-    TriggerClientEvent("mbt_metaclothes:checkDress", {
-		type = "Drawables",
-		index = item.info,
-		sex = player.PlayerData.charinfo.gender,
-        itemInfo = item.info
-	})
+    TriggerClientEvent('mbt_meta_clothes:useTopDress', player.PlayerData.source, item.info, player.PlayerData.charinfo.gender, item.info, item)
 end)
 
 QBCore.Functions.CreateUseableItem('trousers', function(source, item)
@@ -35,12 +30,7 @@ QBCore.Functions.CreateUseableItem('trousers', function(source, item)
         return
     end
 
-    TriggerClientEvent("mbt_metaclothes:checkDress", player.PlayerData.source, {
-		type = "Drawables",
-		index = item.info.index,
-		sex = player.PlayerData.charinfo.gender,
-        itemInfo = item.info
-	})
+    TriggerClientEvent('mbt_meta_clothes:useTrousers', player.PlayerData.source, item.info.index, player.PlayerData.charinfo.gender, item.info, item)
 end)
 
 QBCore.Functions.CreateUseableItem('shoes', function(source, item)
@@ -55,12 +45,7 @@ QBCore.Functions.CreateUseableItem('shoes', function(source, item)
         return
     end
 
-    TriggerClientEvent("mbt_metaclothes:checkDress", player.PlayerData.source, {
-		type = "Drawables",
-		index = item.info.index,
-		sex = player.PlayerData.charinfo.gender,
-        itemInfo = item.info
-	})
+    TriggerClientEvent('mbt_meta_clothes:useShoes', player.PlayerData.source, item.info.index, player.PlayerData.charinfo.gender, item.info, item)
 end)
 
 QBCore.Functions.CreateUseableItem('chain', function(source, item)
@@ -75,12 +60,7 @@ QBCore.Functions.CreateUseableItem('chain', function(source, item)
         return
     end
 
-    TriggerClientEvent("mbt_metaclothes:checkDress", player.PlayerData.source, {
-		type = "Drawables",
-		index = item.info.index,
-		sex = player.PlayerData.charinfo.gender,
-        itemInfo = item.info
-	})
+    TriggerClientEvent('mbt_meta_clothes:useChain', player.PlayerData.source, item.info.index, player.PlayerData.charinfo.gender, item.info, item)
 end)
 
 QBCore.Functions.CreateUseableItem('watch', function(source, item)
@@ -95,12 +75,7 @@ QBCore.Functions.CreateUseableItem('watch', function(source, item)
         return
     end
 
-    TriggerClientEvent("mbt_metaclothes:checkDress", player.PlayerData.source, {
-		type = "Props",
-		index = item.info.index,
-		sex = player.PlayerData.charinfo.gender,
-        itemInfo = item.info
-	})
+    TriggerClientEvent('mbt_meta_clothes:useWatch', player.PlayerData.source, item.info.index, player.PlayerData.charinfo.gender, item.info, item)
 end)
 
 QBCore.Functions.CreateUseableItem('hat', function(source, item)
@@ -115,12 +90,7 @@ QBCore.Functions.CreateUseableItem('hat', function(source, item)
         return
     end
 
-    TriggerClientEvent("mbt_metaclothes:checkDress", player.PlayerData.source, {
-		type = "Props",
-		index = item.info.index,
-		sex = player.PlayerData.charinfo.gender,
-        itemInfo = item.info
-	})
+    TriggerClientEvent('mbt_meta_clothes:useHat', player.PlayerData.source, item.info.index, player.PlayerData.charinfo.gender, item.info, item)
 end)
 
 QBCore.Functions.CreateUseableItem('glasses', function(source, item)
@@ -135,12 +105,7 @@ QBCore.Functions.CreateUseableItem('glasses', function(source, item)
         return
     end
 
-    TriggerClientEvent("mbt_metaclothes:checkDress", player.PlayerData.source, {
-		type = "Props",
-		index = item.info.index,
-		sex = player.PlayerData.charinfo.gender,
-        itemInfo = item.info
-	})
+    TriggerClientEvent('mbt_meta_clothes:useGlasses', player.PlayerData.source, item.info.index, player.PlayerData.charinfo.gender, item.info, item)
 end)
 
 QBCore.Functions.CreateUseableItem('earaccess', function(source, item)
@@ -154,63 +119,60 @@ QBCore.Functions.CreateUseableItem('earaccess', function(source, item)
         MBT.NotifyHandler(MBT.Labels["wrong_sex"]..sexLabel, "error")
         return
     end
+    
+    if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
 
-    TriggerClientEvent("mbt_metaclothes:checkDress", player.PlayerData.source, {
-		type = "Props",
-		index = item.info.index,
-		sex = player.PlayerData.charinfo.gender,
-        itemInfo = item.info
-	})
+    TriggerClientEvent('mbt_meta_clothes:useEarAccess', player.PlayerData.source, item.info.index, player.PlayerData.charinfo.gender, item.info, item)
 end)
 
 QBCore.Functions.AddItems({
     ['topdress'] = {
         name = 'topdress',
-        label = 'YOUR_DESCRIPTION',
+        label = 'Top Dress',
         weight = 100,
         type = 'item',
-        image = 'water_bottle.png',
+        image = 'topdress.png',
         unique = true,
         useable = true,
         shouldClose = true,
         combinable = nil,
-        description = 'For all the thirsty out there'
+        description = 'Top Dress'
     },
     ['trousers'] = {
         name = 'trousers',
         label = 'Trousers',
         weight = 10,
         type = 'item',
-        image = 'sandwich.png',
+        image = 'trousers.png',
         unique = false,
         useable = true,
         shouldClose = true,
         combinable = nil,
-        description = 'Nice bread for your stomach'
+        description = 'Trousers'
     },
     ['shoes'] = {
         name = 'shoes',
-        label = 'Sandwich',
+        label = 'Shoes',
         weight = 10,
         type = 'item',
-        image = 'sandwich.png',
+        image = 'shoes.png',
         unique = false,
         useable = true,
         shouldClose = true,
         combinable = nil,
-        description = 'Nice bread for your stomach'
+        description = 'Shoes'
     },
     ['chain'] = {
         name = 'chain',
         label = 'Chain',
         weight = 10,
         type = 'item',
-        image = 'sandwich.png',
+        image = 'chain.png',
         unique = false,
         useable = true,
         shouldClose = true,
         combinable = nil,
-        description = 'Nice bread for your stomach'
+        description = 'Chain'
     },
 
     ['watch'] = {
@@ -218,47 +180,47 @@ QBCore.Functions.AddItems({
         label = 'Watch',
         weight = 10,
         type = 'item',
-        image = 'sandwich.png',
+        image = 'watch.png',
         unique = false,
         useable = true,
         shouldClose = true,
         combinable = nil,
-        description = 'Nice bread for your stomach'
+        description = 'Watch'
     },
     ['hat'] = {
         name = 'hat',
         label = 'Hat',
         weight = 10,
         type = 'item',
-        image = 'sandwich.png',
+        image = 'hat.png',
         unique = false,
         useable = true,
         shouldClose = true,
         combinable = nil,
-        description = 'Nice bread for your stomach'
+        description = 'Hat'
     },
     ['glasses'] = {
         name = 'glasses',
         label = 'Glasses',
         weight = 10,
         type = 'item',
-        image = 'sandwich.png',
+        image = 'glasses.png',
         unique = false,
         useable = true,
         shouldClose = true,
         combinable = nil,
-        description = 'Nice bread for your stomach'
+        description = 'Glasses'
     },
     ['earaccess'] = {
         name = 'earaccess',
-        label = 'Ear Access',
+        label = 'Ear Accessory',
         weight = 10,
         type = 'item',
-        image = 'sandwich.png',
+        image = 'earaccess.png',
         unique = false,
         useable = true,
         shouldClose = true,
         combinable = nil,
-        description = 'Nice bread for your stomach'
+        description = 'Ear Accessory'
     },  
 })
