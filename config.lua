@@ -3,17 +3,17 @@ MBT = {}
 MBT.Debug     = false
 MBT.MenuKey   = "J"
 
---[[
+
 MBT.CustomInventory = function(itemName, metadata)
     
     -- Put your cutom inventory event here 
-    TriggerEvent('qs-inventory:addItem', source, data.item , 1, data.metadata, {
-            Firstname = '',
-            Lastname = '',
-            showAllDescriptions = true
-        })
-    end
-]]
+    -- TriggerEvent('qs-inventory:addItem', source, data.item , 1, data.metadata, {
+    --         Firstname = '',
+    --         Lastname = '',
+    --         showAllDescriptions = true
+    --     })
+    -- end
+end
 
 MBT.NotifyHandler = function(text, type)
     -- Put your notify here 
@@ -39,7 +39,15 @@ MBT.Labels = {
     ["sett_name"] = "Clothes Menu",
     ["wrong_sex"] = "This piece of clothing is not for ",
     ["undress"] = "You must first undress",
-}
+    ["use_dress_kit"] = "Using Top Dress",
+    ["use_trousers"] = "Using Trousers",
+    ["use_shoes"] = "Using Shoes",
+    ["use_chain"] = "Using Chain",
+    ["use_hat"] = "Using Hat",
+    ["use_glasses"] = "Using Glasses",
+    ["use_earaccess"] = "Using Ear Access",
+    ["use_watch"] = "Using Watch"
+}   
 
 MBT.Drawables = {
     [3] = {
