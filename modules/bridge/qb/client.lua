@@ -27,8 +27,8 @@ AddEventHandler('mbt_metaclothes:checkDress', function(data)
     if isDefault then
         local dressType    = data.itemInfo.type or data.itemInfo.metadata.type
 
-        if dressType == 'Drawable' then TriggerEvent("mbt_metaclothes:applyDress", data.itemInfo.metadata) end
-        if dressType == 'Prop'     then TriggerEvent("mbt_metaclothes:applyProps", data.itemInfo.metadata) end
+        if dressType == 'Drawable' then TriggerEvent("mbt_metaclothes:applyDress", data.itemInfo) end
+        if dressType == 'Prop'     then TriggerEvent("mbt_metaclothes:applyProps", data.itemInfo) end
         if dressType == 'DressKit' then TriggerEvent("mbt_metaclothes:applyKitDress", data.itemInfo) end
     else
         MBT.NotifyHandler(MBT.Labels["undress"], "error")    
