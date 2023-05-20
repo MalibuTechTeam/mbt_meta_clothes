@@ -11,11 +11,10 @@ Props     = {'watch', 'hat', 'glasses', 'earaccess'}
 for i = 1, #Drawables do
     if Drawables[i] == 'topdress' then
         exports(Drawables[i], function(data, slot)
-            local playerSex = player.get('gender')
-            local sexLabel = playerSex == "m" and "male" or "female"
+            local playerSex = player.gender
 
-            if sexLabel ~= slot.metadata.sex then
-                MBT.NotifyHandler(MBT.Labels["wrong_sex"]..sexLabel, "error")
+            if playerSex ~= slot.metadata.sex then
+                MBT.NotifyHandler(MBT.Labels["wrong_sex"]..playerSex, "error")
                 return        
             end
     
@@ -32,11 +31,10 @@ for i = 1, #Drawables do
         end)
     else
         exports(Drawables[i], function(data, slot)
-            local playerSex = player.get('gender')
-            local sexLabel = playerSex == "m" and "male" or "female"
+            local playerSex = player.gender
 
-            if sexLabel ~= slot.metadata.sex then
-                MBT.NotifyHandler(MBT.Labels["wrong_sex"]..sexLabel, "error")
+            if playerSex ~= slot.metadata.sex then
+                MBT.NotifyHandler(MBT.Labels["wrong_sex"]..playerSex, "error")
                 return     
             end
     
@@ -56,11 +54,10 @@ end
 
 for i = 1, #Props do
     exports(Props[i], function(data, slot)
-        local playerSex = player.get('gender')
-        local sexLabel = playerSex == "m" and "male" or "female"
+        local playerSex = player.gender
        
-        if sexLabel ~= slot.metadata.sex then
-            MBT.NotifyHandler(MBT.Labels["wrong_sex"]..sexLabel, "error")
+        if playerSex ~= slot.metadata.sex then
+            MBT.NotifyHandler(MBT.Labels["wrong_sex"]..playerSex, "error")
             return     
         end
 

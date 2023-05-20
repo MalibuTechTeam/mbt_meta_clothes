@@ -7,7 +7,7 @@ chunk()
 
 RegisterNetEvent('mbt_metaclothes:checkDress')
 AddEventHandler('mbt_metaclothes:checkDress', function(data)
-    data.pedSex = data.sex == "m" and "male" or "female"
+    data.pedSex = data.sex
     local currentTopDress = {}
     local isDefault = true
 
@@ -35,6 +35,6 @@ AddEventHandler('mbt_metaclothes:checkDress', function(data)
 end)
 
 function saveOutfit()
-    local appearance = exports['fivem-appearance']:getPedAppearance(cache.ped)
+    local appearance = exports['fivem-appearance']:getPedAppearance(PlayerPedId())
     TriggerServerEvent('ox_appearance:save', appearance)
 end
