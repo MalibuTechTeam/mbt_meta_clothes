@@ -6,8 +6,8 @@ local isQbClothing = GetResourceState('qb-clothing'):find('start')
 local isIlleniumAppearance = GetResourceState('illenium-appearance'):find('start')
 local appearance
 
-RegisterNetEvent('mbt_metaclothes:checkDress')
-AddEventHandler('mbt_metaclothes:checkDress', function(data)
+RegisterNetEvent('mbt_meta_clothes:checkDress')
+AddEventHandler('mbt_meta_clothes:checkDress', function(data)
     data.pedSex = data.sex == 0 and "male" or "female"
     local currentTopDress = {}
     local isDefault = true
@@ -27,9 +27,9 @@ AddEventHandler('mbt_metaclothes:checkDress', function(data)
     if isDefault then
         local dressType    = data.itemInfo.type or data.itemInfo.metadata.type
 
-        if dressType == 'Drawable' then TriggerEvent("mbt_metaclothes:applyDress", data.itemInfo) end
-        if dressType == 'Prop'     then TriggerEvent("mbt_metaclothes:applyProps", data.itemInfo) end
-        if dressType == 'DressKit' then TriggerEvent("mbt_metaclothes:applyKitDress", data.itemInfo) end
+        if dressType == 'Drawable' then TriggerEvent("mbt_meta_clothes:applyDress", data.itemInfo) end
+        if dressType == 'Prop'     then TriggerEvent("mbt_meta_clothes:applyProps", data.itemInfo) end
+        if dressType == 'DressKit' then TriggerEvent("mbt_meta_clothes:applyKitDress", data.itemInfo) end
     else
         MBT.NotifyHandler(MBT.Labels["undress"], "error")    
     end
@@ -43,12 +43,13 @@ local function saveSkinIllenium()
     exports['illenium-appearance']:setPedProps(PlayerPedId(),pedProps)
 
     appearance = exports['illenium-appearance']:getPedAppearance(PlayerPedId())
-    TriggerServerEvent("illenium-appearance:server:saveAppearance", appearance)
+    TriggerServerEvent('mbt_meta_clothes:storePlayerSkin', appearance)
 end
 
 function saveOutfit()
-    if qb_clothing then
-        ---- IMPLEMENT HERE LOGIC FOR SAVE CLOTHING FOR QB CLOTHING
+    if isFivemAppearance then 
+        appearance = exports['fivem-appearance']:getPedAppearance(PlayerPedId())
+        TriggerServerEvent('mbt_meta_clothes:storePlayerSkin', appearance)
     end
 
     if isIlleniumAppearance then saveSkinIllenium() end

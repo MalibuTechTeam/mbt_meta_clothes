@@ -5,6 +5,13 @@ QBCore = exports['qb-core']:GetCoreObject()
 local isQBInventory = GetResourceState('qb-inventory'):find('start')
 local isOXInventory = GetResourceState('ox_inventory'):find('start')
 
+RegisterNetEvent('mbt_meta_clothes:saveSkin', function(source, appearance)
+    local identifier = getPlayerIdentifier(source)
+    MySQL.update.await("UPDATE playerskins SET active = ? WHERE citizenid = ?", {0, identifier})
+    MySQL.query.await("DELETE FROM playerskins WHERE citizenid = ? AND model = ?", {identifier, appearance.model})
+    MySQL.insert.await("INSERT INTO playerskins (citizenid, model, skin, active) VALUES (?, ?, ?, ?)", {identifier, appearance.model, json.encode(appearance), 1})
+end)
+
 RegisterNetEvent('mbt_meta_clothes:removeWear', function(itemName)
 	local Player = QBCore.Functions.GetPlayer(source)
 	if not Player then return end
@@ -58,4 +65,11 @@ end
 function printWarning()
     print("~r~ You are using a different type of inventory, please remember to fill the custom events on the config.If you have problems contact us on Discord: https://discord.gg/tqk3kAEr4f")
     return
+end
+
+function getPlayerIdentifier(source)
+    local player = QBCore.Functions.GetPlayer(source)
+    if player then
+        return player.PlayerData.citizenid
+    end
 end
