@@ -22,7 +22,7 @@ if isOXInventory then
         
                 exports.ox_inventory:useItem(data, function(data)
                     if data then
-                        TriggerEvent("mbt_metaclothes:checkDress", {
+                        TriggerEvent("mbt_meta_clothes:checkDress", {
                             type = "Drawables",
                             index = data.metadata, 
                             sex = playerSex,
@@ -43,7 +43,7 @@ if isOXInventory then
         
                 exports.ox_inventory:useItem(data, function(data)
                     if data then
-                        TriggerEvent("mbt_metaclothes:checkDress", {
+                        TriggerEvent("mbt_meta_clothes:checkDress", {
                             type = "Drawables",
                             index = data.metadata.index, 
                             sex = playerSex,
@@ -67,7 +67,7 @@ if isOXInventory then
     
             exports.ox_inventory:useItem(data, function(data)
                 if data then
-                    TriggerEvent("mbt_metaclothes:checkDress", {
+                    TriggerEvent("mbt_meta_clothes:checkDress", {
                         type = "Props",
                         index = data.metadata.index, 
                         sex = playerSex,
@@ -93,7 +93,7 @@ if isQBInventory then
             flags = 51,
         }, {}, {}, function() -- Done
             StopAnimTask(ped, "clothingshirt", "try_shirt_positive_d", 1.0)
-            TriggerEvent("mbt_metaclothes:checkDress", {
+            TriggerEvent("mbt_meta_clothes:checkDress", {
                 type = "Drawables",
                 index = indexT,
                 sex = sexT,
@@ -120,7 +120,7 @@ if isQBInventory then
             flags = 51,
         }, {}, {}, function() -- Done
             StopAnimTask(ped, 're@construction', 'out_of_breath', 1.0)
-            TriggerEvent("mbt_metaclothes:checkDress", {
+            TriggerEvent("mbt_meta_clothes:checkDress", {
                 type = "Drawables",
                 index = indexT,
                 sex = sexT,
@@ -147,7 +147,7 @@ if isQBInventory then
             flags = 0,
         }, {}, {}, function() -- Done
             StopAnimTask(ped, 'random@domestic', 'pickup_low', 1.0)
-            TriggerEvent("mbt_metaclothes:checkDress", {
+            TriggerEvent("mbt_meta_clothes:checkDress", {
                 type = "Drawables",
                 index = indexT,
                 sex = sexT,
@@ -174,7 +174,7 @@ if isQBInventory then
             flags = 51,
         }, {}, {}, function() -- Done
             StopAnimTask(ped, 'clothingtie', 'try_tie_positive_a', 1.0)
-            TriggerEvent("mbt_metaclothes:checkDress", {
+            TriggerEvent("mbt_meta_clothes:checkDress", {
                 type = "Drawables",
                 index = indexT,
                 sex = sexT,
@@ -201,7 +201,7 @@ if isQBInventory then
             flags = 51,
         }, {}, {}, function() -- Done
             StopAnimTask(ped, 'missheist_agency2ahelmet', 'take_off_helmet_stand', 1.0)
-            TriggerEvent("mbt_metaclothes:checkDress", {
+            TriggerEvent("mbt_meta_clothes:checkDress", {
                 type = "Props",
                 index = indexT,
                 sex = sexT,
@@ -228,7 +228,7 @@ if isQBInventory then
             flags = 51,
         }, {}, {}, function() -- Done
             StopAnimTask(ped, 'clothingspecs', 'take_off', 1.0)
-            TriggerEvent("mbt_metaclothes:checkDress", {
+            TriggerEvent("mbt_meta_clothes:checkDress", {
                 type = "Props",
                 index = indexT,
                 sex = sexT,
@@ -255,7 +255,7 @@ if isQBInventory then
             flags = 51,
         }, {}, {}, function() -- Done
             StopAnimTask(ped, 'mp_cp_stolen_tut', 'b_think', 1.0)
-            TriggerEvent("mbt_metaclothes:checkDress", {
+            TriggerEvent("mbt_meta_clothes:checkDress", {
                 type = "Props",
                 index = indexT,
                 sex = sexT,
@@ -282,7 +282,7 @@ if isQBInventory then
             flags = 51,
         }, {}, {}, function() -- Done
             StopAnimTask(ped, 'nmt_3_rcm-10', 'cs_nigel_dual-10', 1.0)
-            TriggerEvent("mbt_metaclothes:checkDress", {
+            TriggerEvent("mbt_meta_clothes:checkDress", {
                 type = "Props",
                 index = indexT,
                 sex = sexT,

@@ -46,7 +46,7 @@ function handleProps(propIndex)
             Index = propIndex,
             isAnimated = true
         })
-        TriggerServerEvent("mbt_metaclothes:giveProp", propData)
+        TriggerServerEvent("mbt_meta_clothes:giveProp", propData)
     else
         MBT.NotifyHandler(MBT.Labels["nothing_to_unwear"], "error")    
     end
@@ -102,7 +102,7 @@ function handleTorsoUndress()
             Sex = playerSex,
             Index = topDressData["Kit"]["Jacket"]["Index"]
         })
-        TriggerServerEvent("mbt_metaclothes:giveDressKit", topDressData)
+        TriggerServerEvent("mbt_meta_clothes:giveDressKit", topDressData)
     else
         MBT.NotifyHandler(MBT.Labels["nothing_to_unwear"], "error")  
     end
@@ -128,7 +128,7 @@ function handleUndress(dressIndex)
             Index = dressIndex,
             isAnimated = true
         })
-        TriggerServerEvent("mbt_metaclothes:giveDress", dressData)
+        TriggerServerEvent("mbt_meta_clothes:giveDress", dressData)
     else
         MBT.NotifyHandler(MBT.Labels["nothing_to_unwear"], "error") 
     end

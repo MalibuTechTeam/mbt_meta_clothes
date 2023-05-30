@@ -19,7 +19,7 @@ for i = 1, #Drawables do
     
             exports.ox_inventory:useItem(data, function(data)
                 if data then
-                    TriggerEvent("mbt_metaclothes:checkDress", {
+                    TriggerEvent("mbt_meta_clothes:checkDress", {
                         type = "Drawables",
                         index = data.metadata, 
                         sex = playerSex,
@@ -40,7 +40,7 @@ for i = 1, #Drawables do
 
             exports.ox_inventory:useItem(data, function(data)
                 if data then
-                    TriggerEvent("mbt_metaclothes:checkDress", {
+                    TriggerEvent("mbt_meta_clothes:checkDress", {
                         type = "Drawables",
                         index = data.metadata.index, 
                         sex = playerSex,
@@ -64,7 +64,7 @@ for i = 1, #Props do
 
         exports.ox_inventory:useItem(data, function(data)
             if data then
-                TriggerEvent("mbt_metaclothes:checkDress", {
+                TriggerEvent("mbt_meta_clothes:checkDress", {
                     type = "Props",
                     index = data.metadata.index, 
                     sex = playerSex,
