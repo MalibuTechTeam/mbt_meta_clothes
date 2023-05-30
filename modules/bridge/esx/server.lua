@@ -2,9 +2,9 @@ if GetResourceState('es_extended') ~= 'started' then return end
 
 ESX = exports.es_extended:getSharedObject()
 
-RegisterNetEvent('mbt_metaclothes:saveSkin', function(appearance)
-    local xPlayer = ESX.GetPlayerFromId(source)
-    MySQL.update('UPDATE users SET skin = ? WHERE identifier = ?', {json.encode(appearance), xPlayer.identifier})
+RegisterNetEvent('mbt_meta_clothes:saveSkin', function(source, appearance)
+    local identifier = getPlayerIdentifier(source)
+    MySQL.update.await("UPDATE users SET skin = ? WHERE identifier = ?", {json.encode(appearance), identifier})
 end)
 
 function giveDress(data)
@@ -40,4 +40,9 @@ function giveProp(data)
         local playerIdentity = xPlayer.getName()
         exports.ox_inventory:AddItem(xPlayer.source, data.Item, 1, {description = MBT.Labels["props_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, type ="Prop"})
     end
+end
+
+function getPlayerIdentifier(source)
+	local xPlayer = ESX.GetPlayerFromId(source)
+	if xPlayer then return xPlayer.identifier end
 end
