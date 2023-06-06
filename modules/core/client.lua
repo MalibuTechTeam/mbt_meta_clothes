@@ -12,13 +12,13 @@ RegisterNUICallback('handleDress', function(data, cb)
     saveOutfit()
     cb(1)
 end)
- 
+
 RegisterNUICallback('handleProps', function(data, cb)
     handleProps(data.Index)
     saveOutfit()
     cb(1)
 end)
- 
+
 RegisterNUICallback('exitUI', function(data, cb)
 	SetNuiFocus(false, false)
     cb(1)

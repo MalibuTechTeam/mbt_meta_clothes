@@ -25,7 +25,7 @@ function giveDress(data)
         if isOXInventory then exports.ox_inventory:AddItem(source, data.Item, 1 , {description = MBT.Labels["clothes_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, palette = data.Palette, type = "Drawable"}); return end
         if isQBInventory then player.Functions.AddItem(data.Item, 1, false, {description = MBT.Labels["clothes_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, palette = data.Palette, type = "Drawable"}); TriggerEvent("inventory:client:ItemBox", data, "add"); return end
         assert(type(MBT.CustomInventory) == "function", printWarning())
-        MBT.CustomInventory(data.Item, {description = MBT.Labels["clothes_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, palette = data.Palette})
+        MBT.CustomInventory(data.Item, {description = MBT.Labels["clothes_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, palette = data.Palette, type = "Drawable"})
     end
 end
 
@@ -37,7 +37,7 @@ function giveDressKit(data)
 
         for k,v in pairs(data.Kit) do
             metadata[tostring(k)] = {}
-            metadata[tostring(k)]["index"] = v.Index
+            metadata[tostring(k)]["index"]    = v.Index
             metadata[tostring(k)]["drawable"] = v.Drawable
             metadata[tostring(k)]["texture"]  = v.Texture
             metadata[tostring(k)]["palette"]  = v.Palette
@@ -58,7 +58,7 @@ function giveProp(data)
         if isOXInventory then ox_inventory:AddItem(player.PlayerData.source, data.Item, 1 , {description = MBT.Labels["props_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, type ="Prop"}) return end
         if isQBInventory then player.Functions.AddItem(data.Item, 1, false, {description = MBT.Labels["props_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, type ="Prop"}); TriggerEvent("inventory:client:ItemBox", QBCore.Shared.Items[data.Item], "add"); return end
         assert(type(MBT.CustomInventory) == 'function', printWarning())
-        MBT.CustomInventory(data.Item, {description = MBT.Labels["props_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture})
+        MBT.CustomInventory(data.Item, {description = MBT.Labels["props_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture,  type ="Prop"})
     end
 end
 

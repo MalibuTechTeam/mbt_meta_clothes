@@ -23,7 +23,7 @@ function giveDressKit(data)
 
         for k,v in pairs(data.Kit) do
             metadata[tostring(k)] = {}
-            metadata[tostring(k)]["index"] = v.Index
+            metadata[tostring(k)]["index"]    = v.Index
             metadata[tostring(k)]["drawable"] = v.Drawable
             metadata[tostring(k)]["texture"]  = v.Texture
             metadata[tostring(k)]["palette"]  = v.Palette
