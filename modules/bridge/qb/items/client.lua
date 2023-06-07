@@ -59,7 +59,7 @@ if isOXInventory then
         exports(Props[i], function(data, slot)
             local playerSex = QBCore.Functions.GetPlayerData().charinfo.gender
             local sexLabel = playerSex == 0 and "male" or "female"
-           
+            
             if sexLabel ~= slot.metadata.sex then
                 MBT.NotifyHandler(MBT.Labels["wrong_sex"]..sexLabel, "error")  
                 return
