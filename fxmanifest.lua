@@ -18,22 +18,22 @@ dependencies {
 shared_script 'config.lua'
 
 server_scripts{
-    "@oxmysql/lib/MySQL.lua",
-    "modules/functions/**/server.lua",
-    "modules/bridge/**/server.lua",
-    "modules/core/**/server.lua",
+    '@oxmysql/lib/MySQL.lua',
+    'modules/functions/**/server.lua',
+    'modules/bridge/**/server.lua',
+    'modules/core/**/server.lua',
 }
 
 client_scripts{
-    "modules/functions/**/client.lua",
-    "modules/bridge/**/client.lua",
-    "modules/core/**/client.lua",
+    'modules/functions/**/client.lua',
+    'modules/bridge/**/client.lua',
+    'modules/core/**/client.lua',
 }
 
-ui_page "web/index.html"
+ui_page 'web/index.html'
 
 files {
-    "web/index.html",
-    "web/style.css",
-    "web/index.js",
+    'web/index.html',
+    'web/style.css',
+    'web/index.js',
 }
