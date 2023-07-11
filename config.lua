@@ -47,6 +47,7 @@ MBT.Labels = {
     ["use_glasses"] = "Using Glasses",
     ["use_earaccess"] = "Using Ear Access",
     ["use_watch"] = "Using Watch"
+    ["steal_dress"] = "Steal Dress",
 }   
 
 MBT.Drawables = {
@@ -60,7 +61,7 @@ MBT.Drawables = {
     [4] = {
         ["Label"] = MBT.Labels["legs"],
         ["Default"] = {
-            ["male"] = { 21, 21 },
+            ["male"] = { 21 },
             ["female"] = { 14, 105 }
         },
         ["Animation"] = { ["Dict"] = "re@construction", ["Anim"] = "out_of_breath", ["Flag"] = 51, ["Duration"] = 1300 },
