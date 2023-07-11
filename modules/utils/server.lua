@@ -1,4 +1,9 @@
-function MbtVersionCheck(repository)
+
+local Utils = {} 
+
+---@param repository string
+---@return nil
+function Utils.MbtVersionCheck(repository)
 	local resource = GetInvokingResource() or GetCurrentResourceName()
     
 	local currentVersion = GetResourceMetadata(resource, 'version', 0)
@@ -35,4 +40,23 @@ function MbtVersionCheck(repository)
 	end)
 end
 
-MbtVersionCheck('MalibuTechTeam/mbt_meta_clothes')
+function Utils.PrintWarning()
+    print("~r~ You are using a different type of inventory, please remember to fill the custom events on the config. If you have problems contact us on Discord: https://discord.gg/tqk3kAEr4f")
+    return
+end
+
+function Utils.MbtDebugger(...)
+	if MBT.Debug then
+		local arg = {...}
+		local printResult = "["..GetCurrentResourceName().."] | " 
+		for _,v in ipairs(arg) do
+			printResult = printResult .. tostring(v) .. "\t"
+		end
+		printResult = printResult .. "\n"
+		print(printResult)
+	end
+end
+
+Utils.MbtVersionCheck('MalibuTechTeam/mbt_meta_clothes')
+
+return Utils
