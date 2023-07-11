@@ -58,7 +58,7 @@ for i = 1, #Props do
     exports(Props[i], function(data, slot)
         local playerSex = player.get('gender')
         local sexLabel = playerSex == "m" and "male" or "female"
-       
+        
         if sexLabel ~= slot.metadata.sex then
             MBT.NotifyHandler(MBT.Labels["wrong_sex"]..sexLabel, "error")
             return     

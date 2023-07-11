@@ -5,16 +5,18 @@ local import = LoadResourceFile('ox_core', file)
 local chunk = assert(load(import, ('@@ox_core/%s'):format(file)))
 chunk()
 
-local ox_inventory = exports.ox_inventory
+local Utils = loadModule('modules.utils.server')
 
+---@param data table
 function giveDress(data)
     local xPlayer = Ox.GetPlayer(source)
     if xPlayer then
         local playerIdentity = xPlayer.name
-        ox_inventory:AddItem(xPlayer.source, data.Item, 1 , {description = MBT.Labels["clothes_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, palette = data.Palette, type = "Drawable"})
+        exports.ox_inventory:AddItem(xPlayer.source, data.Item, 1 , {description = MBT.Labels["clothes_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, palette = data.Palette, type = "Drawable"})
     end
 end
 
+---@param data table
 function giveDressKit(data)
     local xPlayer = Ox.GetPlayer(source)
     if xPlayer then
@@ -30,14 +32,39 @@ function giveDressKit(data)
         end
 
         Wait(100)
-        ox_inventory:AddItem(xPlayer.source, data.Item, 1, metadata)
+        exports.ox_inventory:AddItem(xPlayer.source, data.Item, 1, metadata)
     end
 end
 
+---@param data table
 function giveProp(data)
     local xPlayer = Ox.GetPlayer(source)
     if xPlayer then
         local playerIdentity = xPlayer.name
-        ox_inventory:AddItem(xPlayer.source, data.Item, 1 , {description = MBT.Labels["props_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, type ="Prop"})
+        exports.ox_inventory:AddItem(xPlayer.source, data.Item, 1 , {description = MBT.Labels["props_desc"]:format(playerIdentity), index = data.Index, sex = data.Sex, drawable = data.Drawable, texture = data.Texture, type ="Prop"})
+    end
+end
+
+---@param source number
+---@param targetWearing table
+---@param playerSex string
+function giveStolenItemDress(source, targetWearing, playerSex)
+    local xPlayer = Ox.GetPlayer(source)
+    local playerIdentity = xPlayer.get('name')
+
+    for k,v in pairs(targetWearing["Drawables"]) do
+        if MBT.Drawables[k]["Item"] then
+            if v.Drawable ~= MBT.Drawables[k]["Default"][playerSex] then
+                exports.ox_inventory:AddItem(source, MBT.Drawables[k]["Item"], 1, {description = MBT.Labels["clothes_desc"]:format(playerIdentity), index = k, sex = playerSex, drawable = v.Drawable, texture = v.Texture, palette = v.Palette, type = "Drawable"})
+            end
+        end
+    end
+
+    for k,v in pairs(targetWearing["Props"]) do
+        if MBT.Props[k]["Item"] then
+            if v.Drawable ~= MBT.Props[k]["Default"][playerSex] then
+                exports.ox_inventory:AddItem(source, MBT.Props[k]["Item"], 1, {description = MBT.Labels["clothes_desc"]:format(playerIdentity), index = k, sex = playerSex, drawable = v.Drawable, texture = v.Texture, palette = v.Palette, type = "Prop"})
+            end
+        end
     end
 end
