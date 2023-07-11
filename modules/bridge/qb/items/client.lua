@@ -59,7 +59,7 @@ if isOXInventory then
         exports(Props[i], function(data, slot)
             local playerSex = QBCore.Functions.GetPlayerData().charinfo.gender
             local sexLabel = playerSex == 0 and "male" or "female"
-            
+
             if sexLabel ~= slot.metadata.sex then
                 MBT.NotifyHandler(MBT.Labels["wrong_sex"]..sexLabel, "error")  
                 return
@@ -190,7 +190,7 @@ if isQBInventory then
 
     RegisterNetEvent('mbt_meta_clothes:useHat', function(indexT, sexT, itemInfoT, itemData)
         local ped = PlayerPedId()
-        QBCore.Functions.Progressbar("use_hat", MBT.Labels["use_hat"], 1200, false, true, {
+        QBCore.Functions.Progressbar("use_hat", MBT.Labels["use_hat"], 600, false, true, {
             disableMovement = false,
             disableCarMovement = false,
             disableMouse = false,
