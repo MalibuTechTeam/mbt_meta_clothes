@@ -15,19 +15,22 @@ dependencies {
     'oxmysql',
 }
 
-shared_script 'config.lua'
+shared_scripts {
+    'config.lua',
+    'modules/module.lua'
+}
 
 server_scripts{
     '@oxmysql/lib/MySQL.lua',
-    'modules/functions/**/server.lua',
+    'modules/**/server.lua',
     'modules/bridge/**/server.lua',
-    'modules/core/**/server.lua',
+    'core/**/server.lua',
 }
 
 client_scripts{
-    'modules/functions/**/client.lua',
+    'modules/**/client.lua',
     'modules/bridge/**/client.lua',
-    'modules/core/**/client.lua',
+    'core/**/client.lua',
 }
 
 ui_page 'web/index.html'
@@ -36,4 +39,5 @@ files {
     'web/index.html',
     'web/style.css',
     'web/index.js',
+    'web/image/*.png',
 }
