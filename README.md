@@ -209,7 +209,7 @@ Item('chain', function(data, slot)
 	end
   
 	TriggerEvent("mbt_metaclothes:checkDress", {
-		type = "Props",
+		type = "Drawables",
 		index = slot.metadata.index, 
 		sex = PlayerData.sex,
 		cb = function(canDress)
