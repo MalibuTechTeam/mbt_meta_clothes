@@ -1,0 +1,15 @@
+# Claude Code / AI tools
+.claude/
+.agent/
+.agents/
+skills/
+skills-lock.json
+DESIGN_V2.md
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
