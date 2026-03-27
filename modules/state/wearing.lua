@@ -11,6 +11,7 @@ local PlayerWearing = {}
 local DirtyPlayers = {}
 local PlayerIdentifiers = {}
 local PlayerHasDbEntry = {}  -- [source] = true if player has an existing DB record
+local PlayerDripXp = {}      -- [source] = cumulative drip XP (never decreases)
 local initialized = false
 
 function MBT.PlayerState.Init()
@@ -22,9 +23,14 @@ function MBT.PlayerState.Init()
             CREATE TABLE IF NOT EXISTS mbt_player_wearing (
                 identifier VARCHAR(60) NOT NULL,
                 wearing_data LONGTEXT NOT NULL,
+                drip_xp INT NOT NULL DEFAULT 0,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 PRIMARY KEY (identifier)
             )
+        ]])
+        -- Add drip_xp column if table already exists without it
+        MySQL.query([[
+            ALTER TABLE mbt_player_wearing ADD COLUMN IF NOT EXISTS drip_xp INT NOT NULL DEFAULT 0
         ]])
         MBT.ServerUtils.MbtDebugger("PlayerState: Database table ready")
     end)
@@ -39,6 +45,7 @@ end
 
 function MBT.PlayerState.InitPlayer(src)
     PlayerWearing[src] = { Drawables = {}, Props = {} }
+    PlayerDripXp[src] = PlayerDripXp[src] or 0
     DirtyPlayers[src] = false
 end
 
@@ -46,7 +53,6 @@ function MBT.PlayerState.SetSlot(src, slotType, slotIndex, metadata)
     if not PlayerWearing[src] then MBT.PlayerState.InitPlayer(src) end
     PlayerWearing[src][slotType][slotIndex] = metadata
     DirtyPlayers[src] = true
-    MBT.ServerUtils.MbtDebugger("PlayerState: SetSlot", src, slotType, slotIndex)
 end
 
 function MBT.PlayerState.GetSlot(src, slotType, slotIndex)
@@ -60,7 +66,6 @@ function MBT.PlayerState.ClearSlot(src, slotType, slotIndex)
     PlayerWearing[src][slotType][slotIndex] = nil
     if metadata then
         DirtyPlayers[src] = true
-        MBT.ServerUtils.MbtDebugger("PlayerState: ClearSlot", src, slotType, slotIndex)
     end
     return metadata
 end
@@ -82,6 +87,28 @@ end
 function MBT.PlayerState.IsLoaded(src)
     return PlayerWearing[src] ~= nil
 end
+
+-----------------------------------------------------------
+-- Drip XP functions (cumulative, never decreases)
+-----------------------------------------------------------
+
+function MBT.PlayerState.GetDripXp(src)
+    return PlayerDripXp[src] or 0
+end
+
+function MBT.PlayerState.SetDripXp(src, xp)
+    PlayerDripXp[src] = xp
+    DirtyPlayers[src] = true
+end
+
+function MBT.PlayerState.AddDripXp(src, amount)
+    PlayerDripXp[src] = (PlayerDripXp[src] or 0) + amount
+    DirtyPlayers[src] = true
+end
+
+-----------------------------------------------------------
+-- Persistence
+-----------------------------------------------------------
 
 function MBT.PlayerState.Save(src, identifier)
     if not PlayerWearing[src] then return end
@@ -108,12 +135,12 @@ function MBT.PlayerState.Save(src, identifier)
         forJson.Props[tostring(k)] = v
     end
     local data = json.encode(forJson)
+    local dripXp = PlayerDripXp[src] or 0
     MySQL.insert(
-        "INSERT INTO mbt_player_wearing (identifier, wearing_data) VALUES (?, ?) ON DUPLICATE KEY UPDATE wearing_data = VALUES(wearing_data), updated_at = CURRENT_TIMESTAMP",
-        {identifier, data}
+        "INSERT INTO mbt_player_wearing (identifier, wearing_data, drip_xp) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE wearing_data = VALUES(wearing_data), drip_xp = VALUES(drip_xp), updated_at = CURRENT_TIMESTAMP",
+        {identifier, data, dripXp}
     )
     DirtyPlayers[src] = false
-    MBT.ServerUtils.MbtDebugger("PlayerState: Saved state for", src)
 end
 
 function MBT.PlayerState.Load(src, identifier)
@@ -129,13 +156,15 @@ function MBT.PlayerState.Load(src, identifier)
 
     PlayerIdentifiers[src] = identifier
 
-    local result = MySQL.scalar.await(
-        "SELECT wearing_data FROM mbt_player_wearing WHERE identifier = ?",
+    local result = MySQL.query.await(
+        "SELECT wearing_data, drip_xp FROM mbt_player_wearing WHERE identifier = ?",
         {identifier}
     )
 
-    if result then
-        local decoded = json.decode(result)
+    if result and result[1] then
+        local row = result[1]
+        PlayerDripXp[src] = row.drip_xp or 0
+        local decoded = json.decode(row.wearing_data)
         if decoded and type(decoded) == "table" then
             -- CRITICAL: json.decode creates STRING keys ("3", "11")
             -- but SetSlot/ClearSlot use NUMERIC keys (3, 11).
@@ -159,7 +188,6 @@ function MBT.PlayerState.Load(src, identifier)
     end
 
     DirtyPlayers[src] = false
-    MBT.ServerUtils.MbtDebugger("PlayerState: Loaded state for", src, identifier, "hasDbEntry:", PlayerHasDbEntry[src])
 end
 
 --- Check if a player has an existing DB record
@@ -178,7 +206,7 @@ function MBT.PlayerState.Cleanup(src)
     DirtyPlayers[src] = nil
     PlayerIdentifiers[src] = nil
     PlayerHasDbEntry[src] = nil
-    MBT.ServerUtils.MbtDebugger("PlayerState: Cleaned up", src)
+    PlayerDripXp[src] = nil
 end
 
 function MBT.PlayerState.SaveAllDirty()

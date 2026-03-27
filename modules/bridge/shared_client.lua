@@ -86,6 +86,10 @@ end
 
 --- Setup steal player dress function
 function MBT.SharedClient.SetupStealDress()
+    -- Store target data for NUI callbacks
+    local stealTarget = {}
+    local stealItemsList = {}
+
     function stealPlayerDress(data)
         local ped = PlayerPedId()
         local closestPlayer = data and data.entity
@@ -95,22 +99,154 @@ function MBT.SharedClient.SetupStealDress()
             return
         end
 
-        if exports.ox_lib:progressCircle({
-            duration = 2000,
-            label = 'Steal clothes',
-            position = 'bottom',
-            useWhileDead = false,
-            canCancel = true,
-            disable = {
-                car = true,
-                move = true,
-                combat = true,
-            },
-        }) then
-            MBT.Utils.StealAnim()
-            TriggerServerEvent('mbt_meta_clothes:syncStealDress', GetPlayerServerId(NetworkGetPlayerIndexFromPed(closestPlayer)))
-        else
-            print('Do stuff when cancelled')
+        local targetServerId = GetPlayerServerId(NetworkGetPlayerIndexFromPed(closestPlayer))
+        local targetSex = MBT.Utils.GetPedSex(closestPlayer)
+        if not targetSex or targetSex == "customSkin" then return end
+
+        -- Store target for NUI callbacks
+        stealTarget = {
+            ped = closestPlayer,
+            serverId = targetServerId,
+            thiefPed = ped
+        }
+
+        -- Build items list for NUI
+        stealItemsList = {}
+        local stealItems = stealItemsList
+
+        -- Check torso kit (3+8+11)
+        local hasTorso = false
+        for _, idx in ipairs({3, 8, 11}) do
+            if MBT.Drawables[idx] and MBT.Drawables[idx]["Default"][targetSex] then
+                local current = GetPedDrawableVariation(closestPlayer, idx)
+                if not MBT.Utils.TableContainsValue({table = MBT.Drawables[idx]["Default"][targetSex], value = current}) then
+                    hasTorso = true
+                    break
+                end
+            end
         end
+        if hasTorso then
+            stealItems[#stealItems + 1] = {
+                label = MBT.Labels["jacket"] or "Top",
+                stealType = "torso",
+                slotIndex = nil
+            }
+        end
+
+        -- Check other drawables
+        for k, v in pairs(MBT.Drawables) do
+            if k ~= 3 and k ~= 8 and k ~= 11 and v["Item"] and v["Default"][targetSex] then
+                local current = GetPedDrawableVariation(closestPlayer, k)
+                if not MBT.Utils.TableContainsValue({table = v["Default"][targetSex], value = current}) then
+                    stealItems[#stealItems + 1] = {
+                        label = v["Label"] or ("Slot " .. k),
+                        stealType = "drawable",
+                        slotIndex = k
+                    }
+                end
+            end
+        end
+
+        -- Check props
+        for k, v in pairs(MBT.Props) do
+            if v["Item"] and v["Default"][targetSex] then
+                local current = GetPedPropIndex(closestPlayer, k)
+                if not MBT.Utils.TableContainsValue({table = v["Default"][targetSex], value = current}) then
+                    stealItems[#stealItems + 1] = {
+                        label = v["Label"] or ("Prop " .. k),
+                        stealType = "prop",
+                        slotIndex = k
+                    }
+                end
+            end
+        end
+
+        if #stealItems == 0 then
+            MBT.NotifyHandler(MBT.Labels["nothing_to_steal"] or "Nothing to steal", "error")
+            return
+        end
+
+        -- Send to NUI
+        SetNuiFocus(true, true)
+        SendNUIMessage({
+            action = "stealMenu",
+            status = true,
+            items = stealItems
+        })
     end
+
+    -- NUI callbacks for steal
+    RegisterNUICallback('handleStealItem', function(data, cb)
+        SetNuiFocus(false, false)
+        SendNUIMessage({action = "stealMenu", status = false})
+
+        if stealTarget.ped and stealTarget.serverId then
+            MBT.Utils.StealSingleItem(
+                stealTarget.thiefPed,
+                stealTarget.ped,
+                stealTarget.serverId,
+                data.stealType,
+                data.slotIndex
+            )
+        end
+        cb(1)
+    end)
+
+    RegisterNUICallback('handleStealAll', function(data, cb)
+        SetNuiFocus(false, false)
+        SendNUIMessage({action = "stealMenu", status = false})
+
+        if stealTarget.ped and stealTarget.serverId then
+            MBT.Utils.StealAllItems(
+                stealTarget.thiefPed,
+                stealTarget.ped,
+                stealTarget.serverId
+            )
+        end
+        cb(1)
+    end)
+
+    -- Multi-select confirm: NUI sends array of selected items
+    RegisterNUICallback('confirmSteal', function(data, cb)
+        SetNuiFocus(false, false)
+        SendNUIMessage({action = "stealMenu", status = false})
+
+        if not stealTarget.ped or not stealTarget.serverId then
+            cb(1)
+            return
+        end
+
+        local items = data.items
+        if not items or #items == 0 then
+            cb(1)
+            return
+        end
+
+        -- Check if all stealable items are selected → use StealAll for efficiency
+        if #items >= #stealItemsList then
+            MBT.Utils.StealAllItems(
+                stealTarget.thiefPed,
+                stealTarget.ped,
+                stealTarget.serverId
+            )
+        else
+            -- Steal each selected item sequentially
+            for _, item in ipairs(items) do
+                MBT.Utils.StealSingleItem(
+                    stealTarget.thiefPed,
+                    stealTarget.ped,
+                    stealTarget.serverId,
+                    item.stealType,
+                    item.slotIndex
+                )
+            end
+        end
+        cb(1)
+    end)
+
+    RegisterNUICallback('closeStealMenu', function(data, cb)
+        SetNuiFocus(false, false)
+        SendNUIMessage({action = "stealMenu", status = false})
+        cb(1)
+    end)
 end

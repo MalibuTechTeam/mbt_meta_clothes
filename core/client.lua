@@ -45,7 +45,6 @@ end)
 -- Server requests PED scan (new players only, after Load completed)
 RegisterNetEvent('mbt_meta_clothes:requestPedScan')
 AddEventHandler('mbt_meta_clothes:requestPedScan', function()
-    MBT.Utils.MbtDebugger("=== requestPedScan: scanning PED for server ===")
     -- New player: no changes needed, just scan PED and show it
     ResetEntityAlpha(PlayerPedId())
     MBT.Utils.SyncWearingState()
@@ -63,59 +62,42 @@ local function applyWearingState(wearingState)
     local sex = MBT.Utils.GetPedSex(ped)
     if sex == "customSkin" then return end
 
-    MBT.Utils.MbtDebugger("applyWearingState: sex =", sex)
-
     for k, v in pairs(MBT.Drawables) do
-        local stored = wearingState.Drawables and wearingState.Drawables[tostring(k)]
-        if not stored then stored = wearingState.Drawables and wearingState.Drawables[k] end
-
-        local beforeDrawable = GetPedDrawableVariation(ped, k)
-        -- No ExpectChange here: during restore protection, the restore guard
-        -- handles all changes (including ours). This prevents the flag from being
-        -- consumed by an appearance script change, leaving us unprotected.
+        local stored = wearingState.Drawables and (wearingState.Drawables[tostring(k)] or wearingState.Drawables[k])
 
         if stored and stored.drawable then
             SetPedComponentVariation(ped, k, stored.drawable, stored.texture or 0, stored.palette or 0)
-            MBT.Utils.MbtDebugger("  Drawable", k, ":", beforeDrawable, "→", stored.drawable, "(RESTORE)")
         else
             local default = v["Default"][sex]
             if type(default) == "table" then
                 SetPedComponentVariation(ped, k, default[1], 0, 0)
-                MBT.Utils.MbtDebugger("  Drawable", k, ":", beforeDrawable, "→", default[1], "(DEFAULT)")
             end
         end
     end
 
     for k, v in pairs(MBT.Props) do
-        local stored = wearingState.Props and wearingState.Props[tostring(k)]
-        if not stored then stored = wearingState.Props and wearingState.Props[k] end
-
-        local beforeProp = GetPedPropIndex(ped, k)
+        local stored = wearingState.Props and (wearingState.Props[tostring(k)] or wearingState.Props[k])
 
         if stored and stored.drawable then
             SetPedPropIndex(ped, k, stored.drawable, stored.texture or 0, true)
-            MBT.Utils.MbtDebugger("  Prop", k, ":", beforeProp, "→", stored.drawable, "(RESTORE)")
+            -- Hat/hair clip fix: apply on restore if wearing hat
+            if k == 0 then
+                MBT.Utils.ApplyHatHairFix(ped)
+            end
         else
             local default = v["Default"][sex]
             if type(default) == "table" then
                 ClearPedProp(ped, k)
-                MBT.Utils.MbtDebugger("  Prop", k, ":", beforeProp, "→ -1 (DEFAULT)")
             end
         end
     end
 
     MBT.Utils.UpdatePlayerClothes()
-    MBT.Utils.MbtDebugger("=== applyWearingState DONE ===")
 end
 
 RegisterNetEvent('mbt_meta_clothes:restoreWearing')
 AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState)
-    MBT.Utils.MbtDebugger("=== restoreWearing RECEIVED ===")
-    if not wearingState then
-        MBT.Utils.MbtDebugger("WARNING: wearingState is nil!")
-        return
-    end
-    MBT.Utils.MbtDebugger("Raw data:", json.encode(wearingState))
+    if not wearingState then return end
 
     -- Normalize JSON string keys to numeric (json.decode creates "3" not 3)
     local normalized = { Drawables = {}, Props = {} }
@@ -140,7 +122,12 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState)
 end)
 
 RegisterNUICallback('handleDress', function(data, cb)
-    if data.Index == 8 then MBT.Utils.HandleTorsoUndress() else MBT.Utils.HandleUndress(data.Index) end
+    -- Torso slots (3=arms, 8=tshirt, 11=jacket) are a single kit — always undress together
+    if data.Index == 3 or data.Index == 8 or data.Index == 11 then
+        MBT.Utils.HandleTorsoUndress()
+    else
+        MBT.Utils.HandleUndress(data.Index)
+    end
     cb(1)
 end)
 
@@ -149,17 +136,52 @@ RegisterNUICallback('handleProps', function(data, cb)
     cb(1)
 end)
 
+RegisterNUICallback('handleToggleState', function(data, cb)
+    -- data.slotType = "Drawables" or "Props", data.slotIndex = number
+    MBT.Utils.HandleToggleState(data.slotType, data.slotIndex)
+    cb(1)
+end)
+
+RegisterNUICallback('handleHairToggle', function(data, cb)
+    MBT.Utils.HandleToggleState("Drawables", 2)
+    cb(1)
+end)
+
 RegisterNUICallback('exitUI', function(data, cb)
     SetNuiFocus(false, false)
     cb(1)
 end)
+
+--- Send slot update to NUI after any dress/undress action
+--- @param slotType string "Drawables" or "Props"
+--- @param slotIndex number The slot index
+--- @param isWearing boolean Whether the slot is now worn (non-default)
+function MBT.Utils.SendSlotUpdate(slotType, slotIndex, isWearing)
+    local ped = PlayerPedId()
+    local update = {
+        action = "updateSlot",
+        slotType = slotType,
+        slotIndex = slotIndex,
+        isWearing = isWearing
+    }
+    if isWearing then
+        if slotType == "Drawables" then
+            update.drawable = GetPedDrawableVariation(ped, slotIndex)
+            update.texture = GetPedTextureVariation(ped, slotIndex)
+        else
+            update.drawable = GetPedPropIndex(ped, slotIndex)
+            update.texture = GetPedPropTextureIndex(ped, slotIndex)
+        end
+    end
+    SendNUIMessage(update)
+end
 
 RegisterNetEvent('mbt_meta_clothes:applyDress')
 AddEventHandler('mbt_meta_clothes:applyDress', function(data)
     local meta = normalizeMetadata(data)
     MBT.Utils.ExpectChange("Drawables", meta.index)
     SetPedComponentVariation(PlayerPedId(), meta.index, meta.drawable, meta.texture, meta.palette)
-    SendNUIMessage({action = "applyDress", indexDress = meta.index})
+    MBT.Utils.SendSlotUpdate("Drawables", meta.index, true)
     TriggerServerEvent("mbt_meta_clothes:storeWearing", "Drawables", meta)
 end)
 
@@ -178,8 +200,9 @@ AddEventHandler('mbt_meta_clothes:applyKitDress', function(data)
             }
         end
     end
-    SendNUIMessage({action = "applyDress", indexDress = 8})
-    MBT.Utils.MbtDebugger("applyKitDress: sending kitMetadata:", json.encode(kitMetadata))
+    MBT.Utils.SendSlotUpdate("Drawables", 3, true)
+    MBT.Utils.SendSlotUpdate("Drawables", 8, true)
+    MBT.Utils.SendSlotUpdate("Drawables", 11, true)
     TriggerServerEvent("mbt_meta_clothes:storeWearingKit", kitMetadata)
 end)
 
@@ -188,7 +211,11 @@ AddEventHandler('mbt_meta_clothes:applyProps', function(data)
     local meta = normalizeMetadata(data)
     MBT.Utils.ExpectChange("Props", meta.index)
     SetPedPropIndex(PlayerPedId(), meta.index, meta.drawable, meta.texture, true)
-    SendNUIMessage({action = "applyProps", indexProp = meta.index})
+    -- Hat/hair clip fix: hide hair when putting on hat (prop 0)
+    if meta.index == 0 then
+        MBT.Utils.ApplyHatHairFix(PlayerPedId())
+    end
+    MBT.Utils.SendSlotUpdate("Props", meta.index, true)
     TriggerServerEvent("mbt_meta_clothes:storeWearing", "Props", meta)
 end)
 
@@ -201,19 +228,29 @@ RegisterNetEvent('mbt_meta_clothes:setDefaultDressTarget')
 AddEventHandler('mbt_meta_clothes:setDefaultDressTarget', function(stealingPlayer)
     local playerPed = PlayerPedId()
     local playerSex = MBT.Utils.GetPedSex(playerPed)
-    local targetWearing = {Drawables = {}, Props = {}}
+    local targetWearing = { Drawables = {}, Props = {} }
 
     -- Scatter all non-default clothing as 3D props BEFORE stripping
     MBT.ClothingProps.ScatterAllFromPed(playerPed, playerSex)
 
     for k, v in pairs(MBT.Drawables) do
-        targetWearing["Drawables"][k] = {Drawable = GetPedDrawableVariation(playerPed, k), Texture = GetPedTextureVariation(playerPed, k), Palette = GetPedPaletteVariation(playerPed, k)}
+        targetWearing["Drawables"][k] = {
+            Drawable = GetPedDrawableVariation(playerPed, k),
+            Texture =
+                GetPedTextureVariation(playerPed, k),
+            Palette = GetPedPaletteVariation(playerPed, k)
+        }
         MBT.Utils.ExpectChange("Drawables", k)
         SetPedComponentVariation(playerPed, k, MBT.Drawables[k]["Default"][playerSex][1], 0, 0)
     end
 
     for k, v in pairs(MBT.Props) do
-        targetWearing["Props"][k] = {Drawable = GetPedPropIndex(playerPed, k), Texture = GetPedPropTextureIndex(playerPed, k), Palette = 0}
+        targetWearing["Props"][k] = {
+            Drawable = GetPedPropIndex(playerPed, k),
+            Texture = GetPedPropTextureIndex(
+                playerPed, k),
+            Palette = 0
+        }
         MBT.Utils.ExpectChange("Props", k)
         SetPedPropIndex(playerPed, k, MBT.Props[k]["Default"][playerSex][1], 0, 0)
     end
@@ -228,9 +265,155 @@ RegisterCommand("toggleUndress", function()
         local armorState = type(checkArmorState) == 'function' and checkArmorState() or false
         local resourceState = MBT.Utils.MbtWearableProps()
 
+        -- Build wearing state for NUI: which slots have non-default drawables
+        local ped = PlayerPedId()
+        local sex = MBT.Utils.GetPedSex(ped)
+        local wearing = { Drawables = {}, Props = {} }
+
+        if sex ~= "customSkin" then
+            for k, v in pairs(MBT.Drawables) do
+                local drawable = GetPedDrawableVariation(ped, k)
+                local isDefault = MBT.Utils.TableContainsValue({ table = v["Default"][sex], value = drawable })
+                if not isDefault then
+                    wearing.Drawables[tostring(k)] = {
+                        index = k,
+                        drawable = drawable,
+                        texture = GetPedTextureVariation(ped, k)
+                    }
+                end
+            end
+            for k, v in pairs(MBT.Props) do
+                local prop = GetPedPropIndex(ped, k)
+                local isDefault = MBT.Utils.TableContainsValue({ table = v["Default"][sex], value = prop })
+                if not isDefault then
+                    wearing.Props[tostring(k)] = {
+                        index = k,
+                        drawable = prop,
+                        texture = GetPedPropTextureIndex(ped, k)
+                    }
+                end
+            end
+        end
+
+        -- Determine sex as numeric (0=male, 1=female) for NUI mannequin image
+        local sexNumeric = (sex == "female") and 1 or 0
+
+        -- Build toggleable slots list: which slots have ClothingStates configured
+        local toggleableSlots = { Drawables = {}, Props = {} }
+        if MBT.ClothingStates then
+            for slotType, slots in pairs(MBT.ClothingStates) do
+                for slotIndex, states in pairs(slots) do
+                    if #states > 0 then
+                        local currentDrawable
+                        if slotType == "Drawables" then
+                            currentDrawable = GetPedDrawableVariation(ped, slotIndex)
+                        else
+                            currentDrawable = GetPedPropIndex(ped, slotIndex)
+                        end
+                        -- Check if current drawable has a toggle state
+                        for _, state in ipairs(states) do
+                            if state.from == currentDrawable or state.to == currentDrawable then
+                                toggleableSlots[slotType][tostring(slotIndex)] = true
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Request drip data from server for NUI display
+        TriggerServerEvent('mbt_meta_clothes:requestDripForNui')
+
         SetNuiFocus(true, true)
-        SendNUIMessage({action = "ui", status = true, mask = maskState, bag = bagState, armor = armorState, wearableProps = resourceState})
+        SendNUIMessage({
+            action = "ui",
+            status = true,
+            wearing = wearing,
+            sex = sexNumeric,
+            mask = maskState,
+            bag = bagState,
+            armor = armorState,
+            wearableProps = resourceState,
+            toggleableSlots = toggleableSlots
+        })
     end
 end, false)
 
 RegisterKeyMapping('toggleUndress', MBT.Labels["sett_name"], 'keyboard', MBT.MenuKey)
+
+-----------------------------------------------------------
+-- Slash commands for quick toggle per slot (/shirt, /trousers, etc.)
+-- Toggle: if wearing non-default → undress with animation
+--         if wearing default → notify nothing to remove
+-----------------------------------------------------------
+
+local function canToggle()
+    local ped = PlayerPedId()
+    return IsPedOnFoot(ped) and not IsPedDeadOrDying(ped, false) and not IsPedCuffed(ped)
+end
+
+-- Drawable commands
+RegisterCommand("shirt", function() if canToggle() then MBT.Utils.HandleTorsoUndress() end end, false)
+RegisterCommand("trousers", function() if canToggle() then MBT.Utils.HandleUndress(4) end end, false)
+RegisterCommand("shoes", function() if canToggle() then MBT.Utils.HandleUndress(6) end end, false)
+RegisterCommand("chain", function() if canToggle() then MBT.Utils.HandleUndress(7) end end, false)
+RegisterCommand("jacket", function() if canToggle() then MBT.Utils.HandleTorsoUndress() end end, false)
+
+-- Prop commands
+RegisterCommand("hat", function() if canToggle() then MBT.Utils.HandleProps(0) end end, false)
+RegisterCommand("glasses", function() if canToggle() then MBT.Utils.HandleProps(1) end end, false)
+RegisterCommand("ears", function() if canToggle() then MBT.Utils.HandleProps(2) end end, false)
+RegisterCommand("watch", function() if canToggle() then MBT.Utils.HandleProps(6) end end, false)
+
+-- Hair toggle: tie up / let down
+RegisterCommand("hair", function() if canToggle() then MBT.Utils.HandleToggleState("Drawables", 2) end end, false)
+
+-----------------------------------------------------------
+-- Clothing States (Tuck/Untuck)
+-- /tuck = auto-detect first toggleable slot
+-- /tuck [slot] = toggle specific drawable slot (e.g. /tuck 11)
+-----------------------------------------------------------
+RegisterCommand("tuck", function(_, args)
+    if not canToggle() then return end
+    if args[1] then
+        local slotIndex = tonumber(args[1])
+        if slotIndex then
+            MBT.Utils.HandleToggleState("Drawables", slotIndex)
+        end
+    else
+        MBT.Utils.HandleToggleState() -- auto-detect
+    end
+end, false)
+
+-----------------------------------------------------------
+-- Drip Reputation — client listener + /drip command
+-----------------------------------------------------------
+
+RegisterNetEvent('mbt_meta_clothes:dripUpdate')
+AddEventHandler('mbt_meta_clothes:dripUpdate', function(data)
+    -- Forward to NUI for display
+    SendNUIMessage({
+        action = "dripUpdate",
+        xp = data.xp,
+        rate = data.rate,
+        level = data.level,
+        levelIndex = data.levelIndex,
+        progress = data.progress
+    })
+end)
+
+RegisterCommand("drip", function()
+    TriggerServerEvent('mbt_meta_clothes:requestDrip')
+end, false)
+
+RegisterNetEvent('mbt_meta_clothes:dripInfo')
+AddEventHandler('mbt_meta_clothes:dripInfo', function(data)
+    local msg = ("~t~🔥 Drip: ~w~%s ~t~(Lv.%d) ~w~| ~t~XP: ~w~%d ~t~| Rate: ~w~+%d/tick"):format(
+        data.level, data.levelIndex, data.xp, data.rate
+    )
+    TriggerEvent('chat:addMessage', {
+        color = { 0, 200, 200 },
+        args = { "Drip", msg }
+    })
+end)

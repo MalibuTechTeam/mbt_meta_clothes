@@ -1,12 +1,94 @@
-MBT = {}
+MBT                      = {}
 
-MBT.Debug     = true
-MBT.MenuKey   = "J"
+-----------------------------------------------------------
+-- General Settings
+-----------------------------------------------------------
+MBT.Debug                = true -- Enable debug prints in server/client console
+MBT.MenuKey              = "J"  -- Keybind to open the clothing menu
+MBT.ActionCooldown       = 1500 -- ms between actions (prevents animation spam)
+MBT.TargetEnabled        = true -- Auto-detects ox_target, qb-target, or qtarget
 
+-----------------------------------------------------------
+-- Clothing Props (3D prop in hand during undress)
+-----------------------------------------------------------
 
-MBT.CustomInventory = function(itemName, metadata)
-    
-    -- Put your cutom inventory event here 
+-----------------------------------------------------------
+-- DNA Forensics
+-----------------------------------------------------------
+MBT.DnaEnabled           = true -- Track who wore each clothing item
+MBT.DnaMaxEntries        = 3    -- Max DNA entries per item (FIFO)
+MBT.DnaExpiryHours       = 48   -- Hours before DNA expires from items
+
+-----------------------------------------------------------
+-- Drip Reputation
+-----------------------------------------------------------
+MBT.DripEnabled          = true -- Enable drip XP accumulation
+MBT.DripInterval         = 300  -- Seconds between drip XP ticks (5 min)
+MBT.DefaultDrip          = 1    -- Default drip points for non-configured drawables
+MBT.DripLevels           = {
+    { name = "Freshman",     minXp = 0 },
+    { name = "Trendy",       minXp = 100 },
+    { name = "Stylish",      minXp = 300 },
+    { name = "Fashion Icon", minXp = 600 },
+    { name = "Drip God",     minXp = 1000 },
+}
+MBT.DripSlotWeights      = {
+    Drawables = {
+        [3]  = 0, -- Arms (part of torso kit, doesn't count separately)
+        [4]  = 2, -- Pants
+        [6]  = 2, -- Shoes
+        [7]  = 1, -- Chain
+        [8]  = 0, -- T-shirt (part of torso kit)
+        [11] = 3, -- Jacket/Top (most visible piece)
+    },
+    Props = {
+        [0] = 1,   -- Hat
+        [1] = 1,   -- Glasses
+        [2] = 0.5, -- Earrings
+        [6] = 0.5, -- Watch
+    }
+}
+
+-----------------------------------------------------------
+-- Progress Bar
+-- Replace with your own progress bar system if needed.
+-- Animation is handled separately by the script.
+-----------------------------------------------------------
+MBT.ProgressBar          = function(options, cb)
+    if GetResourceState('ox_lib') == 'started' then
+        local result = exports.ox_lib:progressCircle({
+            duration = options.duration,
+            label = options.label or '',
+            position = 'bottom',
+            useWhileDead = false,
+            canCancel = true,
+            disable = { car = true, move = true, combat = true },
+        })
+        cb(result)
+    else
+        Wait(options.duration)
+        cb(true)
+    end
+end
+
+-----------------------------------------------------------
+-- Clothing Props (3D props during undress/steal)
+-----------------------------------------------------------
+MBT.ClothingPropsEnabled = false -- Enable 3D prop in hand during undress animation
+MBT.PropCleanupTime      = 60    -- Seconds before scattered props auto-delete
+
+-----------------------------------------------------------
+-- Hat/Hair Clip Fix
+-- Only enable if your server uses custom hair addons that clip through hats.
+-- Map the custom hair drawable IDs that have clipping issues.
+-----------------------------------------------------------
+MBT.HatHairFix           = false
+MBT.HairFixDrawables     = {
+    -- Example: [73] = true, [74] = true,
+}
+
+MBT.CustomInventory      = function(itemName, metadata)
+    -- Put your cutom inventory event here
     -- TriggerEvent('qs-inventory:addItem', source, data.item , 1, data.metadata, {
     --         Firstname = '',
     --         Lastname = '',
@@ -15,51 +97,14 @@ MBT.CustomInventory = function(itemName, metadata)
     -- end
 end
 
-MBT.NotifyHandler = function(text, type)
-    -- Put your notify here 
+MBT.NotifyHandler        = function(text, type)
+    -- Put your notify here
     --[[
         -- Notify({ msg = text, title = "Clothes", style = "dark", type = type or "error", icon = "fa-solid fa-campground", position = "bottom-right", duration = 5000, sound = type or "error" })
     ]]
-
-    exports.ox_lib:notify({
-        title = text,
-        description = 'CLOTHES',
-        duration = 10000,
-        position = 'bottom-right',
-        style = {
-            borderRadius = 7,
-            backgroundColor = '#2e3847',
-            color = '#white',
-            fontFamily = 'Poppins',
-            fontWeight = '500',
-            fontSize = 15,
-            textShadowColor = '#0000',
-
-            borderRightColor = '#2e3847' ,
-            borderBottomColor = '#2e3847',
-            borderTopColor = '#2e3847', 
-            borderLeftColor = '#d54090',
-            
-            borderLeftWidth = 5 ,
-            borderBottomWidth = 0,
-            borderTopWidth = 0, 
-            borderRightWidth = 0,
-
-            borderTopRightRadius = 7,
-            borderLeftRadius  = 7,
-            borderBottomRadius  = 7,
-            borderTopRadius  = 7, 
-            borderRightRadius  =7,
-
-            borderStyle = 'solid',
-            marginBottom = 20
-        },
-        icon = 'fa-solid fa-shirt',
-        iconColor = '#ffcc48'
-    })
 end
 
-MBT.Labels = {
+MBT.Labels               = {
     ["nothing_to_unwear"] = "You don't have any clothes to take off!",
     ["props_desc"] = "Accessory belonging to %s",
     ["clothes_desc"] = "Piece of clothing belonging to %s",
@@ -85,31 +130,12 @@ MBT.Labels = {
     ["use_earaccess"] = "Using Ear Access",
     ["use_watch"] = "Using Watch",
     ["steal_dress"] = "Steal Dress",
-}  
-
-MBT.Target = {
-	["Active"] = true,
-    ["Zones"] = {
-        ["T1"] = function ()
-            exports.ox_target:addGlobalPlayer({
-                {
-                    name = 'steal',
-                    icon = 'fa-solid fa-cube',
-                    event = "mbt_meta_clothes:stealPlayerDress",
-                    distance = 2.0,
-                    label = MBT.Labels["steal_dress"],
-                    canInteract = function(entity)
-                        if IsEntityPlayingAnim(entity, "missminuteman_1ig_2", "handsup_base", 3) then 
-                            return true
-                        end
-                    end
-                }
-            })
-        end
-    }
+    ["stealing"] = "Stealing...",
+    ["stealing_all"] = "Stripping clothes...",
+    ["nothing_to_steal"] = "Nothing to steal",
 }
 
-MBT.Drawables = {
+MBT.Drawables            = {
     [3] = {
         ["Label"] = MBT.Labels["arms"],
         ["Default"] = {
@@ -153,8 +179,12 @@ MBT.Drawables = {
             ["male"] = { 15 },
             ["female"] = { 15 }
         },
-        ["Animation"] = { ["Dict"] = "clothingshirt", ["Anim"] = "try_shirt_positive_d", ["Flag"] = 51,
-            ["Duration"] = 1200 },
+        ["Animation"] = {
+            ["Dict"] = "clothingshirt",
+            ["Anim"] = "try_shirt_positive_d",
+            ["Flag"] = 51,
+            ["Duration"] = 1200
+        },
         ["PropModel"] = "v_24_bdr_mesh_lstshirt"
     },
     [11] = {
@@ -168,12 +198,12 @@ MBT.Drawables = {
     }
 }
 
-MBT.Props = {
+MBT.Props                = {
     [0] = {
         ["Label"] = MBT.Labels["hats"],
         ["Default"] = {
-            ["male"] = {-1},
-            ["female"] = {-1}
+            ["male"] = { -1 },
+            ["female"] = { -1 }
         },
         ["Animation"] = { ["Dict"] = "missheist_agency2ahelmet", ["Anim"] = "take_off_helmet_stand", ["Flag"] = 51, ["Duration"] = 600 },
         ["Item"] = "hat",
@@ -182,8 +212,8 @@ MBT.Props = {
     [1] = {
         ["Label"] = MBT.Labels["glasses"],
         ["Default"] = {
-            ["male"] = {-1, 0},
-            ["female"] = {-1, 0}
+            ["male"] = { -1 },
+            ["female"] = { -1 }
         },
         ["Animation"] = { ["Dict"] = "clothingspecs", ["Anim"] = "take_off", ["Flag"] = 51, ["Duration"] = 1400 },
         ["Item"] = "glasses",
@@ -192,8 +222,8 @@ MBT.Props = {
     [2] = {
         ["Label"] = MBT.Labels["ear_acc"],
         ["Default"] = {
-            ["male"] = {-1},
-            ["female"] = {-1}
+            ["male"] = { -1 },
+            ["female"] = { -1 }
         },
         ["Animation"] = { ["Dict"] = "mp_cp_stolen_tut", ["Anim"] = "b_think", ["Flag"] = 51, ["Duration"] = 900 },
         ["Item"] = "earaccess",
@@ -202,14 +232,11 @@ MBT.Props = {
     [6] = {
         ["Label"] = MBT.Labels["watch"],
         ["Default"] = {
-            ["male"] = {-1},
-            ["female"] = {-1}
+            ["male"] = { -1 },
+            ["female"] = { -1 }
         },
         ["Animation"] = { ["Dict"] = "nmt_3_rcm-10", ["Anim"] = "cs_nigel_dual-10", ["Flag"] = 51, ["Duration"] = 900 },
         ["Item"] = "watch",
         ["PropModel"] = "p_watch_01"
     },
 }
-
--- Prop cleanup time in seconds (how long scattered props stay on the ground)
-MBT.PropCleanupTime = 60
