@@ -27,20 +27,8 @@ local function normalizeMetadata(data)
     return meta
 end
 
-AddEventHandler('onResourceStart', function(resourceName)
-    if (GetCurrentResourceName() == resourceName) then
-        if NetworkIsPlayerActive(PlayerId()) then
-            MBT.Utils.UpdatePlayerClothes()
-            MBT.Utils.Target()
-            SetPedCanLosePropsOnDamage(PlayerPedId(), false, 0)
-            TriggerServerEvent("mbt_meta_clothes:playerReady")
-            -- SyncWearingState is NOT called here — server decides when to scan
-            -- InitClothingCache is called to prepare Hybrid Detection cache
-            MBT.Utils.InitClothingCache()
-            MBT.Utils.StartHybridDetection()
-        end
-    end
-end)
+-- onResourceStart is handled by the framework bridge (esx/qb/ox client.lua)
+-- to avoid duplicate playerReady events
 
 -- Server requests PED scan (new players only, after Load completed)
 RegisterNetEvent('mbt_meta_clothes:requestPedScan')
@@ -112,7 +100,7 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState)
     -- Enable restore protection: for the next 15 seconds, Hybrid Detection
     -- will REVERT any external changes to our managed slots instead of tracking them.
     -- This prevents the appearance script from overwriting our restored state.
-    MBT.Utils.EnableRestoreProtection(wearingState, 15000)
+    MBT.Utils.EnableRestoreProtection(wearingState, MBT.RestoreProtection or 15000)
 
     -- Apply immediately — restore guard (100ms polling, 15s) handles late appearance script changes
     applyWearingState(wearingState)
@@ -137,13 +125,15 @@ RegisterNUICallback('handleProps', function(data, cb)
 end)
 
 RegisterNUICallback('handleToggleState', function(data, cb)
-    -- data.slotType = "Drawables" or "Props", data.slotIndex = number
-    MBT.Utils.HandleToggleState(data.slotType, data.slotIndex)
+    if data and data.slotType and data.slotIndex then
+        MBT.Utils.ToggleClothingState(data.slotType, tonumber(data.slotIndex))
+    end
     cb(1)
 end)
 
 RegisterNUICallback('handleHairToggle', function(data, cb)
-    MBT.Utils.HandleToggleState("Drawables", 2)
+    local toggled = MBT.Utils.ToggleHair()
+    SendNUIMessage({ action = "hairToggleUpdate", hairToggled = toggled })
     cb(1)
 end)
 
@@ -273,7 +263,7 @@ RegisterCommand("toggleUndress", function()
         if sex ~= "customSkin" then
             for k, v in pairs(MBT.Drawables) do
                 local drawable = GetPedDrawableVariation(ped, k)
-                local isDefault = MBT.Utils.TableContainsValue({ table = v["Default"][sex], value = drawable })
+                local isDefault = MBT.TableContains(v["Default"][sex], drawable)
                 if not isDefault then
                     wearing.Drawables[tostring(k)] = {
                         index = k,
@@ -284,7 +274,7 @@ RegisterCommand("toggleUndress", function()
             end
             for k, v in pairs(MBT.Props) do
                 local prop = GetPedPropIndex(ped, k)
-                local isDefault = MBT.Utils.TableContainsValue({ table = v["Default"][sex], value = prop })
+                local isDefault = MBT.TableContains(v["Default"][sex], prop)
                 if not isDefault then
                     wearing.Props[tostring(k)] = {
                         index = k,
@@ -322,8 +312,11 @@ RegisterCommand("toggleUndress", function()
             end
         end
 
+        -- Check hair toggleability for NUI
+        local hairToggleable = MBT.Utils.IsHairToggleable and MBT.Utils.IsHairToggleable() or false
+
         -- Request drip data from server for NUI display
-        TriggerServerEvent('mbt_meta_clothes:requestDripForNui')
+        TriggerServerEvent('mbt_meta_clothes:requestDripInfo')
 
         SetNuiFocus(true, true)
         SendNUIMessage({
@@ -335,12 +328,13 @@ RegisterCommand("toggleUndress", function()
             bag = bagState,
             armor = armorState,
             wearableProps = resourceState,
-            toggleableSlots = toggleableSlots
+            toggleableSlots = toggleableSlots,
+            hairToggleable = hairToggleable
         })
     end
 end, false)
 
-RegisterKeyMapping('toggleUndress', MBT.Labels["sett_name"], 'keyboard', MBT.MenuKey)
+RegisterKeyMapping('toggleUndress', MBT.Locale["sett_name"] or "Clothes Menu", 'keyboard', MBT.MenuKey)
 
 -----------------------------------------------------------
 -- Slash commands for quick toggle per slot (/shirt, /trousers, etc.)
@@ -367,7 +361,47 @@ RegisterCommand("ears", function() if canToggle() then MBT.Utils.HandleProps(2) 
 RegisterCommand("watch", function() if canToggle() then MBT.Utils.HandleProps(6) end end, false)
 
 -- Hair toggle: tie up / let down
-RegisterCommand("hair", function() if canToggle() then MBT.Utils.HandleToggleState("Drawables", 2) end end, false)
+RegisterCommand("hair", function() if canToggle() then MBT.Utils.ToggleHair() end end, false)
+
+-- Steal command (fallback for servers without target scripts)
+RegisterCommand("steal", function()
+    if not canToggle() then return end
+    local myPed = PlayerPedId()
+    local myCoords = GetEntityCoords(myPed)
+    local maxDist = MBT.StealDistance or 5.0
+    local closestPed, closestDist = nil, maxDist
+
+    for _, playerId in ipairs(GetActivePlayers()) do
+        if playerId ~= PlayerId() then
+            local targetPed = GetPlayerPed(playerId)
+            if targetPed and targetPed ~= 0 then
+                local dist = #(myCoords - GetEntityCoords(targetPed))
+                if dist < closestDist then
+                    local canSteal = IsEntityPlayingAnim(targetPed, "missminuteman_1ig_2", "handsup_base", 3)
+                        or IsPedDeadOrDying(targetPed, false)
+                        or IsPedRagdoll(targetPed)
+                    if canSteal then
+                        closestPed = targetPed
+                        closestDist = dist
+                    end
+                end
+            end
+        end
+    end
+
+    if closestPed then
+        stealPlayerDress({ entity = closestPed })
+    else
+        MBT.Notification(MBT.Locale["nothing_to_steal"])
+    end
+end, false)
+
+-----------------------------------------------------------
+-- Server → Client notification relay
+-----------------------------------------------------------
+RegisterNetEvent('mbt_meta_clothes:notify', function(data)
+    MBT.Notification(data)
+end)
 
 -----------------------------------------------------------
 -- Clothing States (Tuck/Untuck)
@@ -376,13 +410,17 @@ RegisterCommand("hair", function() if canToggle() then MBT.Utils.HandleToggleSta
 -----------------------------------------------------------
 RegisterCommand("tuck", function(_, args)
     if not canToggle() then return end
-    if args[1] then
-        local slotIndex = tonumber(args[1])
-        if slotIndex then
-            MBT.Utils.HandleToggleState("Drawables", slotIndex)
-        end
+    local slotIndex = tonumber(args[1])
+    if not slotIndex then
+        MBT.Notification(MBT.Locale["tuck_usage"])
+        return
+    end
+    if MBT.Props[slotIndex] then
+        MBT.Utils.ToggleClothingState("Props", slotIndex)
+    elseif MBT.Drawables[slotIndex] then
+        MBT.Utils.ToggleClothingState("Drawables", slotIndex)
     else
-        MBT.Utils.HandleToggleState() -- auto-detect
+        MBT.Notification(MBT.Locale["tuck_invalid_slot"])
     end
 end, false)
 
@@ -404,16 +442,34 @@ AddEventHandler('mbt_meta_clothes:dripUpdate', function(data)
 end)
 
 RegisterCommand("drip", function()
-    TriggerServerEvent('mbt_meta_clothes:requestDrip')
+    TriggerServerEvent('mbt_meta_clothes:requestDripInfo')
 end, false)
+
+RegisterNUICallback('requestDripScore', function(data, cb)
+    TriggerServerEvent('mbt_meta_clothes:requestDripInfo')
+    cb(1)
+end)
 
 RegisterNetEvent('mbt_meta_clothes:dripInfo')
 AddEventHandler('mbt_meta_clothes:dripInfo', function(data)
-    local msg = ("~t~🔥 Drip: ~w~%s ~t~(Lv.%d) ~w~| ~t~XP: ~w~%d ~t~| Rate: ~w~+%d/tick"):format(
-        data.level, data.levelIndex, data.xp, data.rate
-    )
+    -- Update NUI
+    SendNUIMessage({
+        action = "dripUpdate",
+        xp = data.xp,
+        rate = data.rate,
+        level = data.level,           -- The name string from server
+        levelIndex = data.levelIndex, -- The numeric level from server
+        progress = data.progress
+    })
+
+    -- Show in chat
+    local lvl = data.level or MBT.Locale["drip_unknown"]
+    local lvlIdx = data.levelIndex or 1
+    local xp = data.xp or 0
+    local rate = data.rate or 0
+    local msg = MBT.Locale["drip_info"]:format(lvl, lvlIdx, xp, rate)
     TriggerEvent('chat:addMessage', {
         color = { 0, 200, 200 },
-        args = { "Drip", msg }
+        args = { MBT.Locale["drip_label"], msg }
     })
 end)

@@ -27,6 +27,7 @@ interface MannequinProps {
   drip?: DripState;
   wearableProps?: boolean;
   hairToggled?: boolean;
+  hairToggleable?: boolean;
   stealMode?: boolean;
   stealItems?: StealItem[];
   onCategoryClick: (id: string, rect: { left: number; top: number }) => void;
@@ -40,6 +41,7 @@ export default function Mannequin({
   drip = { xp: 0, rate: 0, level: "Freshman", levelIndex: 1, progress: 0 },
   wearableProps = false,
   hairToggled = false,
+  hairToggleable = false,
   stealMode = false,
   stealItems = [],
   onCategoryClick,
@@ -153,7 +155,7 @@ export default function Mannequin({
     {
       icon: <Scissors size={20} />,
       id: "hair",
-      active: hairToggled,
+      active: hairToggleable,
       onClick: () => {
         fetchNui("handleHairToggle").catch(() => {});
       },
@@ -223,6 +225,22 @@ export default function Mannequin({
           className={`w-full h-full object-contain transition-all duration-500 z-10
             ${stealMode ? "sepia-[0.3] hue-rotate-[320deg] brightness-[0.8]" : "drop-shadow-[0_10px_50px_rgba(255,255,255,0.15)]"}`}
         />
+
+        {/* Clothing Layers (Visual Overlays) */}
+        <AnimatePresence>
+          {wearing.Props?.["0"] && (
+            <motion.img
+              key="layer-hat"
+              initial={{ opacity: 0, y: -10, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              src="./layers/hat.png"
+              className="absolute top-[-2%] left-[51%] w-[18%] h-auto -translate-x-1/2 z-20 pointer-events-none drop-shadow-[0_5px_15px_rgba(0,0,0,0.5)]"
+              alt="Hat Layer"
+            />
+          )}
+        </AnimatePresence>
 
         {/* Pedestal shadow effect - Restored to Minimalist Original */}
         <div className="absolute bottom-[0.5%] left-1/2 -translate-x-1/2 w-[55%] h-14 bg-gradient-to-t from-white/30 to-transparent rounded-[100%] blur-[8px] z-0 shadow-[0_25px_60px_rgba(255,255,255,0.2)] opacity-60" />

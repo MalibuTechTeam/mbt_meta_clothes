@@ -56,6 +56,7 @@ export interface NUIMessageUI {
   wearableProps?: boolean;
   toggleableSlots?: ToggleableSlots;
   hairToggled?: boolean;
+  hairToggleable?: boolean;
 }
 
 export interface NUIMessageHairToggleUpdate {

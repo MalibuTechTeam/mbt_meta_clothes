@@ -24,7 +24,7 @@ function MBT.QbUseable.RegisterItems()
             local sexMatch = player.PlayerData.charinfo.gender == 0 and "male" or "female"
 
             if sexMatch ~= item.info.sex then
-                MBT.NotifyHandler(MBT.Labels["wrong_sex"]..sexMatch, "error")
+                TriggerClientEvent('mbt_meta_clothes:notify', player.PlayerData.source, { title = MBT.Locale["wrong_sex"].title, description = MBT.Locale["wrong_sex"].description .. sexMatch, type = "error", icon = "ban" })
                 return
             end
 

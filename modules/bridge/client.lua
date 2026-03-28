@@ -25,10 +25,7 @@ function MBT.SharedClient.SetupCheckDress(sexToLabel)
                 "Invalid value or wrong type for key " .. data.index
             )
 
-            if not playerWearing[data.type] or not MBT.Utils.TableContainsValue({
-                table = MBT[data.type][data.index]["Default"][data.pedSex],
-                value = playerWearing[data.type][data.index]
-            }) then
+            if not MBT.playerWearing[data.type] or not MBT.TableContains(MBT[data.type][data.index]["Default"][data.pedSex], MBT.playerWearing[data.type][data.index]) then
                 isDefault = false
             end
         end
@@ -42,8 +39,8 @@ function MBT.SharedClient.SetupCheckDress(sexToLabel)
             end
 
             if not dressType then
-                MBT.Utils.MbtDebugger("checkDress: dressType is nil, cannot apply clothing")
-                MBT.NotifyHandler(MBT.Labels["undress"], "error")
+                MBT.Debugger("checkDress: dressType is nil, cannot apply clothing")
+                MBT.Notification(MBT.Locale["undress"])
                 return
             end
 
@@ -51,7 +48,7 @@ function MBT.SharedClient.SetupCheckDress(sexToLabel)
             if dressType == 'Prop'     then TriggerEvent("mbt_meta_clothes:applyProps", data.itemInfo) end
             if dressType == 'DressKit' then TriggerEvent("mbt_meta_clothes:applyKitDress", data.itemInfo) end
         else
-            MBT.NotifyHandler(MBT.Labels["undress"], "error")
+            MBT.Notification(MBT.Locale["undress"])
         end
     end)
 end
@@ -95,7 +92,7 @@ function MBT.SharedClient.SetupStealDress()
         local closestPlayer = data and data.entity
 
         if not closestPlayer then
-            MBT.Utils.MbtDebugger("stealPlayerDress: no target entity")
+            MBT.Debugger("stealPlayerDress: no target entity")
             return
         end
 
@@ -119,7 +116,7 @@ function MBT.SharedClient.SetupStealDress()
         for _, idx in ipairs({3, 8, 11}) do
             if MBT.Drawables[idx] and MBT.Drawables[idx]["Default"][targetSex] then
                 local current = GetPedDrawableVariation(closestPlayer, idx)
-                if not MBT.Utils.TableContainsValue({table = MBT.Drawables[idx]["Default"][targetSex], value = current}) then
+                if not MBT.TableContains(MBT.Drawables[idx]["Default"][targetSex], current) then
                     hasTorso = true
                     break
                 end
@@ -127,7 +124,7 @@ function MBT.SharedClient.SetupStealDress()
         end
         if hasTorso then
             stealItems[#stealItems + 1] = {
-                label = MBT.Labels["jacket"] or "Top",
+                label = MBT.Locale["top"] or MBT.Locale["jacket"],
                 stealType = "torso",
                 slotIndex = nil
             }
@@ -137,9 +134,9 @@ function MBT.SharedClient.SetupStealDress()
         for k, v in pairs(MBT.Drawables) do
             if k ~= 3 and k ~= 8 and k ~= 11 and v["Item"] and v["Default"][targetSex] then
                 local current = GetPedDrawableVariation(closestPlayer, k)
-                if not MBT.Utils.TableContainsValue({table = v["Default"][targetSex], value = current}) then
+                if not MBT.TableContains(v["Default"][targetSex], current) then
                     stealItems[#stealItems + 1] = {
-                        label = v["Label"] or ("Slot " .. k),
+                        label = MBT.Locale[MBT.SlotLocaleKeys.Drawables[k]] or ("Slot " .. k),
                         stealType = "drawable",
                         slotIndex = k
                     }
@@ -151,9 +148,9 @@ function MBT.SharedClient.SetupStealDress()
         for k, v in pairs(MBT.Props) do
             if v["Item"] and v["Default"][targetSex] then
                 local current = GetPedPropIndex(closestPlayer, k)
-                if not MBT.Utils.TableContainsValue({table = v["Default"][targetSex], value = current}) then
+                if not MBT.TableContains(v["Default"][targetSex], current) then
                     stealItems[#stealItems + 1] = {
-                        label = v["Label"] or ("Prop " .. k),
+                        label = MBT.Locale[MBT.SlotLocaleKeys.Props[k]] or ("Prop " .. k),
                         stealType = "prop",
                         slotIndex = k
                     }
@@ -162,7 +159,7 @@ function MBT.SharedClient.SetupStealDress()
         end
 
         if #stealItems == 0 then
-            MBT.NotifyHandler(MBT.Labels["nothing_to_steal"] or "Nothing to steal", "error")
+            MBT.Notification(MBT.Locale["nothing_to_steal"])
             return
         end
 

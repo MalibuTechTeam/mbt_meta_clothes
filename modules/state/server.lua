@@ -32,12 +32,12 @@ function MBT.PlayerState.Init()
         MySQL.query([[
             ALTER TABLE mbt_player_wearing ADD COLUMN IF NOT EXISTS drip_xp INT NOT NULL DEFAULT 0
         ]])
-        MBT.ServerUtils.MbtDebugger("PlayerState: Database table ready")
+        MBT.Debugger("PlayerState: Database table ready")
     end)
 
     Citizen.CreateThread(function()
         while true do
-            Wait(300000)
+            Wait((MBT.StateSaveInterval or 300) * 1000)
             MBT.PlayerState.SaveAllDirty()
         end
     end)
@@ -164,21 +164,26 @@ function MBT.PlayerState.Load(src, identifier)
     if result and result[1] then
         local row = result[1]
         PlayerDripXp[src] = row.drip_xp or 0
-        local decoded = json.decode(row.wearing_data)
-        if decoded and type(decoded) == "table" then
+        local ok, decoded = pcall(json.decode, row.wearing_data)
+        if ok and decoded and type(decoded) == "table" then
             -- CRITICAL: json.decode creates STRING keys ("3", "11")
             -- but SetSlot/ClearSlot use NUMERIC keys (3, 11).
             -- In Lua, tbl["3"] and tbl[3] are DIFFERENT keys.
             -- Normalize all keys to numeric to prevent ghost entries.
             local normalized = { Drawables = {}, Props = {} }
             for k, v in pairs(decoded.Drawables or {}) do
-                normalized.Drawables[tonumber(k) or k] = v
+                if type(v) == "table" then
+                    normalized.Drawables[tonumber(k) or k] = v
+                end
             end
             for k, v in pairs(decoded.Props or {}) do
-                normalized.Props[tonumber(k) or k] = v
+                if type(v) == "table" then
+                    normalized.Props[tonumber(k) or k] = v
+                end
             end
             PlayerWearing[src] = normalized
         else
+            MBT.Debugger("PlayerState: corrupted DB data for", identifier, "- resetting")
             MBT.PlayerState.InitPlayer(src)
         end
         PlayerHasDbEntry[src] = true
@@ -218,6 +223,6 @@ function MBT.PlayerState.SaveAllDirty()
         end
     end
     if count > 0 then
-        MBT.ServerUtils.MbtDebugger("PlayerState: Periodic save — saved", count, "players")
+        MBT.Debugger("PlayerState: Periodic save — saved", count, "players")
     end
 end

@@ -1,16 +1,34 @@
-MBT                      = {}
+MBT                      = MBT or {}
 
 -----------------------------------------------------------
 -- General Settings
 -----------------------------------------------------------
 MBT.Debug                = true -- Enable debug prints in server/client console
+MBT.Language             = 'en' -- Language: 'en', 'it' (add your own in locales/)
 MBT.MenuKey              = "J"  -- Keybind to open the clothing menu
 MBT.ActionCooldown       = 1500 -- ms between actions (prevents animation spam)
 MBT.TargetEnabled        = true -- Auto-detects ox_target, qb-target, or qtarget
 
 -----------------------------------------------------------
--- Clothing Props (3D prop in hand during undress)
+-- Stealing
 -----------------------------------------------------------
+MBT.StealDistance        = 5.0   -- Max distance (meters) to steal from a player
+MBT.TargetDistance       = 2.0   -- ox_target / qb-target interaction distance
+MBT.StealDuration        = 1500  -- ms progress bar for single item steal
+MBT.StealAllDuration     = 2500  -- ms progress bar for steal all
+MBT.VictimAnimCap        = 10000 -- ms max victim animation (anti-grief)
+
+-----------------------------------------------------------
+-- Security
+-----------------------------------------------------------
+MBT.RateLimitWindow      = 2000 -- ms window for rate limiting
+MBT.RateLimitMax         = 5    -- Max calls per window per player
+
+-----------------------------------------------------------
+-- Persistence
+-----------------------------------------------------------
+MBT.StateSaveInterval    = 300   -- Seconds between periodic dirty saves (5 min)
+MBT.RestoreProtection    = 15000 -- ms to protect restored state from external overwrites
 
 -----------------------------------------------------------
 -- DNA Forensics
@@ -87,64 +105,40 @@ MBT.HairFixDrawables     = {
     -- Example: [73] = true, [74] = true,
 }
 
-MBT.CustomInventory      = function(itemName, metadata)
-    -- Put your cutom inventory event here
-    -- TriggerEvent('qs-inventory:addItem', source, data.item , 1, data.metadata, {
-    --         Firstname = '',
-    --         Lastname = '',
-    --         showAllDescriptions = true
-    --     })
-    -- end
-end
+-----------------------------------------------------------
+-- Custom Inventory Fallback
+-- Only needed if you DON'T use ox_inventory or qb-inventory.
+-- Uncomment and fill with your inventory's addItem logic.
+-----------------------------------------------------------
+-- MBT.CustomInventory = function(source, itemName, count, metadata)
+--     exports['qs-inventory']:AddItem(source, itemName, count, metadata)
+-- end
 
-MBT.NotifyHandler        = function(text, type)
-    -- Put your notify here
-    --[[
-        -- Notify({ msg = text, title = "Clothes", style = "dark", type = type or "error", icon = "fa-solid fa-campground", position = "bottom-right", duration = 5000, sound = type or "error" })
-    ]]
-end
+MBT.Notification         = function(data)
+    -- Preset for ox_lib (uncomment to use)
+    exports.ox_lib:notify({
+        title = data.title or "Clothes",
+        description = data.description,
+        type = data.type or "info",
+        icon = data.icon or "shirt",
+        duration = data.duration or 4000
+    })
 
-MBT.Labels               = {
-    ["nothing_to_unwear"] = "You don't have any clothes to take off!",
-    ["props_desc"] = "Accessory belonging to %s",
-    ["clothes_desc"] = "Piece of clothing belonging to %s",
-    ["ear_acc"] = "Ear Accessories",
-    ["glasses"] = "Glasses",
-    ["chain"] = "Torso Accessories",
-    ["hats"] = "Hats",
-    ["arms"] = "Arms",
-    ["legs"] = "Legs",
-    ["foot"] = "Foot",
-    ["t_shirt"] = "TShirt",
-    ["jacket"] = "Jacket",
-    ["watch"] = "Watch",
-    ["sett_name"] = "Clothes Menu",
-    ["wrong_sex"] = "This piece of clothing is not for ",
-    ["undress"] = "You must first undress",
-    ["use_dress_kit"] = "Using Top Dress",
-    ["use_trousers"] = "Using Trousers",
-    ["use_shoes"] = "Using Shoes",
-    ["use_chain"] = "Using Chain",
-    ["use_hat"] = "Using Hat",
-    ["use_glasses"] = "Using Glasses",
-    ["use_earaccess"] = "Using Ear Access",
-    ["use_watch"] = "Using Watch",
-    ["steal_dress"] = "Steal Dress",
-    ["stealing"] = "Stealing...",
-    ["stealing_all"] = "Stripping clothes...",
-    ["nothing_to_steal"] = "Nothing to steal",
-}
+    -- Preset for ESX Standard
+    -- ESX.ShowNotification(data.description or data.title)
+
+    -- Preset for QBCore Standard
+    -- QBCore.Functions.Notify(data.description or data.title, data.type or "primary")
+end
 
 MBT.Drawables            = {
     [3] = {
-        ["Label"] = MBT.Labels["arms"],
         ["Default"] = {
             ["male"] = { 15 },
             ["female"] = { 15 }
         }
     },
     [4] = {
-        ["Label"] = MBT.Labels["legs"],
         ["Default"] = {
             ["male"] = { 21 },
             ["female"] = { 14, 105 }
@@ -154,7 +148,6 @@ MBT.Drawables            = {
         ["PropModel"] = "prop_ld_jeans_01"
     },
     [6] = {
-        ["Label"] = MBT.Labels["foot"],
         ["Default"] = {
             ["male"] = { 34 },
             ["female"] = { 118 }
@@ -164,7 +157,6 @@ MBT.Drawables            = {
         ["PropModel"] = "v_ret_ps_shoe_01"
     },
     [7] = {
-        ["Label"] = MBT.Labels["chain"],
         ["Default"] = {
             ["male"] = { 0 },
             ["female"] = { 0 }
@@ -174,7 +166,6 @@ MBT.Drawables            = {
         ["PropModel"] = "p_cletus_necklace_s"
     },
     [8] = {
-        ["Label"] = MBT.Labels["t_shirt"],
         ["Default"] = {
             ["male"] = { 15 },
             ["female"] = { 15 }
@@ -188,7 +179,6 @@ MBT.Drawables            = {
         ["PropModel"] = "v_24_bdr_mesh_lstshirt"
     },
     [11] = {
-        ["Label"] = MBT.Labels["jacket"],
         ["Default"] = {
             ["male"] = { 15 },
             ["female"] = { 15 }
@@ -200,7 +190,6 @@ MBT.Drawables            = {
 
 MBT.Props                = {
     [0] = {
-        ["Label"] = MBT.Labels["hats"],
         ["Default"] = {
             ["male"] = { -1 },
             ["female"] = { -1 }
@@ -210,7 +199,6 @@ MBT.Props                = {
         ["PropModel"] = "xm3_prop_xm3_hat_ron_01a"
     },
     [1] = {
-        ["Label"] = MBT.Labels["glasses"],
         ["Default"] = {
             ["male"] = { -1 },
             ["female"] = { -1 }
@@ -220,7 +208,6 @@ MBT.Props                = {
         ["PropModel"] = "v_44_m_spyglasses"
     },
     [2] = {
-        ["Label"] = MBT.Labels["ear_acc"],
         ["Default"] = {
             ["male"] = { -1 },
             ["female"] = { -1 }
@@ -230,7 +217,6 @@ MBT.Props                = {
         ["PropModel"] = "p_tmom_earrings_s"
     },
     [6] = {
-        ["Label"] = MBT.Labels["watch"],
         ["Default"] = {
             ["male"] = { -1 },
             ["female"] = { -1 }

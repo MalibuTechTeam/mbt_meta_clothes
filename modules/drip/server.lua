@@ -74,7 +74,7 @@ function MBT.Drip.GetLevel(xp)
     xp = xp or 0
     local levels = MBT.DripLevels
     if not levels or #levels == 0 then
-        return { name = "Unknown", minXp = 0, index = 1 }, 1.0
+        return { name = MBT.Locale["drip_unknown"] or "Unknown", minXp = 0, index = 1 }, 1.0
     end
 
     local currentLevel = levels[1]
@@ -104,6 +104,28 @@ function MBT.Drip.GetLevel(xp)
         index = currentIndex
     }, progress
 end
+
+-----------------------------------------------------------
+-- /drip command handler — player requests their drip info
+-----------------------------------------------------------
+RegisterNetEvent('mbt_meta_clothes:requestDripInfo', function()
+    local src = source
+    if not MBT.PlayerState.IsLoaded(src) then return end
+
+    local totalXp = MBT.PlayerState.GetDripXp(src)
+    local rate = MBT.Drip.CalculateRate(src)
+    local level, progress = MBT.Drip.GetLevel(totalXp)
+
+    local dripData = {
+        xp = totalXp,
+        rate = rate,
+        level = level.name,
+        levelIndex = level.index or 1,
+        progress = progress
+    }
+    MBT.Debugger("dripInfo sending:", json.encode(dripData))
+    TriggerClientEvent('mbt_meta_clothes:dripInfo', src, dripData)
+end)
 
 -----------------------------------------------------------
 -- Periodic XP tick — runs every DripInterval seconds
@@ -140,7 +162,7 @@ if MBT.DripEnabled then
                         -- Update state bags so other scripts see the new drip level
                         MBT.UpdateStateBags(src)
 
-                        MBT.ServerUtils.MbtDebugger("Drip tick:", src, "+" .. rate .. "XP", "total:" .. totalXp, level.name)
+                        MBT.Debugger("Drip tick:", src, "+" .. rate .. "XP", "total:" .. totalXp, level.name)
                     end
                 end
             end

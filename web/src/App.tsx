@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Mannequin from "./components/Mannequin";
 import { fetchNui } from "./utils/fetchNui";
@@ -7,7 +7,6 @@ import {
   Glasses,
   Watch,
   ShieldCheck,
-  X,
   Backpack,
   Crown,
   Drama,
@@ -16,9 +15,6 @@ import {
   Gem,
   RefreshCw,
   Pocket,
-  Link,
-  Sticker,
-  Sparkles,
   Smile,
 } from "lucide-react";
 import "./index.css";
@@ -41,37 +37,48 @@ import type {
 
 // Slot definitions matching Lua config (MBT.Drawables / MBT.Props)
 // Torso slots (3, 8, 11) are a single kit "Top Dress" — represented by slot 8
+// Slot definitions matching Lua config (MBT.Drawables / MBT.Props)
+// Core slots (always visible)
 const DRAWABLE_SLOTS: Record<number, SlotDefinition> = {
-  1: { label: "Maschera", icon: Drama, category: "head" },
   8: { label: "Top", icon: Shirt, category: "torso" },
   4: { label: "Pantaloni", icon: Pocket, category: "legs" },
   6: { label: "Scarpe", icon: Footprints, category: "feet" },
   7: { label: "Collana", icon: Gem, category: "accessories" },
-  9: { label: "Gubbotto", icon: ShieldCheck, category: "armor" },
-  44: { label: "Zaino", icon: Backpack, category: "bags" }, // Actually slot 5, check config
-  10: { label: "Decals", icon: Sticker, category: "torso" },
 };
 
-// Re-check slot 5 mapping
-DRAWABLE_SLOTS[5] = { label: "Zaino", icon: Backpack, category: "bags" };
+// Extra slots (only visible when mbt_wearable_props is active)
+const DRAWABLE_SLOTS_WEARABLE: Record<number, SlotDefinition> = {
+  1: { label: "Maschera", icon: Drama, category: "head" },
+  5: { label: "Zaino", icon: Backpack, category: "bags" },
+  9: { label: "Giubbotto", icon: ShieldCheck, category: "armor" },
+};
 
 const PROP_SLOTS: Record<number, SlotDefinition> = {
   0: { label: "Cappello", icon: Crown, category: "head" },
   1: { label: "Occhiali", icon: Glasses, category: "head" },
   2: { label: "Orecchini", icon: Ear, category: "head" },
   6: { label: "Orologio", icon: Watch, category: "accessories" },
-  7: { label: "Bracciale", icon: Link, category: "accessories" },
 };
 
+// Reserved for future wearable_props prop slots
+const PROP_SLOTS_WEARABLE: Record<number, SlotDefinition> = {};
+
 // Map hotspot categories → which slots they show
+// Base categories (always visible)
 const CATEGORY_SLOTS: Record<string, CategorySlots> = {
-  head: { Drawables: [1], Props: [0, 1, 2] },
-  torso: { Drawables: [3, 8, 10, 11], Props: [] },
-  accessories: { Drawables: [7], Props: [6, 7] },
-  armor: { Drawables: [9], Props: [] },
-  bags: { Drawables: [5], Props: [] },
+  head: { Drawables: [], Props: [0, 1, 2] },
+  torso: { Drawables: [8], Props: [] },
+  accessories: { Drawables: [7], Props: [6] },
   legs: { Drawables: [4], Props: [] },
   feet: { Drawables: [6], Props: [] },
+};
+
+// Extra slots added per category when wearable_props is active
+const CATEGORY_SLOTS_WEARABLE: Record<string, CategorySlots> = {
+  head: { Drawables: [1], Props: [] },
+  accessories: { Drawables: [], Props: [] },
+  armor: { Drawables: [9], Props: [] },
+  bags: { Drawables: [5], Props: [] },
 };
 
 // Hotspot display metadata
@@ -117,6 +124,7 @@ export default function App() {
     Props: {},
   });
   const [hairToggled, setHairToggled] = useState(false);
+  const [hairToggleable, setHairToggleable] = useState(false);
   const [stealMode, setStealMode] = useState(false);
   const [stealItems, setStealItems] = useState<StealItem[]>([]);
 
@@ -150,6 +158,7 @@ export default function App() {
           });
           if (d.toggleableSlots) setToggleableSlots(d.toggleableSlots);
           if (d.hairToggled !== undefined) setHairToggled(d.hairToggled);
+          if (d.hairToggleable !== undefined) setHairToggleable(d.hairToggleable);
         }
         if (!isVisible) {
           setActiveCategory({ id: null, rect: null });
@@ -179,13 +188,15 @@ export default function App() {
           levelIndex: number;
           progress: number;
         };
-        setDrip({
-          xp: d.xp,
-          rate: d.rate,
-          level: d.level,
-          levelIndex: d.levelIndex,
-          progress: d.progress,
-        });
+        setDrip((prev) => ({
+          ...prev,
+          xp: d.xp !== undefined ? d.xp : prev.xp,
+          rate: d.rate !== undefined ? d.rate : prev.rate,
+          level: d.level !== undefined ? d.level : prev.level,
+          levelIndex:
+            d.levelIndex !== undefined ? d.levelIndex : prev.levelIndex,
+          progress: d.progress !== undefined ? d.progress : prev.progress,
+        }));
       }
 
       if (action === "hairToggleUpdate") {
@@ -318,8 +329,16 @@ export default function App() {
   // Il pannello si aprirà esattamente a 40px di distanza dal punto cliccato sul manichino
   const laserLength = 100;
 
-  const activeCategorySlots =
-    hasActive && activeCategory.id ? CATEGORY_SLOTS[activeCategory.id] : null;
+  const activeCategorySlots = useMemo(() => {
+    if (!hasActive || !activeCategory.id) return null;
+    const base = CATEGORY_SLOTS[activeCategory.id];
+    const extra = extraState.wearableProps ? CATEGORY_SLOTS_WEARABLE[activeCategory.id] : null;
+    if (!base && !extra) return null;
+    return {
+      Drawables: [...(base?.Drawables || []), ...(extra?.Drawables || [])],
+      Props: [...(base?.Props || []), ...(extra?.Props || [])],
+    };
+  }, [hasActive, activeCategory.id, extraState.wearableProps]);
   const activeMeta =
     hasActive && activeCategory.id ? HOTSPOT_META[activeCategory.id] : null;
 
@@ -417,26 +436,35 @@ export default function App() {
 
   return (
     <div className="w-screen h-screen bg-transparent select-none relative overflow-hidden font-sans">
-      <div
-        className={`absolute inset-0 z-0 transition-opacity duration-700 ease-in-out ${
-          visible
-            ? "pointer-events-auto opacity-100"
-            : "pointer-events-none opacity-0"
-        }`}
-        style={{
-          background:
-            "linear-gradient(to right, transparent 0%, transparent 45%, rgba(5, 11, 20, 0.7) 75%, rgba(0, 4, 10, 0.95) 100%)",
-        }}
-        onClick={() => setActiveCategory({ id: null, rect: null })}
-      />
-
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {visible && (
           <motion.div
             key="main-app-ui"
+            variants={{
+              hidden: { opacity: 0 },
+              show: { opacity: 1 },
+            }}
+            initial="hidden"
+            animate="show"
+            exit="hidden"
+            transition={{ duration: 0.3 }}
             className="absolute inset-0 w-full h-full"
-            exit={{ opacity: 0, transition: { duration: 0.3 } }}
           >
+            {/* Background Backdrop - Moved inside for sync */}
+            <motion.div
+              variants={{
+                hidden: { opacity: 0 },
+                show: { opacity: 1 },
+              }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 z-0 bg-transparent pointer-events-auto"
+              style={{
+                background:
+                  "linear-gradient(to right, transparent 0%, transparent 45%, rgba(5, 11, 20, 0.7) 75%, rgba(0, 4, 10, 0.95) 100%)",
+              }}
+              onClick={() => setActiveCategory({ id: null, rect: null })}
+            />
+
             <Mannequin
               activeCategory={activeCategory.id}
               wearing={wearing}
@@ -444,6 +472,7 @@ export default function App() {
               drip={drip}
               wearableProps={extraState.wearableProps}
               hairToggled={hairToggled}
+              hairToggleable={hairToggleable}
               stealMode={stealMode}
               stealItems={stealItems}
               onClose={handleExitUI}
@@ -516,16 +545,14 @@ export default function App() {
                       animate="show"
                       className="grid grid-cols-3 gap-y-6 gap-x-2 py-2 overflow-visible"
                     >
-                      {activeCategorySlots?.Drawables.map(
-                        (idx) =>
-                          DRAWABLE_SLOTS[idx] &&
-                          renderSlot("Drawables", idx, DRAWABLE_SLOTS[idx]),
-                      )}
-                      {activeCategorySlots?.Props.map(
-                        (idx) =>
-                          PROP_SLOTS[idx] &&
-                          renderSlot("Props", idx, PROP_SLOTS[idx]),
-                      )}
+                      {activeCategorySlots?.Drawables.map((idx) => {
+                        const def = DRAWABLE_SLOTS[idx] || DRAWABLE_SLOTS_WEARABLE[idx];
+                        return def ? renderSlot("Drawables", idx, def) : null;
+                      })}
+                      {activeCategorySlots?.Props.map((idx) => {
+                        const def = PROP_SLOTS[idx] || PROP_SLOTS_WEARABLE[idx];
+                        return def ? renderSlot("Props", idx, def) : null;
+                      })}
 
                       {activeCategorySlots &&
                         activeCategorySlots.Drawables.length === 0 &&

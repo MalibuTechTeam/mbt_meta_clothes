@@ -20,7 +20,7 @@ function MBT.QbItems.RegisterItems()
     for _, cfg in ipairs(ItemConfig) do
         RegisterNetEvent(cfg.event, function(indexT, sexT, itemInfoT, itemData)
             local ped = PlayerPedId()
-            QBCore.Functions.Progressbar(cfg.progId, MBT.Labels[cfg.label], cfg.duration, false, true, {
+            QBCore.Functions.Progressbar(cfg.progId, MBT.Locale[cfg.label], cfg.duration, false, true, {
                 disableMovement = false,
                 disableCarMovement = false,
                 disableMouse = false,

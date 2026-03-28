@@ -42,14 +42,6 @@ local SLOT_ZONES = {
     }
 }
 
---- Check if a table contains a value (local helper to avoid dependency on MBT.Utils load order)
-local function tableContains(tbl, val)
-    if not tbl then return false end
-    for _, v in ipairs(tbl) do
-        if v == val then return true end
-    end
-    return false
-end
 
 -----------------------------------------------------------
 -- Model loading
@@ -172,7 +164,7 @@ function MBT.ClothingProps.ScatterAllFromPed(ped, sex)
     for k, v in pairs(MBT.Drawables) do
         if v["PropModel"] and v["Default"][sex] then
             local current = GetPedDrawableVariation(ped, k)
-            if not tableContains(v["Default"][sex], current) then
+            if not MBT.TableContains(v["Default"][sex], current) then
                 MBT.ClothingProps.ScatterFromPed(ped, v["PropModel"], "Drawables", k)
             end
         end
@@ -181,7 +173,7 @@ function MBT.ClothingProps.ScatterAllFromPed(ped, sex)
     for k, v in pairs(MBT.Props) do
         if v["PropModel"] and v["Default"][sex] then
             local current = GetPedPropIndex(ped, k)
-            if not tableContains(v["Default"][sex], current) then
+            if not MBT.TableContains(v["Default"][sex], current) then
                 MBT.ClothingProps.ScatterFromPed(ped, v["PropModel"], "Props", k)
             end
         end

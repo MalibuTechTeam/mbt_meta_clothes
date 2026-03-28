@@ -1,5 +1,5 @@
 local playerSex
-playerWearing = { Drawables = {}, Props = {} }
+MBT.playerWearing = { Drawables = {}, Props = {} }
 local lastActionTime = 0
 
 MBT.Utils = {}
@@ -17,16 +17,16 @@ end
 function MBT.Utils.UpdatePlayerClothes()
     local playerPed = PlayerPedId()
     for k,v in pairs(MBT.Drawables) do
-        playerWearing["Drawables"][k] = GetPedDrawableVariation(playerPed, k)
+        MBT.playerWearing["Drawables"][k] = GetPedDrawableVariation(playerPed, k)
     end
     
     for k,v in pairs(MBT.Props) do
-        playerWearing["Props"][k] = GetPedPropIndex(playerPed, k)
+        MBT.playerWearing["Props"][k] = GetPedPropIndex(playerPed, k)
     end
 
     SendNUIMessage({
         action = "checkPlayerClothes", 
-        clothes = playerWearing, 
+        clothes = MBT.playerWearing, 
         defaultIndexCLothes = MBT.Drawables, 
         defaultIndexProps = MBT.Props,
         playerSex = MBT.Utils.GetPedSex(PlayerPedId())
@@ -40,7 +40,7 @@ function MBT.Utils.HandleTopDress(data)
 
     for k,v in pairs(data.index) do
         if type(v) == "table" and k ~= "Arms" then
-            if not MBT.Utils.TableContainsValue({table = MBT[data.type][v.index]["Default"][data.pedSex], value = playerWearing["Drawables"][v.index]}) then
+            if not MBT.TableContains(MBT[data.type][v.index]["Default"][data.pedSex], MBT.playerWearing["Drawables"][v.index]) then
                 canWear = false
                 break
             end
@@ -74,7 +74,7 @@ function MBT.Utils.HandleProps(propIndex)
         MBT.Utils.UpdatePlayerClothes()
         if MBT.Utils.SendWearingToNUI then MBT.Utils.SendWearingToNUI() end
     else
-        MBT.NotifyHandler(MBT.Labels["nothing_to_unwear"], "error")
+        MBT.Notification(MBT.Locale["nothing_to_unwear"])
     end
 end
 
@@ -132,7 +132,7 @@ function MBT.Utils.HandleTorsoUndress()
         MBT.Utils.UpdatePlayerClothes()
         if MBT.Utils.SendWearingToNUI then MBT.Utils.SendWearingToNUI() end
     else
-        MBT.NotifyHandler(MBT.Labels["nothing_to_unwear"], "error")
+        MBT.Notification(MBT.Locale["nothing_to_unwear"])
     end
 end
 
@@ -162,7 +162,7 @@ function MBT.Utils.HandleUndress(dressIndex)
         MBT.Utils.UpdatePlayerClothes()
         if MBT.Utils.SendWearingToNUI then MBT.Utils.SendWearingToNUI() end
     else
-        MBT.NotifyHandler(MBT.Labels["nothing_to_unwear"], "error")
+        MBT.Notification(MBT.Locale["nothing_to_unwear"])
     end
 end
 
@@ -170,13 +170,13 @@ end
 function MBT.Utils.IsAbleToUndress(data)
     local isAble = true
     local playerSex = MBT.Utils.GetPedSex(PlayerPedId()) 
-    local isWearingDefault = MBT.Utils.TableContainsValue({table = MBT[data.Type][data.Index]["Default"][playerSex], value = data.Drawable})
+    local isWearingDefault = MBT.TableContains(MBT[data.Type][data.Index]["Default"][playerSex], data.Drawable)
     
     if MBT.Utils.IsTable(MBT[data.Type][data.Index]["Default"][playerSex]) then
         if isWearingDefault then
             if data.Index == 8 then
                 local currentJacket = {Index = 11, Drawable = GetPedDrawableVariation(PlayerPedId(), 11)}
-                if MBT.Utils.TableContainsValue({table = MBT[data.Type][currentJacket.Index]["Default"][playerSex], value = currentJacket.Drawable}) then -- Jacket?
+                if MBT.TableContains(MBT[data.Type][currentJacket.Index]["Default"][playerSex], currentJacket.Drawable) then -- Jacket?
                     isAble = false
                 end
             else
@@ -284,80 +284,24 @@ function MBT.Utils.GetPedSex(ped)
     end
 end
 
----@param data table
-function MBT.Utils.TableContainsValue(data) 
-    for i = 1, #data.table do
-        if data.table[i] == data.value then return true end
-    end
-    return false
-end
 
 ---@param x table
 function MBT.Utils.IsTable(x)
     return type(x) == "table" 
 end
 
+local targetInitialized = false
 function MBT.Utils.Target()
+    if targetInitialized then return end
+    targetInitialized = true
     if MBT.TargetModule and MBT.TargetModule.Setup then
         MBT.TargetModule.Setup()
     end
 end
 
----@param dictionaries string
----@param clip string
----@param duration number
-function MBT.Utils.PlayAnimation(dictionaries, clip, duration)
-    local playerPed = PlayerPedId()
-    if DoesEntityExist(playerPed) then
-        Citizen.CreateThread(function()
-            RequestAnimDict(dictionaries)
-            while not HasAnimDictLoaded(dictionaries) do
-                Citizen.Wait(100)
-            end
-
-			if IsEntityPlayingAnim(playerPed, dictionaries, clip, 3) then
-                ClearPedSecondaryTask(playerPed)
-            else
-                TaskPlayAnim(playerPed, dictionaries, clip, 1.0, -1.0, duration, 8, 0, 0, 0, 0)
-                RemoveAnimDict(dictionaries)
-            end
-        end)
-    end
-end
-
-function MBT.Utils.StealAnim()
-    MBT.Utils.PlayAnimation("anim@heists@load_box", "idle", 1000)
-    Citizen.Wait(1000)
-    MBT.Utils.PlayAnimation("anim@heists@box_carry@", "idle", 500)
-    Citizen.Wait(500)
-    MBT.Utils.PlayAnimation("missfam5_yoga", "start_pose", 500)
-    Citizen.Wait(500)
-    MBT.Utils.PlayAnimation("missbigscore2aig_7@driver", "boot_r_loop", 1000)
-    Citizen.Wait(1000)
-    MBT.Utils.PlayAnimation("mini@yoga", "outro_2", 1000)
-    Citizen.Wait(1000)
-    MBT.Utils.PlayAnimation("missbigscore2aig_7@driver", "boot_l_loop", 1000)
-    Citizen.Wait(1000)
-    MBT.Utils.PlayAnimation("mini@yoga", "outro_2", 1000)
-    Citizen.Wait(1000)
-    ClearPedTasks(PlayerPedId())
-end
-
 function MBT.Utils.MbtWearableProps()
     local resourceState = GetResourceState("mbt_wearable_props") ~= "missing"
     return resourceState
-end
-
-function MBT.Utils.MbtDebugger(...)
-	if MBT.Debug then
-		local arg = {...}
-		local printResult = "["..GetCurrentResourceName().."] | " 
-		for _,v in ipairs(arg) do
-			printResult = printResult .. tostring(v) .. "\t"
-		end
-		printResult = printResult .. "\n"
-		print(printResult)
-	end
 end
 
 -----------------------------------------------------------
@@ -408,7 +352,7 @@ function MBT.Utils.SyncWearingState()
 
     for k, v in pairs(MBT.Drawables) do
         local current = GetPedDrawableVariation(ped, k)
-        if not MBT.Utils.TableContainsValue({table = v["Default"][sex], value = current}) then
+        if not MBT.TableContains(v["Default"][sex], current) then
             wearingData.Drawables[k] = {
                 index = k,
                 drawable = current,
@@ -422,7 +366,7 @@ function MBT.Utils.SyncWearingState()
 
     for k, v in pairs(MBT.Props) do
         local current = GetPedPropIndex(ped, k)
-        if not MBT.Utils.TableContainsValue({table = v["Default"][sex], value = current}) then
+        if not MBT.TableContains(v["Default"][sex], current) then
             wearingData.Props[k] = {
                 index = k,
                 drawable = current,
@@ -455,7 +399,7 @@ function MBT.Utils.StartHybridDetection()
         Wait(500)
 
         while true do
-            local pollInterval = restoreProtection and 100 or 1000
+            local pollInterval = restoreProtection and 250 or 1000
             Wait(pollInterval)
 
             local ped = PlayerPedId()
@@ -477,7 +421,7 @@ function MBT.Utils.StartHybridDetection()
                         expectedChanges[key] = nil
                         clothingCache.Drawables[k] = { drawable = currentDrawable, texture = currentTexture }
                         if restoreProtection and restoreState and restoreState.Drawables then
-                            local isDefault = MBT.Utils.TableContainsValue({table = v["Default"][sex], value = currentDrawable})
+                            local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
                             if isDefault then
                                 restoreState.Drawables[tostring(k)] = nil
                                 restoreState.Drawables[k] = nil
@@ -499,7 +443,7 @@ function MBT.Utils.StartHybridDetection()
                         end
                     else
                         clothingCache.Drawables[k] = { drawable = currentDrawable, texture = currentTexture }
-                        local isDefault = MBT.Utils.TableContainsValue({table = v["Default"][sex], value = currentDrawable})
+                        local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
                         if isDefault then
                             TriggerServerEvent("mbt_meta_clothes:externalUndress", "Drawables", k)
                         else
@@ -528,7 +472,7 @@ function MBT.Utils.StartHybridDetection()
                         expectedChanges[key] = nil
                         clothingCache.Props[k] = { drawable = currentDrawable, texture = currentTexture }
                         if restoreProtection and restoreState and restoreState.Props then
-                            local isDefault = MBT.Utils.TableContainsValue({table = v["Default"][sex], value = currentDrawable})
+                            local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
                             if isDefault then
                                 restoreState.Props[tostring(k)] = nil
                                 restoreState.Props[k] = nil
@@ -550,7 +494,7 @@ function MBT.Utils.StartHybridDetection()
                         end
                     else
                         clothingCache.Props[k] = { drawable = currentDrawable, texture = currentTexture }
-                        local isDefault = MBT.Utils.TableContainsValue({table = v["Default"][sex], value = currentDrawable})
+                        local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
                         if isDefault then
                             if k == 0 then MBT.Utils.RestoreHairFromHatFix(ped) end
                             TriggerServerEvent("mbt_meta_clothes:externalUndress", "Props", k)
@@ -639,8 +583,8 @@ function MBT.Utils.StealSingleItem(thiefPed, targetPed, targetServerId, stealTyp
 
     local cancelled = false
     MBT.ProgressBar({
-        duration = 1500,
-        label = MBT.Labels["stealing"] or "Stealing...",
+        duration = MBT.StealDuration or 1500,
+        label = MBT.Locale["stealing"] or "Stealing...",
     }, function(result)
         if not result then cancelled = true end
     end)
@@ -660,8 +604,8 @@ function MBT.Utils.StealAllItems(thiefPed, targetPed, targetServerId)
 
     local cancelled = false
     MBT.ProgressBar({
-        duration = 2500,
-        label = MBT.Labels["stealing_all"] or "Stripping clothes...",
+        duration = MBT.StealAllDuration or 2500,
+        label = MBT.Locale["stealing_all"] or "Stripping clothes...",
     }, function(result)
         if not result then cancelled = true end
     end)
@@ -839,4 +783,26 @@ end
 
 function MBT.Utils.MbtWearableProps()
     return GetResourceState('mbt_wearable_props') == 'started'
+end
+
+--- Send full wearing state to NUI (updates all slot visuals)
+function MBT.Utils.SendWearingToNUI()
+    local ped = PlayerPedId()
+    local sex = MBT.Utils.GetPedSex(ped)
+    if not sex or sex == "customSkin" then return end
+
+    local wearing = { Drawables = {}, Props = {} }
+    for k, v in pairs(MBT.Drawables) do
+        local current = GetPedDrawableVariation(ped, k)
+        if not MBT.TableContains(v["Default"][sex], current) then
+            wearing.Drawables[tostring(k)] = { drawable = current, texture = GetPedTextureVariation(ped, k) }
+        end
+    end
+    for k, v in pairs(MBT.Props) do
+        local current = GetPedPropIndex(ped, k)
+        if not MBT.TableContains(v["Default"][sex], current) then
+            wearing.Props[tostring(k)] = { drawable = current, texture = GetPedPropTextureIndex(ped, k) }
+        end
+    end
+    SendNUIMessage({ action = "updateWearing", wearing = wearing })
 end

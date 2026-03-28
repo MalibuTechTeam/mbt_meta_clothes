@@ -5,13 +5,6 @@
 
 MBT.GiveItems = {}
 
-local function tableContainsValue(tbl, value)
-    if type(tbl) ~= "table" then return tbl == value end
-    for i = 1, #tbl do
-        if tbl[i] == value then return true end
-    end
-    return false
-end
 
 --- Build item description with optional clothing ID for admin reference
 --- @param baseDesc string The base description (e.g. "Piece of clothing belonging to John")
@@ -42,14 +35,14 @@ function MBT.GiveItems.Setup(config)
         local metadata
         if storedMetadata then
             metadata = storedMetadata
-            metadata.description = buildDescription(MBT.Labels["clothes_desc"]:format(playerIdentity), metadata)
+            metadata.description = buildDescription(MBT.Locale["clothes_desc"]:format(playerIdentity), metadata)
         else
             metadata = {
                 index = data.Index, sex = data.Sex,
                 drawable = data.Drawable, texture = data.Texture, palette = data.Palette,
                 type = "Drawable"
             }
-            metadata.description = buildDescription(MBT.Labels["clothes_desc"]:format(playerIdentity), metadata)
+            metadata.description = buildDescription(MBT.Locale["clothes_desc"]:format(playerIdentity), metadata)
         end
 
         -- Clean expired DNA before returning item to inventory
@@ -63,7 +56,7 @@ function MBT.GiveItems.Setup(config)
         if not player then return end
         local playerIdentity = config.getPlayerName(player)
         local metadata = {
-            description = MBT.Labels["clothes_desc"]:format(playerIdentity),
+            description = MBT.Locale["clothes_desc"]:format(playerIdentity),
             sex = data.Sex, type = "DressKit"
         }
 
@@ -95,14 +88,14 @@ function MBT.GiveItems.Setup(config)
         local metadata
         if storedMetadata then
             metadata = storedMetadata
-            metadata.description = buildDescription(MBT.Labels["props_desc"]:format(playerIdentity), metadata)
+            metadata.description = buildDescription(MBT.Locale["props_desc"]:format(playerIdentity), metadata)
         else
             metadata = {
                 index = data.Index, sex = data.Sex,
                 drawable = data.Drawable, texture = data.Texture,
                 type = "Prop"
             }
-            metadata.description = buildDescription(MBT.Labels["props_desc"]:format(playerIdentity), metadata)
+            metadata.description = buildDescription(MBT.Locale["props_desc"]:format(playerIdentity), metadata)
         end
 
         -- Clean expired DNA before returning item to inventory
@@ -120,7 +113,7 @@ function MBT.GiveItems.Setup(config)
         local torsoSlots = {3, 8, 11}
         local hasNonDefaultTorso = false
         local kitMetadata = {
-            description = MBT.Labels["clothes_desc"]:format(playerIdentity),
+            description = MBT.Locale["clothes_desc"]:format(playerIdentity),
             sex = playerSex, type = "DressKit"
         }
         local slotNames = {[3] = "Arms", [8] = "Tshirt", [11] = "Jacket"}
@@ -128,7 +121,7 @@ function MBT.GiveItems.Setup(config)
         for _, slotIdx in ipairs(torsoSlots) do
             local v = targetWearing["Drawables"][slotIdx]
             if v and MBT.Drawables[slotIdx] then
-                local isDefault = tableContainsValue(MBT.Drawables[slotIdx]["Default"][playerSex], v.Drawable)
+                local isDefault = MBT.TableContains(MBT.Drawables[slotIdx]["Default"][playerSex], v.Drawable)
                 if not isDefault then
                     hasNonDefaultTorso = true
                 end
@@ -149,9 +142,9 @@ function MBT.GiveItems.Setup(config)
         for k, v in pairs(targetWearing["Drawables"]) do
             if k ~= 3 and k ~= 8 and k ~= 11 then
                 if MBT.Drawables[k] and MBT.Drawables[k]["Item"] then
-                    if not tableContainsValue(MBT.Drawables[k]["Default"][playerSex], v.Drawable) then
+                    if not MBT.TableContains(MBT.Drawables[k]["Default"][playerSex], v.Drawable) then
                         config.addItem(stealSource, MBT.Drawables[k]["Item"], 1, {
-                            description = buildDescription(MBT.Labels["clothes_desc"]:format(playerIdentity), {index = k, drawable = v.Drawable, texture = v.Texture}),
+                            description = buildDescription(MBT.Locale["clothes_desc"]:format(playerIdentity), {index = k, drawable = v.Drawable, texture = v.Texture}),
                             index = k, sex = playerSex,
                             drawable = v.Drawable, texture = v.Texture, palette = v.Palette,
                             type = "Drawable"
@@ -164,9 +157,9 @@ function MBT.GiveItems.Setup(config)
         -- Props
         for k, v in pairs(targetWearing["Props"]) do
             if MBT.Props[k] and MBT.Props[k]["Item"] then
-                if not tableContainsValue(MBT.Props[k]["Default"][playerSex], v.Drawable) then
+                if not MBT.TableContains(MBT.Props[k]["Default"][playerSex], v.Drawable) then
                     config.addItem(stealSource, MBT.Props[k]["Item"], 1, {
-                        description = buildDescription(MBT.Labels["props_desc"]:format(playerIdentity), {index = k, drawable = v.Drawable, texture = v.Texture}),
+                        description = buildDescription(MBT.Locale["props_desc"]:format(playerIdentity), {index = k, drawable = v.Drawable, texture = v.Texture}),
                         index = k, sex = playerSex,
                         drawable = v.Drawable, texture = v.Texture, palette = v.Palette,
                         type = "Prop"

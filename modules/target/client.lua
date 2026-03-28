@@ -33,11 +33,11 @@ function MBT.TargetModule.Setup()
 
     activeTarget = detectTarget()
     if not activeTarget then
-        MBT.Utils.MbtDebugger("Target: No supported target script found (ox_target, qb-target, qtarget)")
+        MBT.Debugger("Target: No supported target script found (ox_target, qb-target, qtarget)")
         return
     end
 
-    MBT.Utils.MbtDebugger("Target: Using", activeTarget)
+    MBT.Debugger("Target: Using", activeTarget)
 
     if activeTarget == 'ox_target' then
         -- Remove existing target before re-adding (prevents duplicate on ensure)
@@ -46,9 +46,9 @@ function MBT.TargetModule.Setup()
             {
                 name = 'mbt_steal_dress',
                 icon = 'fa-solid fa-shirt',
-                label = MBT.Labels["steal_dress"],
+                label = MBT.Locale["steal_dress"],
                 event = 'mbt_meta_clothes:stealPlayerDress',
-                distance = 2.0,
+                distance = MBT.TargetDistance or 2.0,
                 canInteract = function(entity)
                     return canStealFrom(entity)
                 end
@@ -61,7 +61,7 @@ function MBT.TargetModule.Setup()
                 {
                     name = 'mbt_steal_dress',
                     icon = 'fa-solid fa-shirt',
-                    label = MBT.Labels["steal_dress"],
+                    label = MBT.Locale["steal_dress"],
                     type = 'client',
                     event = 'mbt_meta_clothes:stealPlayerDress',
                     canInteract = function(entity)
@@ -69,7 +69,7 @@ function MBT.TargetModule.Setup()
                     end
                 }
             },
-            distance = 2.0
+            distance = MBT.TargetDistance or 2.0
         })
     end
 end

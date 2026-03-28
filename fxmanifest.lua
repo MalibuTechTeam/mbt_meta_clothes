@@ -16,6 +16,8 @@ dependencies {
 }
 
 shared_scripts {
+    'modules/shared.lua',
+    'locales/*.lua',
     'config.lua',
     'data/clothing_states.lua',
 }
@@ -25,7 +27,7 @@ server_scripts {
     -- 1. Server utilities (MBT.ServerUtils)
     'modules/utils/server.lua',
     -- 2. Player wearing state manager (MBT.PlayerState)
-    'modules/state/wearing.lua',
+    'modules/state/server.lua',
     -- 3. Shared inventory give functions (MBT.GiveItems)
     'modules/bridge/inventory/give_items.lua',
     'modules/bridge/inventory/qb_useable.lua',
@@ -43,9 +45,9 @@ client_scripts {
     -- 2. Target module (MBT.TargetModule)
     'modules/target/client.lua',
     -- 3. Clothing props system (MBT.ClothingProps)
-    'modules/props/clothing_props.lua',
+    'modules/props/client.lua',
     -- 4. Shared bridge logic (MBT.SharedClient)
-    'modules/bridge/shared_client.lua',
+    'modules/bridge/client.lua',
     -- 5. Shared inventory item handlers (MBT.OxItems, MBT.QbItems)
     'modules/bridge/inventory/ox_items.lua',
     'modules/bridge/inventory/qb_items.lua',

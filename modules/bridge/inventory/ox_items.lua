@@ -20,7 +20,7 @@ function MBT.OxItems.RegisterItems(getPlayerSex)
             local sex, sexLabel = getPlayerSex()
 
             if sexLabel ~= slot.metadata.sex then
-                MBT.NotifyHandler(MBT.Labels["wrong_sex"]..sexLabel, "error")
+                MBT.Notification({ title = MBT.Locale["wrong_sex"].title, description = MBT.Locale["wrong_sex"].description .. sexLabel, type = "error", icon = "ban" })
                 return
             end
 
@@ -42,7 +42,7 @@ function MBT.OxItems.RegisterItems(getPlayerSex)
             local sex, sexLabel = getPlayerSex()
 
             if sexLabel ~= slot.metadata.sex then
-                MBT.NotifyHandler(MBT.Labels["wrong_sex"]..sexLabel, "error")
+                MBT.Notification({ title = MBT.Locale["wrong_sex"].title, description = MBT.Locale["wrong_sex"].description .. sexLabel, type = "error", icon = "ban" })
                 return
             end
 

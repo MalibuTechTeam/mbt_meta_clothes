@@ -39,20 +39,68 @@ function MBT.ServerUtils.MbtVersionCheck(repository)
 end
 
 function MBT.ServerUtils.PrintWarning()
-    print("~r~ You are using a different type of inventory, please remember to fill the custom events on the config. If you have problems contact us on Discord: https://discord.gg/tqk3kAEr4f")
-    return
+    MBT.Warn("You are using a different type of inventory, please fill the custom events in config.lua. Discord: https://discord.gg/tqk3kAEr4f")
 end
 
-function MBT.ServerUtils.MbtDebugger(...)
-    if MBT.Debug then
-        local arg = {...}
-        local printResult = "["..GetCurrentResourceName().."] | "
-        for _,v in ipairs(arg) do
-            printResult = printResult .. tostring(v) .. "\t"
-        end
-        printResult = printResult .. "\n"
-        print(printResult)
+
+-----------------------------------------------------------
+-- Security: Input validation + Rate limiting + Proximity check
+-----------------------------------------------------------
+
+--- Validate slotType and slotIndex (derived from config)
+function MBT.ServerUtils.ValidateSlot(slotType, slotIndex)
+    if slotType ~= "Drawables" and slotType ~= "Props" then return false end
+    local slots = slotType == "Drawables" and MBT.Drawables or MBT.Props
+    if not slots then return false end
+    local idx = tonumber(slotIndex)
+    if not idx then return false end
+    return slots[idx] ~= nil, idx
+end
+
+--- Rate limiter: per-source, per-event
+local rateLimits = {} -- [source] = { [eventName] = { count, lastReset } }
+
+function MBT.ServerUtils.CheckRateLimit(src, eventName)
+    local now = GetGameTimer()
+    if not rateLimits[src] then rateLimits[src] = {} end
+    if not rateLimits[src][eventName] then
+        rateLimits[src][eventName] = { count = 0, lastReset = now }
     end
+
+    local limit = rateLimits[src][eventName]
+    if now - limit.lastReset > (MBT.RateLimitWindow or 2000) then
+        limit.count = 0
+        limit.lastReset = now
+    end
+
+    limit.count = limit.count + 1
+    if limit.count > (MBT.RateLimitMax or 5) then
+        MBT.Debugger("RATE LIMITED:", src, eventName, limit.count, "calls in window")
+        return false
+    end
+    return true
+end
+
+-- Cleanup rate limits on disconnect
+AddEventHandler('playerDropped', function()
+    rateLimits[source] = nil
+end)
+
+--- Check proximity between two players (server-side)
+function MBT.ServerUtils.CheckProximity(src1, src2, maxDistance)
+    local ped1 = GetPlayerPed(src1)
+    local ped2 = GetPlayerPed(src2)
+    if not ped1 or ped1 == 0 or not ped2 or ped2 == 0 then return false end
+
+    local c1 = GetEntityCoords(ped1)
+    local c2 = GetEntityCoords(ped2)
+    local dist = #(c1 - c2)
+    return dist <= (maxDistance or 5.0)
+end
+
+--- Validate that a source is a real online player
+function MBT.ServerUtils.IsValidPlayer(src)
+    return src and GetPlayerPing(src) > 0
 end
 
 --- Check if wearable_props has gloves export available

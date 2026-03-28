@@ -16,8 +16,11 @@ local function addItem(src, itemName, count, metadata)
             TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[itemName], "add")
         end
     else
-        assert(type(MBT.CustomInventory) == 'function', MBT.ServerUtils.PrintWarning())
-        MBT.CustomInventory(itemName, metadata)
+        if type(MBT.CustomInventory) == 'function' then
+            MBT.CustomInventory(itemName, metadata)
+        else
+            MBT.ServerUtils.PrintWarning()
+        end
     end
 end
 
