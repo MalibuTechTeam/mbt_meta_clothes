@@ -390,6 +390,69 @@ function MBT.Utils.EnableRestoreProtection(wearingState, durationMs)
     end)
 end
 
+-- Pre-cache expected change keys (built after config loads to avoid string concat in hot loop)
+local expectedChangeKeys = { Drawables = {}, Props = {} }
+SetTimeout(0, function()
+    for k in pairs(MBT.Drawables or {}) do expectedChangeKeys.Drawables[k] = "Drawables_" .. tostring(k) end
+    for k in pairs(MBT.Props or {}) do expectedChangeKeys.Props[k] = "Props_" .. tostring(k) end
+end)
+
+--- Process a single slot change in the detection loop
+local function processSlotChange(ped, slotType, k, v, sex, currentDrawable, currentTexture, isProps)
+    local key = (expectedChangeKeys[slotType] or {})[k] or (slotType .. "_" .. tostring(k))
+
+    if expectedChanges[key] then
+        expectedChanges[key] = nil
+        clothingCache[slotType][k] = { drawable = currentDrawable, texture = currentTexture }
+        if restoreProtection and restoreState and restoreState[slotType] then
+            local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
+            if isDefault then
+                restoreState[slotType][tostring(k)] = nil
+                restoreState[slotType][k] = nil
+            else
+                restoreState[slotType][tostring(k)] = { drawable = currentDrawable, texture = currentTexture }
+            end
+        end
+    elseif restoreProtection and restoreState then
+        local stored = restoreState[slotType] and (restoreState[slotType][tostring(k)] or restoreState[slotType][k])
+        if stored and stored.drawable then
+            if isProps then
+                SetPedPropIndex(ped, k, stored.drawable, stored.texture or 0, true)
+            else
+                SetPedComponentVariation(ped, k, stored.drawable, stored.texture or 0, stored.palette or 0)
+            end
+            clothingCache[slotType][k] = { drawable = stored.drawable, texture = stored.texture or 0 }
+        else
+            local default = v["Default"][sex]
+            if type(default) == "table" then
+                if isProps then
+                    ClearPedProp(ped, k)
+                    clothingCache[slotType][k] = { drawable = -1, texture = 0 }
+                else
+                    SetPedComponentVariation(ped, k, default[1], 0, 0)
+                    clothingCache[slotType][k] = { drawable = default[1], texture = 0 }
+                end
+            end
+        end
+    else
+        clothingCache[slotType][k] = { drawable = currentDrawable, texture = currentTexture }
+        local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
+        if isDefault then
+            if isProps and k == 0 then MBT.Utils.RestoreHairFromHatFix(ped) end
+            TriggerServerEvent("mbt_meta_clothes:externalUndress", slotType, k)
+        else
+            if isProps and k == 0 then MBT.Utils.ApplyHatHairFix(ped) end
+            TriggerServerEvent("mbt_meta_clothes:externalDress", slotType, {
+                index = k,
+                drawable = currentDrawable,
+                texture = currentTexture,
+                sex = sex,
+                type = isProps and "Prop" or "Drawable"
+            })
+        end
+    end
+end
+
 --- Start the Hybrid Detection polling loop
 function MBT.Utils.StartHybridDetection()
     if detectionRunning then return end
@@ -399,7 +462,7 @@ function MBT.Utils.StartHybridDetection()
         Wait(500)
 
         while true do
-            local pollInterval = restoreProtection and 250 or 1000
+            local pollInterval = restoreProtection and 500 or 1000
             Wait(pollInterval)
 
             local ped = PlayerPedId()
@@ -413,49 +476,8 @@ function MBT.Utils.StartHybridDetection()
                 local cached = clothingCache.Drawables[k]
                 local currentDrawable = GetPedDrawableVariation(ped, k)
                 local currentTexture = GetPedTextureVariation(ped, k)
-
                 if cached and (cached.drawable ~= currentDrawable or cached.texture ~= currentTexture) then
-                    local key = "Drawables_" .. tostring(k)
-
-                    if expectedChanges[key] then
-                        expectedChanges[key] = nil
-                        clothingCache.Drawables[k] = { drawable = currentDrawable, texture = currentTexture }
-                        if restoreProtection and restoreState and restoreState.Drawables then
-                            local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
-                            if isDefault then
-                                restoreState.Drawables[tostring(k)] = nil
-                                restoreState.Drawables[k] = nil
-                            else
-                                restoreState.Drawables[tostring(k)] = { drawable = currentDrawable, texture = currentTexture }
-                            end
-                        end
-                    elseif restoreProtection and restoreState then
-                        local stored = restoreState.Drawables and (restoreState.Drawables[tostring(k)] or restoreState.Drawables[k])
-                        if stored and stored.drawable then
-                            SetPedComponentVariation(ped, k, stored.drawable, stored.texture or 0, stored.palette or 0)
-                            clothingCache.Drawables[k] = { drawable = stored.drawable, texture = stored.texture or 0 }
-                        else
-                            local default = v["Default"][sex]
-                            if type(default) == "table" then
-                                SetPedComponentVariation(ped, k, default[1], 0, 0)
-                                clothingCache.Drawables[k] = { drawable = default[1], texture = 0 }
-                            end
-                        end
-                    else
-                        clothingCache.Drawables[k] = { drawable = currentDrawable, texture = currentTexture }
-                        local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
-                        if isDefault then
-                            TriggerServerEvent("mbt_meta_clothes:externalUndress", "Drawables", k)
-                        else
-                            TriggerServerEvent("mbt_meta_clothes:externalDress", "Drawables", {
-                                index = k,
-                                drawable = currentDrawable,
-                                texture = currentTexture,
-                                sex = sex,
-                                type = "Drawable"
-                            })
-                        end
-                    end
+                    processSlotChange(ped, "Drawables", k, v, sex, currentDrawable, currentTexture, false)
                 end
             end
 
@@ -464,51 +486,8 @@ function MBT.Utils.StartHybridDetection()
                 local cached = clothingCache.Props[k]
                 local currentDrawable = GetPedPropIndex(ped, k)
                 local currentTexture = GetPedPropTextureIndex(ped, k)
-
                 if cached and (cached.drawable ~= currentDrawable or cached.texture ~= currentTexture) then
-                    local key = "Props_" .. tostring(k)
-
-                    if expectedChanges[key] then
-                        expectedChanges[key] = nil
-                        clothingCache.Props[k] = { drawable = currentDrawable, texture = currentTexture }
-                        if restoreProtection and restoreState and restoreState.Props then
-                            local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
-                            if isDefault then
-                                restoreState.Props[tostring(k)] = nil
-                                restoreState.Props[k] = nil
-                            else
-                                restoreState.Props[tostring(k)] = { drawable = currentDrawable, texture = currentTexture }
-                            end
-                        end
-                    elseif restoreProtection and restoreState then
-                        local stored = restoreState.Props and (restoreState.Props[tostring(k)] or restoreState.Props[k])
-                        if stored and stored.drawable then
-                            SetPedPropIndex(ped, k, stored.drawable, stored.texture or 0, true)
-                            clothingCache.Props[k] = { drawable = stored.drawable, texture = stored.texture or 0 }
-                        else
-                            local default = v["Default"][sex]
-                            if type(default) == "table" then
-                                ClearPedProp(ped, k)
-                                clothingCache.Props[k] = { drawable = -1, texture = 0 }
-                            end
-                        end
-                    else
-                        clothingCache.Props[k] = { drawable = currentDrawable, texture = currentTexture }
-                        local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
-                        if isDefault then
-                            if k == 0 then MBT.Utils.RestoreHairFromHatFix(ped) end
-                            TriggerServerEvent("mbt_meta_clothes:externalUndress", "Props", k)
-                        else
-                            if k == 0 then MBT.Utils.ApplyHatHairFix(ped) end
-                            TriggerServerEvent("mbt_meta_clothes:externalDress", "Props", {
-                                index = k,
-                                drawable = currentDrawable,
-                                texture = currentTexture,
-                                sex = sex,
-                                type = "Prop"
-                            })
-                        end
-                    end
+                    processSlotChange(ped, "Props", k, v, sex, currentDrawable, currentTexture, true)
                 end
             end
 
@@ -746,14 +725,15 @@ function MBT.Utils.ToggleClothingState(slotType, slotIndex)
                     currentTexture = GetPedPropTextureIndex(ped, slotIndex)
                 end
 
-                -- Play animation from slot config (same as undress)
+                -- Play toggle-specific animation (ToggleAnimation key, separate from undress Animation)
                 local slotConfig = slotType == "Drawables" and MBT.Drawables[slotIndex] or MBT.Props[slotIndex]
-                if slotConfig and slotConfig["Animation"] then
+                local toggleAnim = slotConfig and slotConfig["ToggleAnimation"]
+                if toggleAnim then
                     MBT.Utils.PlayEmote({
-                        Dict = slotConfig["Animation"]["Dict"],
-                        Anim = slotConfig["Animation"]["Anim"],
-                        Flag = slotConfig["Animation"]["Flag"],
-                        Dur = slotConfig["Animation"]["Duration"]
+                        Dict = toggleAnim["Dict"],
+                        Anim = toggleAnim["Anim"],
+                        Flag = toggleAnim["Flag"],
+                        Dur  = toggleAnim["Duration"]
                     }, function()
                         MBT.Utils.ExpectChange(slotType, slotIndex)
                         if slotType == "Drawables" then

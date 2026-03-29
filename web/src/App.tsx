@@ -35,65 +35,15 @@ import type {
   NUIMessageUpdateWearing,
 } from "./types";
 
-// Slot definitions matching Lua config (MBT.Drawables / MBT.Props)
-// Torso slots (3, 8, 11) are a single kit "Top Dress" — represented by slot 8
-// Slot definitions matching Lua config (MBT.Drawables / MBT.Props)
-// Core slots (always visible)
-const DRAWABLE_SLOTS: Record<number, SlotDefinition> = {
-  8: { label: "Top", icon: Shirt, category: "torso" },
-  4: { label: "Pantaloni", icon: Pocket, category: "legs" },
-  6: { label: "Scarpe", icon: Footprints, category: "feet" },
-  7: { label: "Collana", icon: Gem, category: "accessories" },
-};
-
-// Extra slots (only visible when mbt_wearable_props is active)
-const DRAWABLE_SLOTS_WEARABLE: Record<number, SlotDefinition> = {
-  1: { label: "Maschera", icon: Drama, category: "head" },
-  5: { label: "Zaino", icon: Backpack, category: "bags" },
-  9: { label: "Giubbotto", icon: ShieldCheck, category: "armor" },
-};
-
-const PROP_SLOTS: Record<number, SlotDefinition> = {
-  0: { label: "Cappello", icon: Crown, category: "head" },
-  1: { label: "Occhiali", icon: Glasses, category: "head" },
-  2: { label: "Orecchini", icon: Ear, category: "head" },
-  6: { label: "Orologio", icon: Watch, category: "accessories" },
-};
-
-// Reserved for future wearable_props prop slots
-const PROP_SLOTS_WEARABLE: Record<number, SlotDefinition> = {};
-
-// Map hotspot categories → which slots they show
-// Base categories (always visible)
-const CATEGORY_SLOTS: Record<string, CategorySlots> = {
-  head: { Drawables: [], Props: [0, 1, 2] },
-  torso: { Drawables: [8], Props: [] },
-  accessories: { Drawables: [7], Props: [6] },
-  legs: { Drawables: [4], Props: [] },
-  feet: { Drawables: [6], Props: [] },
-};
-
-// Extra slots added per category when wearable_props is active
-const CATEGORY_SLOTS_WEARABLE: Record<string, CategorySlots> = {
-  head: { Drawables: [1], Props: [] },
-  accessories: { Drawables: [], Props: [] },
-  armor: { Drawables: [9], Props: [] },
-  bags: { Drawables: [5], Props: [] },
-};
-
-// Hotspot display metadata
-const HOTSPOT_META: Record<
-  string,
-  { icon: React.ComponentType<{ size?: number }>; label: string }
-> = {
-  head: { icon: Smile, label: "Testa & Volto" },
-  torso: { icon: Shirt, label: "Torso" },
-  accessories: { icon: Watch, label: "Accessori" },
-  armor: { icon: ShieldCheck, label: "Kevlar" },
-  bags: { icon: Backpack, label: "Zaini" },
-  legs: { icon: Pocket, label: "Pantaloni" },
-  feet: { icon: Footprints, label: "Scarpe" },
-};
+import {
+  DRAWABLE_SLOTS,
+  DRAWABLE_SLOTS_WEARABLE,
+  PROP_SLOTS,
+  PROP_SLOTS_WEARABLE,
+  CATEGORY_SLOTS,
+  CATEGORY_SLOTS_WEARABLE,
+  HOTSPOT_META,
+} from "./constants";
 
 export default function App() {
   const [visible, setVisible] = useState(false);
@@ -158,7 +108,9 @@ export default function App() {
           });
           if (d.toggleableSlots) setToggleableSlots(d.toggleableSlots);
           if (d.hairToggled !== undefined) setHairToggled(d.hairToggled);
-          if (d.hairToggleable !== undefined) setHairToggleable(d.hairToggleable);
+          if (d.hairToggleable !== undefined)
+            setHairToggleable(d.hairToggleable);
+          if (d.drip) setDrip(d.drip);
         }
         if (!isVisible) {
           setActiveCategory({ id: null, rect: null });
@@ -187,6 +139,7 @@ export default function App() {
           level: string;
           levelIndex: number;
           progress: number;
+          breakdown?: any;
         };
         setDrip((prev) => ({
           ...prev,
@@ -196,6 +149,7 @@ export default function App() {
           levelIndex:
             d.levelIndex !== undefined ? d.levelIndex : prev.levelIndex,
           progress: d.progress !== undefined ? d.progress : prev.progress,
+          breakdown: d.breakdown !== undefined ? d.breakdown : prev.breakdown,
         }));
       }
 
@@ -298,13 +252,20 @@ export default function App() {
 
   const handleToggleClick = useCallback(
     (slotType: "Drawables" | "Props", slotIndex: number) => {
-      fetchNui("handleToggleState", { slotType, slotIndex });
+      // Torso kit: button is slot 8 but ClothingStates are on slot 11 (jacket)
+      const effectiveIndex =
+        slotType === "Drawables" && slotIndex === 8 ? 11 : slotIndex;
+      fetchNui("handleToggleState", { slotType, slotIndex: effectiveIndex });
     },
     [],
   );
 
   const isSlotToggleable = useCallback(
     (slotType: "Drawables" | "Props", slotIndex: number): boolean => {
+      // Torso kit: slot 8 button represents jacket (slot 11) — check slot 11 states
+      if (slotType === "Drawables" && slotIndex === 8) {
+        return !!(toggleableSlots["Drawables"]?.["11"] || toggleableSlots["Drawables"]?.["8"]);
+      }
       return !!toggleableSlots[slotType]?.[String(slotIndex)];
     },
     [toggleableSlots],
@@ -332,7 +293,9 @@ export default function App() {
   const activeCategorySlots = useMemo(() => {
     if (!hasActive || !activeCategory.id) return null;
     const base = CATEGORY_SLOTS[activeCategory.id];
-    const extra = extraState.wearableProps ? CATEGORY_SLOTS_WEARABLE[activeCategory.id] : null;
+    const extra = extraState.wearableProps
+      ? CATEGORY_SLOTS_WEARABLE[activeCategory.id]
+      : null;
     if (!base && !extra) return null;
     return {
       Drawables: [...(base?.Drawables || []), ...(extra?.Drawables || [])],
@@ -460,7 +423,7 @@ export default function App() {
               className="absolute inset-0 z-0 bg-transparent pointer-events-auto"
               style={{
                 background:
-                  "linear-gradient(to right, transparent 0%, transparent 45%, rgba(5, 11, 20, 0.7) 75%, rgba(0, 4, 10, 0.95) 100%)",
+                  "linear-gradient(to right, transparent 0%, transparent 30%, rgba(5, 11, 20, 0.8) 45%, rgba(0, 4, 10, 0.95) 100%)",
               }}
               onClick={() => setActiveCategory({ id: null, rect: null })}
             />
@@ -502,11 +465,62 @@ export default function App() {
                       animate={{ pathLength: 1 }}
                       exit={{ pathLength: 0 }}
                       transition={{ duration: 0.4, ease: "easeOut" }}
-                      d={`M ${startX} ${startY} L ${startX - laserLength - 260} ${startY}`}
-                      stroke="rgba(255,255,255,0.4)"
-                      strokeWidth="1.5"
+                      d={`M ${startX} ${startY} 
+                         L ${startX - 20} ${startY} 
+                         L ${startX - 40} ${startY + 20} 
+                         L ${startX - 100} ${startY + 20} 
+                         L ${startX - 120} ${startY} 
+                         L ${startX - laserLength - 260} ${startY}`}
+                      stroke="rgba(255,255,255,0.25)"
+                      strokeWidth="1"
                       fill="none"
                     />
+                    {/* Energy Flow Path */}
+                    <motion.path
+                      initial={{
+                        pathLength: 0,
+                        opacity: 0,
+                        strokeDashoffset: 100,
+                      }}
+                      animate={{
+                        pathLength: 1,
+                        opacity: 1,
+                        strokeDashoffset: 0,
+                      }}
+                      exit={{ opacity: 0 }}
+                      transition={{
+                        pathLength: { duration: 0.4, ease: "easeOut" },
+                        opacity: { duration: 0.4 },
+                        strokeDashoffset: {
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: "linear",
+                        },
+                      }}
+                      d={`M ${startX} ${startY} 
+                         L ${startX - 20} ${startY} 
+                         L ${startX - 40} ${startY + 20} 
+                         L ${startX - 100} ${startY + 20} 
+                         L ${startX - 120} ${startY} 
+                         L ${startX - laserLength - 260} ${startY}`}
+                      stroke="url(#laserGradient)"
+                      strokeWidth="1.5"
+                      strokeDasharray="10 20"
+                      fill="none"
+                    />
+                    <defs>
+                      <linearGradient
+                        id="laserGradient"
+                        x1="0%"
+                        y1="0%"
+                        x2="100%"
+                        y2="0%"
+                      >
+                        <stop offset="0%" stopColor="rgba(37, 99, 235, 0)" />
+                        <stop offset="50%" stopColor="rgba(37, 99, 235, 0.8)" />
+                        <stop offset="100%" stopColor="rgba(37, 99, 235, 0)" />
+                      </linearGradient>
+                    </defs>
                   </motion.g>
                 )}
               </AnimatePresence>
@@ -533,7 +547,7 @@ export default function App() {
                   }}
                 >
                   <div className="absolute bottom-full left-0 w-full flex justify-between items-end pb-2">
-                    <h2 className="text-white text-md font-medium tracking-wider flex items-center gap-2 px-1">
+                    <h2 className="text-white text-md font-bold tracking-wider flex items-center gap-2 px-1 drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
                       {activeMeta.label}
                     </h2>
                   </div>
@@ -546,7 +560,8 @@ export default function App() {
                       className="grid grid-cols-3 gap-y-6 gap-x-2 py-2 overflow-visible"
                     >
                       {activeCategorySlots?.Drawables.map((idx) => {
-                        const def = DRAWABLE_SLOTS[idx] || DRAWABLE_SLOTS_WEARABLE[idx];
+                        const def =
+                          DRAWABLE_SLOTS[idx] || DRAWABLE_SLOTS_WEARABLE[idx];
                         return def ? renderSlot("Drawables", idx, def) : null;
                       })}
                       {activeCategorySlots?.Props.map((idx) => {

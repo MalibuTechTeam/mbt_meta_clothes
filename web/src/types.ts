@@ -57,6 +57,7 @@ export interface NUIMessageUI {
   toggleableSlots?: ToggleableSlots;
   hairToggled?: boolean;
   hairToggleable?: boolean;
+  drip?: DripState;
 }
 
 export interface NUIMessageHairToggleUpdate {
@@ -80,6 +81,7 @@ export interface NUIMessageDripUpdate {
   level: string;
   levelIndex: number;
   progress: number;
+  breakdown?: { slotType: 'Drawables' | 'Props'; slotIndex: number; rate: number }[];
 }
 
 export interface DripState {
@@ -88,6 +90,7 @@ export interface DripState {
   level: string;
   levelIndex: number;
   progress: number;
+  breakdown?: { slotType: 'Drawables' | 'Props'; slotIndex: number; rate: number }[];
 }
 
 export interface StealItem {

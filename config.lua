@@ -183,6 +183,7 @@ MBT.Drawables            = {
             ["male"] = { 15 },
             ["female"] = { 15 }
         },
+        ["ToggleAnimation"] = { ["Dict"] = "missmic4", ["Anim"] = "michael_tux_fidget", ["Flag"] = 51, ["Duration"] = 1500 },
         ["Item"] = "jacket",
         ["PropModel"] = "v_24_bdr_mesh_lstshirt"
     }
