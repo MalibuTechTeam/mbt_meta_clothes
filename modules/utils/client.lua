@@ -725,9 +725,9 @@ function MBT.Utils.ToggleClothingState(slotType, slotIndex)
                     currentTexture = GetPedPropTextureIndex(ped, slotIndex)
                 end
 
-                -- Play toggle-specific animation (ToggleAnimation key, separate from undress Animation)
+                -- Play toggle-specific animation: prefer ToggleAnimation, fallback to Animation
                 local slotConfig = slotType == "Drawables" and MBT.Drawables[slotIndex] or MBT.Props[slotIndex]
-                local toggleAnim = slotConfig and slotConfig["ToggleAnimation"]
+                local toggleAnim = slotConfig and (slotConfig["ToggleAnimation"] or slotConfig["Animation"])
                 if toggleAnim then
                     MBT.Utils.PlayEmote({
                         Dict = toggleAnim["Dict"],

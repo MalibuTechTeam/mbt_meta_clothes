@@ -15,6 +15,7 @@ import {
   DRAWABLE_SLOTS,
   DRAWABLE_SLOTS_WEARABLE,
   PROP_SLOTS,
+  LAYER_META,
 } from "../constants";
 import type { WearingState, DripState, StealItem } from "../types";
 
@@ -227,7 +228,7 @@ export default function Mannequin({
 
         <img
           key={sex === 1 ? "female" : "male"}
-          src={sex === 1 ? "./mannequin_female.png" : "./mannequin.png"}
+          src={sex === 1 ? "./mannequin_female.png" : "./mannequin_male.png"}
           alt="Ped Mannequin"
           className={`w-full h-full object-contain transition-all duration-500 z-10
             ${stealMode ? "sepia-[0.3] hue-rotate-[320deg] brightness-[0.8]" : "drop-shadow-[0_10px_50px_rgba(255,255,255,0.15)]"}`}
@@ -235,18 +236,34 @@ export default function Mannequin({
 
         {/* Clothing Layers (Visual Overlays) */}
         <AnimatePresence>
-          {wearing.Props?.["0"] && (
-            <motion.img
-              key="layer-hat"
-              initial={{ opacity: 0, y: -10, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.9 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              src="./layers/hat.png"
-              className="absolute top-[3.5%] left-[50%] w-[40%] h-auto -translate-x-1/2 z-20 pointer-events-none drop-shadow-[0_5px_15px_rgba(0,0,0,0.5)]"
-              alt="Hat Layer"
-            />
-          )}
+          {Object.entries(LAYER_META).map(([key, meta]) => {
+            const [slotType, slotIndexStr] = key.split("-");
+            const worn =
+              wearing[slotType as keyof typeof wearing]?.[slotIndexStr];
+            if (!worn) return null;
+            const gender = sex === 1 ? "female" : "male";
+            return (
+              <motion.img
+                key={`layer-${key}`}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                src={`./layers/${meta.path}_${gender}.png`}
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+                style={{
+                  top: meta.top,
+                  left: meta.left,
+                  width: meta.width,
+                  zIndex: meta.zIndex,
+                }}
+                className="absolute -translate-x-1/2 h-auto pointer-events-none drop-shadow-[0_5px_15px_rgba(0,0,0,0.5)]"
+                alt={`${meta.path} layer`}
+              />
+            );
+          })}
         </AnimatePresence>
 
         {/* Pedestal shadow effect - Restored to Minimalist Original */}
@@ -380,25 +397,25 @@ export default function Mannequin({
                 exit={{ y: -10, opacity: 0 }}
                 className="absolute top-full left-1/2 -translate-x-1/2 mt-2 pt-1 pointer-events-none"
               >
-                <div className="bg-[#050B14] border border-white/20 rounded-full px-4 py-2.5 flex items-center gap-4 shadow-[0_15px_40px_rgba(0,0,0,0.9)] pointer-events-auto border-t-white/10 whitespace-nowrap">
-                  <div className="flex items-center gap-2.5 pr-4 border-r border-white/10">
+                <div className="bg-[#050B14] border-[0.0625rem] border-white/20 rounded-full px-[1rem] py-[0.625rem] flex items-center gap-[1rem] shadow-[0_0.9375rem_2.5rem_rgba(0,0,0,0.9)] pointer-events-auto border-t-white/10 whitespace-nowrap">
+                  <div className="flex items-center gap-[0.625rem] pr-[1rem] border-r border-white/10">
                     <Flame
                       size={18}
-                      className="text-red-500 fill-red-500/20 drop-shadow-[0_0_10px_rgba(239,68,68,0.7)]"
+                      className="text-red-500 fill-red-500/20 drop-shadow-[0_0_0.625rem_rgba(239,68,68,0.7)]"
                     />
-                    <span className="text-[11px] font-black text-white uppercase tracking-[0.15em] drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
+                    <span className="text-[0.6875rem] font-black text-white uppercase tracking-[0.15em] drop-shadow-[0_0.125rem_0.5rem_rgba(0,0,0,1)]">
                       {drip.level}
                     </span>
                   </div>
 
-                  <div className="w-40 h-2 bg-white/20 rounded-full overflow-hidden border border-white/20 relative shadow-inner">
+                  <div className="w-[9rem] h-[0.375rem] bg-white/20 rounded-full overflow-hidden border border-white/20 relative shadow-inner">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{
                         width: `${Math.max(3, Math.min(drip.progress * 100, 100))}%`,
                       }}
                       style={{ backgroundColor: "#FF0000" }}
-                      className="h-full rounded-full shadow-[0_0_12px_rgba(255,0,0,0.8)] relative"
+                      className="h-full rounded-full shadow-[0_0_0.75rem_rgba(255,0,0,0.8)] relative"
                     >
                       {/* Shine Effect */}
                       <motion.div
@@ -413,18 +430,18 @@ export default function Mannequin({
                     </motion.div>
                   </div>
 
-                  <div className="flex items-center gap-4 pl-1">
-                    <div className="flex items-baseline gap-1 leading-none">
-                      <span className="text-sm font-black text-white tabular-nums drop-shadow-md">
+                  <div className="flex items-center gap-[1rem] pl-[0.25rem]">
+                    <div className="flex items-baseline gap-[0.25rem] leading-none">
+                      <span className="text-[0.875rem] font-black text-white tabular-nums drop-shadow-md">
                         {drip.xp}
                       </span>
-                      <span className="text-[8px] font-bold text-red-500 uppercase tracking-tighter">
+                      <span className="text-[0.5rem] font-bold text-red-500 uppercase tracking-tighter">
                         XP
                       </span>
                     </div>
 
-                    <div className="bg-red-500/20 px-2 py-0.5 rounded-md border border-red-500/30">
-                      <span className="text-[10px] font-black text-red-400 tracking-widest leading-none">
+                    <div className="bg-red-500/20 px-[0.5rem] py-[0.125rem] rounded-md border border-red-500/30">
+                      <span className="text-[0.625rem] font-black text-red-400 tracking-widest leading-none">
                         LV.{drip.levelIndex}
                       </span>
                     </div>
@@ -432,7 +449,7 @@ export default function Mannequin({
 
                   {/* Item Breakdown Tooltip-style list — Deepened contrast */}
                   {drip.breakdown && drip.breakdown.length > 0 && (
-                    <div className="flex items-center gap-5 pl-6 border-l border-white/15 ml-2">
+                    <div className="flex items-center gap-[1.25rem] pl-[1.5rem] border-l border-white/15 ml-[0.5rem]">
                       {drip.breakdown.map((item, idx) => {
                         const slotMeta =
                           item.slotType === "Drawables"
@@ -445,15 +462,15 @@ export default function Mannequin({
                         return (
                           <div
                             key={`${item.slotType}-${item.slotIndex}-${idx}`}
-                            className="flex items-center gap-2 group/item transition-all"
+                            className="flex items-center gap-[0.5rem] group/item transition-all"
                           >
-                            <div className="p-2 bg-white/5 rounded-lg border border-white/5 group-hover/item:bg-red-500/10 group-hover/item:border-red-500/30 transition-all">
+                            <div className="p-[0.5rem] bg-white/5 rounded-lg border border-white/5 group-hover/item:bg-red-500/10 group-hover/item:border-red-500/30 transition-all">
                               <slotMeta.icon
                                 size={14}
                                 className="text-white/60 group-hover/item:text-red-400 transition-colors"
                               />
                             </div>
-                            <span className="text-[12px] font-black text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.4)]">
+                            <span className="text-[0.75rem] font-black text-red-500 drop-shadow-[0_0_0.5rem_rgba(239,68,68,0.4)]">
                               +{item.rate}
                             </span>
                           </div>

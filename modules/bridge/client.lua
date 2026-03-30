@@ -63,21 +63,24 @@ function MBT.SharedClient.SetupInventoryChecks()
     end
 
     function checkMaskState()
-        local maskCount = exports.ox_inventory:Search('count', 'mask')
-        return maskCount >= 1
+        -- Has mask item in inventory AND something non-default is on component 1 (mask slot)
+        if exports.ox_inventory:Search('count', 'mask') < 1 then return false end
+        return GetPedDrawableVariation(PlayerPedId(), 1) ~= 0
     end
 
     function checkBagState()
-        local bagCount = exports.ox_inventory:Search('count', 'bag')
-        return bagCount >= 1
+        -- Has bag item in inventory AND something non-default is on component 5 (bag slot)
+        if exports.ox_inventory:Search('count', 'bag') < 1 then return false end
+        return GetPedDrawableVariation(PlayerPedId(), 5) ~= 0
     end
 
     function checkArmorState()
-        local armorCount = exports.ox_inventory:Search('count', {'smallarmor', 'medarmor', 'heavyarmor'})
-        for _, v in pairs(armorCount) do
-            if v >= 1 then return true end
-        end
-        return false
+        -- Has any armor item in inventory AND something non-default is on component 9 (armor slot)
+        local hasItem = exports.ox_inventory:Search('count', 'smallarmor') >= 1
+                     or exports.ox_inventory:Search('count', 'medarmor') >= 1
+                     or exports.ox_inventory:Search('count', 'heavyarmor') >= 1
+        if not hasItem then return false end
+        return GetPedDrawableVariation(PlayerPedId(), 9) ~= 0
     end
 end
 

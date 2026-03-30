@@ -158,6 +158,11 @@ export default function App() {
         setHairToggled(d.hairToggled);
       }
 
+      if (action === "extraStateUpdate") {
+        const d = event.data as Partial<ExtraState>;
+        setExtraState((prev) => ({ ...prev, ...d }));
+      }
+
       if (action === "updateWearing") {
         const d = event.data as { action: string; wearing: WearingState };
         if (d.wearing) setWearing(d.wearing);
@@ -237,6 +242,13 @@ export default function App() {
       // Slot 8 (Top) special check
       if (slotType === "Drawables" && slotIndex === 8) {
         if (!wearing.Drawables?.["8"] && !wearing.Drawables?.["11"]) return;
+      // wearable_props slots: check extraState booleans instead of wearing table
+      } else if (slotType === "Drawables" && slotIndex === 1) {
+        if (!extraState.mask) return;
+      } else if (slotType === "Drawables" && slotIndex === 5) {
+        if (!extraState.bag) return;
+      } else if (slotType === "Drawables" && slotIndex === 9) {
+        if (!extraState.armor) return;
       } else {
         if (!wearing[slotType]?.[String(slotIndex)]) return;
       }
@@ -264,7 +276,10 @@ export default function App() {
     (slotType: "Drawables" | "Props", slotIndex: number): boolean => {
       // Torso kit: slot 8 button represents jacket (slot 11) — check slot 11 states
       if (slotType === "Drawables" && slotIndex === 8) {
-        return !!(toggleableSlots["Drawables"]?.["11"] || toggleableSlots["Drawables"]?.["8"]);
+        return !!(
+          toggleableSlots["Drawables"]?.["11"] ||
+          toggleableSlots["Drawables"]?.["8"]
+        );
       }
       return !!toggleableSlots[slotType]?.[String(slotIndex)];
     },
@@ -277,9 +292,13 @@ export default function App() {
       if (slotType === "Drawables" && slotIndex === 8) {
         return !!(wearing.Drawables?.["8"] || wearing.Drawables?.["11"]);
       }
+      // wearable_props slots: worn state comes from extraState booleans, not wearing table
+      if (slotType === "Drawables" && slotIndex === 1) return !!extraState.mask;
+      if (slotType === "Drawables" && slotIndex === 5) return !!extraState.bag;
+      if (slotType === "Drawables" && slotIndex === 9) return !!extraState.armor;
       return !!wearing[slotType]?.[String(slotIndex)];
     },
-    [wearing],
+    [wearing, extraState],
   );
 
   // Laser HUD math
@@ -289,6 +308,9 @@ export default function App() {
 
   // Il pannello si aprirà esattamente a 40px di distanza dal punto cliccato sul manichino
   const laserLength = 100;
+
+  // Scaling factor for absolute pixel calculations
+  const scale = window.innerHeight / 1080;
 
   const activeCategorySlots = useMemo(() => {
     if (!hasActive || !activeCategory.id) return null;
@@ -346,12 +368,15 @@ export default function App() {
         <motion.button
           whileHover={worn ? { scale: 1.05 } : {}}
           whileTap={worn ? { scale: 0.95 } : {}}
-          onClick={() => handleSlotClick(slotType, slotIndex)}
-          className={`aspect-square w-14 rounded-full flex items-center justify-center relative group transition-all duration-300
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSlotClick(slotType, slotIndex);
+          }}
+          className={`aspect-square w-[3.5rem] rounded-full flex items-center justify-center relative group transition-all duration-300 pointer-events-auto
             ${
               worn
-                ? "bg-white/10 border border-white/40 cursor-pointer shadow-[0_0_20px_rgba(255,255,255,0.05)]"
-                : "bg-[#0B121D]/40 border border-white/5 opacity-50 cursor-default hover:bg-[#0B121D]/60"
+                ? "bg-white/10 border-[0.0625rem] border-white/40 cursor-pointer shadow-[0_0_1.25rem_rgba(255,255,255,0.05)]"
+                : "bg-[#0B121D]/40 border-[0.0625rem] border-white/5 opacity-50 cursor-default hover:bg-[#0B121D]/60"
             }`}
         >
           {/* Active Orbit Ring */}
@@ -411,180 +436,195 @@ export default function App() {
             animate="show"
             exit="hidden"
             transition={{ duration: 0.3 }}
-            className="absolute inset-0 w-full h-full"
+            className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden"
           >
-            {/* Background Backdrop - Moved inside for sync */}
-            <motion.div
-              variants={{
-                hidden: { opacity: 0 },
-                show: { opacity: 1 },
-              }}
-              transition={{ duration: 0.3 }}
-              className="absolute inset-0 z-0 bg-transparent pointer-events-auto"
-              style={{
-                background:
-                  "linear-gradient(to right, transparent 0%, transparent 30%, rgba(5, 11, 20, 0.8) 45%, rgba(0, 4, 10, 0.95) 100%)",
-              }}
-              onClick={() => setActiveCategory({ id: null, rect: null })}
-            />
+            {/* Safe Center Area: Constrains UI to a virtual 16:9 box on Ultrawide */}
+            <div className="relative w-full h-full max-w-[177.77vh] mx-auto pointer-events-none">
+              {/* Background Backdrop - Moved inside for sync */}
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0 },
+                  show: { opacity: 1 },
+                }}
+                transition={{ duration: 0.3 }}
+                className="absolute inset-0 z-0 bg-transparent pointer-events-auto"
+                style={{
+                  background:
+                    "linear-gradient(to right, transparent 0%, transparent 30%, rgba(5, 11, 20, 0.8) 65%, rgba(0, 4, 10, 0.95) 100%)",
+                }}
+                onClick={() => setActiveCategory({ id: null, rect: null })}
+              />
 
-            <Mannequin
-              activeCategory={activeCategory.id}
-              wearing={wearing}
-              sex={sex}
-              drip={drip}
-              wearableProps={extraState.wearableProps}
-              hairToggled={hairToggled}
-              hairToggleable={hairToggleable}
-              stealMode={stealMode}
-              stealItems={stealItems}
-              onClose={handleExitUI}
-              onCategoryClick={(id, rect) => {
-                if (activeCategory.id === id) {
-                  setActiveCategory({ id: null, rect: null });
-                } else {
-                  setActiveCategory({ id, rect });
-                }
-              }}
-            />
+              <Mannequin
+                activeCategory={activeCategory.id}
+                wearing={wearing}
+                sex={sex}
+                drip={drip}
+                wearableProps={extraState.wearableProps}
+                hairToggled={hairToggled}
+                hairToggleable={hairToggleable}
+                stealMode={stealMode}
+                stealItems={stealItems}
+                onClose={handleExitUI}
+                onCategoryClick={(id, rect) => {
+                  if (activeCategory.id === id) {
+                    setActiveCategory({ id: null, rect: null });
+                  } else {
+                    setActiveCategory({ id, rect });
+                  }
+                }}
+              />
 
-            {/* SVG Laser HUD */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
-              <AnimatePresence>
-                {hasActive && (
-                  <motion.g
-                    key={`laser-${activeCategory.id}`}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <motion.circle cx={startX} cy={startY} r={2} fill="white" />
-                    <motion.path
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1 }}
-                      exit={{ pathLength: 0 }}
-                      transition={{ duration: 0.4, ease: "easeOut" }}
-                      d={`M ${startX} ${startY} 
-                         L ${startX - 20} ${startY} 
-                         L ${startX - 40} ${startY + 20} 
-                         L ${startX - 100} ${startY + 20} 
-                         L ${startX - 120} ${startY} 
-                         L ${startX - laserLength - 260} ${startY}`}
-                      stroke="rgba(255,255,255,0.25)"
-                      strokeWidth="1"
-                      fill="none"
-                    />
-                    {/* Energy Flow Path */}
-                    <motion.path
-                      initial={{
-                        pathLength: 0,
-                        opacity: 0,
-                        strokeDashoffset: 100,
-                      }}
-                      animate={{
-                        pathLength: 1,
-                        opacity: 1,
-                        strokeDashoffset: 0,
-                      }}
+              {/* SVG Laser HUD */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
+                <AnimatePresence>
+                  {hasActive && (
+                    <motion.g
+                      key={`laser-${activeCategory.id}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      transition={{
-                        pathLength: { duration: 0.4, ease: "easeOut" },
-                        opacity: { duration: 0.4 },
-                        strokeDashoffset: {
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: "linear",
-                        },
-                      }}
-                      d={`M ${startX} ${startY} 
-                         L ${startX - 20} ${startY} 
-                         L ${startX - 40} ${startY + 20} 
-                         L ${startX - 100} ${startY + 20} 
-                         L ${startX - 120} ${startY} 
-                         L ${startX - laserLength - 260} ${startY}`}
-                      stroke="url(#laserGradient)"
-                      strokeWidth="1.5"
-                      strokeDasharray="10 20"
-                      fill="none"
-                    />
-                    <defs>
-                      <linearGradient
-                        id="laserGradient"
-                        x1="0%"
-                        y1="0%"
-                        x2="100%"
-                        y2="0%"
+                      transition={{ duration: 0.3 }}
+                    >
+                      <motion.circle
+                        cx={startX}
+                        cy={startY}
+                        r={2}
+                        fill="white"
+                      />
+                      <motion.path
+                        initial={{ pathLength: 0 }}
+                        animate={{ pathLength: 1 }}
+                        exit={{ pathLength: 0 }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        d={`M ${startX} ${startY} 
+                         L ${startX - 20 * scale} ${startY} 
+                         L ${startX - 40 * scale} ${startY + 20 * scale} 
+                         L ${startX - 100 * scale} ${startY + 20 * scale} 
+                         L ${startX - 120 * scale} ${startY} 
+                         L ${startX - (laserLength + 260) * scale} ${startY}`}
+                        stroke="rgba(255,255,255,0.25)"
+                        strokeWidth="1"
+                        fill="none"
+                      />
+                      {/* Energy Flow Path */}
+                      <motion.path
+                        initial={{
+                          pathLength: 0,
+                          opacity: 0,
+                          strokeDashoffset: 100,
+                        }}
+                        animate={{
+                          pathLength: 1,
+                          opacity: 1,
+                          strokeDashoffset: 0,
+                        }}
+                        exit={{ opacity: 0 }}
+                        transition={{
+                          pathLength: { duration: 0.4, ease: "easeOut" },
+                          opacity: { duration: 0.4 },
+                          strokeDashoffset: {
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "linear",
+                          },
+                        }}
+                        d={`M ${startX} ${startY} 
+                         L ${startX - 20 * scale} ${startY} 
+                         L ${startX - 40 * scale} ${startY + 20 * scale} 
+                         L ${startX - 100 * scale} ${startY + 20 * scale} 
+                         L ${startX - 120 * scale} ${startY} 
+                         L ${startX - (laserLength + 260) * scale} ${startY}`}
+                        stroke="url(#laserGradient)"
+                        strokeWidth="1.5"
+                        strokeDasharray="10 20"
+                        fill="none"
+                      />
+                      <defs>
+                        <linearGradient
+                          id="laserGradient"
+                          x1="0%"
+                          y1="0%"
+                          x2="100%"
+                          y2="0%"
+                        >
+                          <stop offset="0%" stopColor="rgba(37, 99, 235, 0)" />
+                          <stop
+                            offset="50%"
+                            stopColor="rgba(37, 99, 235, 0.8)"
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="rgba(37, 99, 235, 0)"
+                          />
+                        </linearGradient>
+                      </defs>
+                    </motion.g>
+                  )}
+                </AnimatePresence>
+              </svg>
+
+              {/* Floating Contextual Panel */}
+              <AnimatePresence mode="wait">
+                {hasActive && activeMeta && (
+                  <motion.div
+                    key={`panel-${activeCategory.id}`}
+                    initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: 20, scale: 0.95 }}
+                    transition={{
+                      type: "spring" as const,
+                      stiffness: 350,
+                      damping: 25,
+                    }}
+                    className="absolute z-20 flex flex-col pointer-events-auto"
+                    style={{
+                      right: `calc(100% - ${startX}px + 6.25rem)`,
+                      top: `${startY}px`,
+                      width: "16.25rem",
+                    }}
+                  >
+                    <div className="absolute bottom-full left-0 w-full flex justify-between items-end pb-2">
+                      <h2 className="text-white text-[1rem] font-bold tracking-wider flex items-center gap-2 px-1 drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
+                        {activeMeta.label}
+                      </h2>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-[0.25rem] pt-[1.5rem]">
+                      <motion.div
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="show"
+                        className="grid grid-cols-3 gap-y-[1.5rem] gap-x-[0.5rem] py-[0.5rem] overflow-visible"
                       >
-                        <stop offset="0%" stopColor="rgba(37, 99, 235, 0)" />
-                        <stop offset="50%" stopColor="rgba(37, 99, 235, 0.8)" />
-                        <stop offset="100%" stopColor="rgba(37, 99, 235, 0)" />
-                      </linearGradient>
-                    </defs>
-                  </motion.g>
+                        {activeCategorySlots?.Drawables.map((idx) => {
+                          const def =
+                            DRAWABLE_SLOTS[idx] || DRAWABLE_SLOTS_WEARABLE[idx];
+                          return def ? renderSlot("Drawables", idx, def) : null;
+                        })}
+                        {activeCategorySlots?.Props.map((idx) => {
+                          const def =
+                            PROP_SLOTS[idx] || PROP_SLOTS_WEARABLE[idx];
+                          return def ? renderSlot("Props", idx, def) : null;
+                        })}
+
+                        {activeCategorySlots &&
+                          activeCategorySlots.Drawables.length === 0 &&
+                          activeCategorySlots.Props.length === 0 && (
+                            <div className="col-span-4 py-8 text-center">
+                              <p className="text-white/30 text-[0.875rem]">
+                                {extraState.wearableProps
+                                  ? "Nessun oggetto in questa categoria"
+                                  : "Disponibile con mbt_wearable_props"}
+                              </p>
+                            </div>
+                          )}
+                      </motion.div>
+                    </div>
+                  </motion.div>
                 )}
               </AnimatePresence>
-            </svg>
-
-            {/* Floating Contextual Panel */}
-            <AnimatePresence mode="wait">
-              {hasActive && activeMeta && (
-                <motion.div
-                  key={`panel-${activeCategory.id}`}
-                  initial={{ opacity: 0, x: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: 20, scale: 0.95 }}
-                  transition={{
-                    type: "spring" as const,
-                    stiffness: 350,
-                    damping: 25,
-                  }}
-                  className="absolute z-20 flex flex-col"
-                  style={{
-                    right: `${window.innerWidth - startX + laserLength}px`,
-                    top: `${startY}px`,
-                    width: "260px",
-                  }}
-                >
-                  <div className="absolute bottom-full left-0 w-full flex justify-between items-end pb-2">
-                    <h2 className="text-white text-md font-bold tracking-wider flex items-center gap-2 px-1 drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
-                      {activeMeta.label}
-                    </h2>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 pt-6">
-                    <motion.div
-                      variants={containerVariants}
-                      initial="hidden"
-                      animate="show"
-                      className="grid grid-cols-3 gap-y-6 gap-x-2 py-2 overflow-visible"
-                    >
-                      {activeCategorySlots?.Drawables.map((idx) => {
-                        const def =
-                          DRAWABLE_SLOTS[idx] || DRAWABLE_SLOTS_WEARABLE[idx];
-                        return def ? renderSlot("Drawables", idx, def) : null;
-                      })}
-                      {activeCategorySlots?.Props.map((idx) => {
-                        const def = PROP_SLOTS[idx] || PROP_SLOTS_WEARABLE[idx];
-                        return def ? renderSlot("Props", idx, def) : null;
-                      })}
-
-                      {activeCategorySlots &&
-                        activeCategorySlots.Drawables.length === 0 &&
-                        activeCategorySlots.Props.length === 0 && (
-                          <div className="col-span-4 py-8 text-center">
-                            <p className="text-white/30 text-sm">
-                              {extraState.wearableProps
-                                ? "Nessun oggetto in questa categoria"
-                                : "Disponibile con mbt_wearable_props"}
-                            </p>
-                          </div>
-                        )}
-                    </motion.div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

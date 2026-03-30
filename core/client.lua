@@ -109,7 +109,21 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState)
     ResetEntityAlpha(PlayerPedId())
 end)
 
+-- Slots owned by wearable_props — clicking them in meta_clothes NUI delegates removal there
+local WEARABLE_PROPS_SLOTS = {
+    [1]  = "mask",
+    [5]  = "bag",
+    [9]  = "smallarmor",
+}
+
 RegisterNUICallback('handleDress', function(data, cb)
+    -- Delegate to wearable_props if the slot belongs to it and the resource is running
+    local wpItemType = WEARABLE_PROPS_SLOTS[data.Index]
+    if wpItemType and MBT.Utils.MbtWearableProps() then
+        exports['mbt_wearable_props']:removeWearable(wpItemType)
+        cb(1)
+        return
+    end
     -- Torso slots (3=arms, 8=tshirt, 11=jacket) are a single kit — always undress together
     if data.Index == 3 or data.Index == 8 or data.Index == 11 then
         MBT.Utils.HandleTorsoUndress()
@@ -402,6 +416,28 @@ end, false)
 RegisterNetEvent('mbt_meta_clothes:notify', function(data)
     MBT.Notification(data)
 end)
+
+-----------------------------------------------------------
+-- wearable_props statebag listeners
+-- Keep NUI extraState in sync when mask/bag/armor change
+-- outside of the meta_clothes NUI (e.g. via wearable_props UI)
+-----------------------------------------------------------
+local wpStatebags = {
+    { key = 'mbt_isWearingMask',       nuiKey = 'mask'  },
+    { key = 'mbt_isWearingBag',        nuiKey = 'bag'   },
+    { key = 'mbt_isWearingSmallarmor', nuiKey = 'armor' },
+    { key = 'mbt_isWearingMedarmor',   nuiKey = 'armor' },
+    { key = 'mbt_isWearingHeavyarmor', nuiKey = 'armor' },
+}
+for _, sb in ipairs(wpStatebags) do
+    local sbKey  = sb.key
+    local nuiKey = sb.nuiKey
+    AddStateBagChangeHandler(sbKey, nil, function(bagName, _, value)
+        -- Only react to own player statebag
+        if bagName ~= ('player:%d'):format(GetPlayerServerId(PlayerId())) then return end
+        SendNUIMessage({ action = 'extraStateUpdate', [nuiKey] = value == true })
+    end)
+end
 
 -----------------------------------------------------------
 -- Clothing States (Tuck/Untuck)

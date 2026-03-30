@@ -15,7 +15,13 @@ import {
 import { SlotDefinition, CategorySlots } from "./types";
 
 // Custom Trousers Icon (Lucide Lab)
-const Trousers = ({ size = 24, ...props }: { size?: number; className?: string }) => (
+const Trousers = ({
+  size = 24,
+  ...props
+}: {
+  size?: number;
+  className?: string;
+}) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width={size}
@@ -85,4 +91,97 @@ export const HOTSPOT_META: Record<
   bags: { icon: Backpack, label: "Zaini" },
   legs: { icon: Trousers, label: "Pantaloni" },
   feet: { icon: Footprints, label: "Scarpe" },
+};
+
+// Clothing layer overlay metadata — one entry per slot that has a PNG layer.
+// path: base filename without sex suffix and extension (e.g. "hat" → "hat_male.png" / "hat_female.png")
+// If the sex-specific PNG doesn't exist, the layer is silently hidden (onError).
+export interface LayerMeta {
+  path: string;
+  top: string;
+  left: string;
+  width: string;
+  zIndex: number;
+}
+
+export const LAYER_META: Record<string, LayerMeta> = {
+  // Props
+  "Props-0": {
+    path: "hat",
+    top: "-3.5%",
+    left: "50%",
+    width: "40%",
+    zIndex: 25,
+  },
+  "Props-1": {
+    path: "glasses",
+    top: "13%",
+    left: "50%",
+    width: "28%",
+    zIndex: 26,
+  },
+  "Props-2": {
+    path: "earrings",
+    top: "15%",
+    left: "50%",
+    width: "20%",
+    zIndex: 24,
+  },
+  "Props-6": {
+    path: "watch",
+    top: "50%",
+    left: "34%",
+    width: "14%",
+    zIndex: 20,
+  },
+  // Drawables
+  "Drawables-1": {
+    path: "mask",
+    top: "10%",
+    left: "50%",
+    width: "35%",
+    zIndex: 27,
+  },
+  "Drawables-5": {
+    path: "backpack",
+    top: "32%",
+    left: "62%",
+    width: "36%",
+    zIndex: 10,
+  },
+  "Drawables-7": {
+    path: "chain",
+    top: "31%",
+    left: "50%",
+    width: "24%",
+    zIndex: 22,
+  },
+  "Drawables-8": {
+    path: "jacket",
+    top: "29%",
+    left: "50%",
+    width: "62%",
+    zIndex: 18,
+  },
+  "Drawables-9": {
+    path: "armor",
+    top: "29%",
+    left: "50%",
+    width: "60%",
+    zIndex: 19,
+  },
+  "Drawables-4": {
+    path: "pants",
+    top: "57%",
+    left: "50%",
+    width: "55%",
+    zIndex: 15,
+  },
+  "Drawables-6": {
+    path: "shoes",
+    top: "83%",
+    left: "50%",
+    width: "50%",
+    zIndex: 12,
+  },
 };
