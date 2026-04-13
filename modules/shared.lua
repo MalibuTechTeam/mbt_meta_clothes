@@ -12,7 +12,7 @@ local side = IsDuplicityVersion() and "^4S" or "^5C"
 --- @param ... any Values to print (auto-converted to string)
 function MBT.Debugger(...)
     if not MBT.Debug then return end
-    local args = {...}
+    local args = { ... }
     local parts = {}
     for _, v in ipairs(args) do
         parts[#parts + 1] = tostring(v)
@@ -22,7 +22,7 @@ end
 
 --- Log a warning (always prints, regardless of MBT.Debug)
 function MBT.Warn(...)
-    local args = {...}
+    local args = { ... }
     local parts = {}
     for _, v in ipairs(args) do
         parts[#parts + 1] = tostring(v)

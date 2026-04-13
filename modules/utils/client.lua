@@ -497,6 +497,51 @@ function MBT.Utils.StartHybridDetection()
 end
 
 -----------------------------------------------------------
+-- External API: allow other scripts to mark expected changes
+-- and suppress restore protection for specific slots.
+-- Used by mbt_wearable_props to hide hat/glasses when wearing mask.
+-----------------------------------------------------------
+exports('expectChange', function(slotType, slotIndex)
+    MBT.Utils.ExpectChange(slotType, slotIndex)
+end)
+
+--- Suppress a slot from restore protection and update cache.
+--- Calling this tells meta_clothes: "I intentionally cleared this slot, don't restore it."
+--- @param slotType string "Drawables" | "Props"
+--- @param slotIndex number slot index
+--- @param drawable number new drawable value (-1 for cleared props, 0 for default components)
+--- @param texture number new texture value
+exports('suppressSlot', function(slotType, slotIndex, drawable, texture)
+    MBT.Utils.ExpectChange(slotType, slotIndex)
+    -- Update cache so detection won't see a diff
+    if clothingCache[slotType] then
+        clothingCache[slotType][slotIndex] = { drawable = drawable or 0, texture = texture or 0 }
+    end
+    -- Remove from restore state so restore protection won't revert it
+    if restoreProtection and restoreState and restoreState[slotType] then
+        restoreState[slotType][tostring(slotIndex)] = nil
+        restoreState[slotType][slotIndex] = nil
+    end
+end)
+
+--- Restore a slot into restore protection tracking and update cache.
+--- Called when wearable is removed and the original prop should be tracked again.
+--- @param slotType string "Drawables" | "Props"
+--- @param slotIndex number slot index
+--- @param drawable number restored drawable value
+--- @param texture number restored texture value
+exports('restoreSlot', function(slotType, slotIndex, drawable, texture)
+    MBT.Utils.ExpectChange(slotType, slotIndex)
+    if clothingCache[slotType] then
+        clothingCache[slotType][slotIndex] = { drawable = drawable or 0, texture = texture or 0 }
+    end
+    -- Re-add to restore state if protection is active
+    if restoreProtection and restoreState and restoreState[slotType] then
+        restoreState[slotType][tostring(slotIndex)] = { drawable = drawable, texture = texture or 0 }
+    end
+end)
+
+-----------------------------------------------------------
 -- Steal functions
 -----------------------------------------------------------
 

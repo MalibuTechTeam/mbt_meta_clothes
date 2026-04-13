@@ -53,6 +53,9 @@ function MBT.PlayerState.SetSlot(src, slotType, slotIndex, metadata)
     if not PlayerWearing[src] then MBT.PlayerState.InitPlayer(src) end
     PlayerWearing[src][slotType][slotIndex] = metadata
     DirtyPlayers[src] = true
+    -- Broadcast for consumers (e.g. mbt_wearable_props capacity).
+    -- Server-side event so listeners can recompute without polling.
+    TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, slotIndex, metadata)
 end
 
 function MBT.PlayerState.GetSlot(src, slotType, slotIndex)
@@ -66,6 +69,7 @@ function MBT.PlayerState.ClearSlot(src, slotType, slotIndex)
     PlayerWearing[src][slotType][slotIndex] = nil
     if metadata then
         DirtyPlayers[src] = true
+        TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, slotIndex, nil)
     end
     return metadata
 end
@@ -76,6 +80,7 @@ function MBT.PlayerState.ClearAllSlots(src, slotType)
     PlayerWearing[src][slotType] = {}
     if next(allMetadata) then
         DirtyPlayers[src] = true
+        TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, nil, nil)
     end
     return allMetadata
 end

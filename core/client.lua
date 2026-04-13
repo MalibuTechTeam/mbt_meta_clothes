@@ -262,6 +262,69 @@ AddEventHandler('mbt_meta_clothes:setDefaultDressTarget', function(stealingPlaye
     TriggerServerEvent('mbt_meta_clothes:giveStolenItemDress', stealingPlayer, targetWearing, playerSex)
 end)
 
+-----------------------------------------------------------
+-- Steal single item: victim resets the stolen slot to default
+-----------------------------------------------------------
+RegisterNetEvent('mbt_meta_clothes:stealApplyDefault')
+AddEventHandler('mbt_meta_clothes:stealApplyDefault', function(stealType, slotIndex)
+    local ped = PlayerPedId()
+    local sex = MBT.Utils.GetPedSex(ped)
+    if sex == "customSkin" then return end
+
+    if stealType == "torso" then
+        -- Scatter torso props before resetting
+        for _, idx in ipairs({3, 8, 11}) do
+            MBT.ClothingProps.ScatterFromPed(ped, "Drawables", idx)
+            MBT.Utils.ExpectChange("Drawables", idx)
+            local default = MBT.Drawables[idx] and MBT.Drawables[idx]["Default"][sex]
+            if default then
+                SetPedComponentVariation(ped, idx, default[1], 0, 0)
+            end
+            MBT.Utils.SendSlotUpdate("Drawables", idx, false)
+        end
+    elseif stealType == "drawable" and slotIndex then
+        MBT.ClothingProps.ScatterFromPed(ped, "Drawables", slotIndex)
+        MBT.Utils.ExpectChange("Drawables", slotIndex)
+        local default = MBT.Drawables[slotIndex] and MBT.Drawables[slotIndex]["Default"][sex]
+        if default then
+            SetPedComponentVariation(ped, slotIndex, default[1], 0, 0)
+        end
+        MBT.Utils.SendSlotUpdate("Drawables", slotIndex, false)
+    elseif stealType == "prop" and slotIndex then
+        MBT.ClothingProps.ScatterFromPed(ped, "Props", slotIndex)
+        MBT.Utils.ExpectChange("Props", slotIndex)
+        local default = MBT.Props[slotIndex] and MBT.Props[slotIndex]["Default"][sex]
+        if default then
+            ClearPedProp(ped, slotIndex)
+        end
+        -- Restore hair if hat was stolen
+        if slotIndex == 0 then
+            MBT.Utils.RestoreHairFromHatFix(ped)
+        end
+        MBT.Utils.SendSlotUpdate("Props", slotIndex, false)
+    end
+
+    MBT.Utils.UpdatePlayerClothes()
+end)
+
+-----------------------------------------------------------
+-- Victim animation relay (requested by thief via server)
+-----------------------------------------------------------
+RegisterNetEvent('mbt_meta_clothes:playVictimAnim')
+AddEventHandler('mbt_meta_clothes:playVictimAnim', function(duration, targetDown)
+    local ped = PlayerPedId()
+    local dict = targetDown and "missexile3" or "missmic4"
+    local clip = targetDown and "ex03_dingy_search_case_base_michael" or "michael_tux_fidget"
+    while not HasAnimDictLoaded(dict) do
+        RequestAnimDict(dict)
+        Wait(50)
+    end
+    TaskPlayAnim(ped, dict, clip, 3.0, 3.0, duration, 49, 0, false, false, false)
+    Wait(duration)
+    ClearPedTasks(ped)
+    RemoveAnimDict(dict)
+end)
+
 RegisterCommand("toggleUndress", function()
     if IsPedOnFoot(PlayerPedId()) and not IsPedDeadOrDying(PlayerPedId(), false) and not IsPedCuffed(PlayerPedId()) then
         local bagState = type(checkBagState) == 'function' and checkBagState() or false

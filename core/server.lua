@@ -73,6 +73,7 @@ end)
 RegisterNetEvent('mbt_meta_clothes:syncInitialWearing', function(wearingData)
     local src = source
     if type(wearingData) ~= "table" then return end
+    if not MBT.ServerUtils.CheckRateLimit(src, "syncInitialWearing") then return end
 
     -- Only process for NEW players (no DB entry)
     if MBT.PlayerState.HasDbEntry(src) then
@@ -205,6 +206,7 @@ end)
 -----------------------------------------------------------
 
 RegisterNetEvent('mbt_meta_clothes:storePlayerSkin', function(appearance)
+    if type(appearance) ~= "table" then return end
     playerSkins[source] = appearance
 end)
 
