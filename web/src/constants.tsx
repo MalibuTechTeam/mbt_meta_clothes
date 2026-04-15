@@ -11,6 +11,7 @@ import {
   Gem,
   Smile,
   HatGlasses,
+  Sparkles,
 } from "lucide-react";
 import { SlotDefinition, CategorySlots } from "./types";
 
@@ -59,6 +60,7 @@ export const PROP_SLOTS: Record<number, SlotDefinition> = {
   1: { label: "Occhiali", icon: Glasses, category: "head" },
   2: { label: "Orecchini", icon: Ear, category: "head" },
   6: { label: "Orologio", icon: Watch, category: "accessories" },
+  7: { label: "Bracciale", icon: Sparkles, category: "accessories" },
 };
 
 // Reserved for future wearable_props prop slots
@@ -68,7 +70,7 @@ export const PROP_SLOTS_WEARABLE: Record<number, SlotDefinition> = {};
 export const CATEGORY_SLOTS: Record<string, CategorySlots> = {
   head: { Drawables: [], Props: [0, 1, 2] },
   torso: { Drawables: [8], Props: [] },
-  accessories: { Drawables: [7], Props: [6] },
+  accessories: { Drawables: [7], Props: [6, 7] },
   legs: { Drawables: [4], Props: [] },
   feet: { Drawables: [6], Props: [] },
 };

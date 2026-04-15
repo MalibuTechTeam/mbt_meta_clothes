@@ -54,6 +54,7 @@ Locales['en'] = {
     ["t_shirt"]     = "TShirt",
     ["jacket"]      = "Jacket",
     ["watch"]       = "Watch",
+    ["bracelet"]    = "Bracelet",
     ["top"]         = "Top",
 
     -----------------------------------------------------------
@@ -74,6 +75,9 @@ Locales['en'] = {
     ["use_glasses"]    = "Using Glasses",
     ["use_earaccess"]  = "Using Ear Access",
     ["use_watch"]      = "Using Watch",
+    ["use_bracelet"]   = "Using Bracelet",
+    ["use_item"]       = "Using item...",
+    ["cancel"]         = "Cancelled",
     ["stealing"]       = "Stealing...",
     ["stealing_all"]   = "Stripping clothes...",
 

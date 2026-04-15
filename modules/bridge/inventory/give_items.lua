@@ -48,7 +48,8 @@ function MBT.GiveItems.Setup(config)
         -- Clean expired DNA before returning item to inventory
         MBT.ServerUtils.CleanExpiredDNA(metadata)
 
-        config.addItem(config.getPlayerSource(player), data.Item, 1, metadata)
+        local itemName = MBT.ResolveItemName(MBT.Drawables[data.Index], metadata) or data.Item
+        config.addItem(config.getPlayerSource(player), itemName, 1, metadata)
     end
 
     function giveDressKit(data)
@@ -101,7 +102,8 @@ function MBT.GiveItems.Setup(config)
         -- Clean expired DNA before returning item to inventory
         MBT.ServerUtils.CleanExpiredDNA(metadata)
 
-        config.addItem(config.getPlayerSource(player), data.Item, 1, metadata)
+        local itemName = MBT.ResolveItemName(MBT.Props[data.Index], metadata) or data.Item
+        config.addItem(config.getPlayerSource(player), itemName, 1, metadata)
     end
 
     function giveStolenItemDress(stealSource, targetWearing, playerSex)
@@ -109,23 +111,21 @@ function MBT.GiveItems.Setup(config)
         if not player then return end
         local playerIdentity = config.getPlayerName(player)
 
-        -- Check if torso slots (3, 8, 11) have non-default drawables → create topdress kit
-        local torsoSlots = {3, 8, 11}
+        -- Check if torso slots have non-default drawables → create topdress kit
         local hasNonDefaultTorso = false
         local kitMetadata = {
             description = MBT.Locale["clothes_desc"]:format(playerIdentity),
             sex = playerSex, type = "DressKit"
         }
-        local slotNames = {[3] = "Arms", [8] = "Tshirt", [11] = "Jacket"}
 
-        for _, slotIdx in ipairs(torsoSlots) do
+        for _, slotIdx in ipairs(MBT.TorsoKitSlots) do
             local v = targetWearing["Drawables"][slotIdx]
             if v and MBT.Drawables[slotIdx] then
                 local isDefault = MBT.TableContains(MBT.Drawables[slotIdx]["Default"][playerSex], v.Drawable)
                 if not isDefault then
                     hasNonDefaultTorso = true
                 end
-                kitMetadata[slotNames[slotIdx]] = {
+                kitMetadata[MBT.TorsoSlotNames[slotIdx]] = {
                     index = slotIdx,
                     drawable = v.Drawable,
                     texture = v.Texture,
@@ -140,10 +140,12 @@ function MBT.GiveItems.Setup(config)
 
         -- Other drawable slots (not part of torso kit)
         for k, v in pairs(targetWearing["Drawables"]) do
-            if k ~= 3 and k ~= 8 and k ~= 11 then
-                if MBT.Drawables[k] and MBT.Drawables[k]["Item"] then
-                    if not MBT.TableContains(MBT.Drawables[k]["Default"][playerSex], v.Drawable) then
-                        config.addItem(stealSource, MBT.Drawables[k]["Item"], 1, {
+            if not MBT.TableContains(MBT.TorsoKitSlots, k) then
+                local slotCfg = MBT.Drawables[k]
+                local itemName = MBT.ResolveItemName(slotCfg, v)
+                if slotCfg and itemName then
+                    if not MBT.TableContains(slotCfg["Default"][playerSex], v.Drawable) then
+                        config.addItem(stealSource, itemName, 1, {
                             description = buildDescription(MBT.Locale["clothes_desc"]:format(playerIdentity), {index = k, drawable = v.Drawable, texture = v.Texture}),
                             index = k, sex = playerSex,
                             drawable = v.Drawable, texture = v.Texture, palette = v.Palette,
@@ -156,9 +158,11 @@ function MBT.GiveItems.Setup(config)
 
         -- Props
         for k, v in pairs(targetWearing["Props"]) do
-            if MBT.Props[k] and MBT.Props[k]["Item"] then
-                if not MBT.TableContains(MBT.Props[k]["Default"][playerSex], v.Drawable) then
-                    config.addItem(stealSource, MBT.Props[k]["Item"], 1, {
+            local slotCfg = MBT.Props[k]
+            local itemName = MBT.ResolveItemName(slotCfg, v)
+            if slotCfg and itemName then
+                if not MBT.TableContains(slotCfg["Default"][playerSex], v.Drawable) then
+                    config.addItem(stealSource, itemName, 1, {
                         description = buildDescription(MBT.Locale["props_desc"]:format(playerIdentity), {index = k, drawable = v.Drawable, texture = v.Texture}),
                         index = k, sex = playerSex,
                         drawable = v.Drawable, texture = v.Texture, palette = v.Palette,

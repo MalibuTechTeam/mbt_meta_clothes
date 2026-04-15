@@ -1,52 +1,90 @@
 -----------------------------------------------------------
 -- QB-Inventory server-side item registration
+-- Item names are derived dynamically from MBT.Drawables / MBT.Props
+-- config so that ["Item"] = "belt" or ["Item"] = {"belt","fancy_belt"}
+-- both get registered automatically without touching this file.
 -----------------------------------------------------------
 
 MBT.QbUseable = {}
 
-local ItemConfig = {
-    { name = 'topdress',  event = 'mbt_meta_clothes:useTopDress',  label = 'Top Dress',     weight = 100, unique = true,  isTopDress = true },
-    { name = 'trousers',  event = 'mbt_meta_clothes:useTrousers',  label = 'Trousers',      weight = 10,  unique = false },
-    { name = 'shoes',     event = 'mbt_meta_clothes:useShoes',     label = 'Shoes',          weight = 10,  unique = false },
-    { name = 'chain',     event = 'mbt_meta_clothes:useChain',     label = 'Chain',          weight = 10,  unique = false },
-    { name = 'watch',     event = 'mbt_meta_clothes:useWatch',     label = 'Watch',          weight = 10,  unique = false },
-    { name = 'hat',       event = 'mbt_meta_clothes:useHat',       label = 'Hat',            weight = 10,  unique = false },
-    { name = 'glasses',   event = 'mbt_meta_clothes:useGlasses',   label = 'Glasses',        weight = 10,  unique = false },
-    { name = 'earaccess', event = 'mbt_meta_clothes:useEarAccess', label = 'Ear Accessory',  weight = 10,  unique = false },
-}
-
 function MBT.QbUseable.RegisterItems()
-    for _, cfg in ipairs(ItemConfig) do
-        QBCore.Functions.CreateUseableItem(cfg.name, function(source, item)
+    local registered    = {}
+    local itemsToAdd    = {}
+
+    local function registerItem(itemName, slotType, slotIndex, isTopDress)
+        if registered[itemName] then return end
+        registered[itemName] = true
+
+        local name = itemName
+
+        QBCore.Functions.CreateUseableItem(name, function(source, item)
             local player = QBCore.Functions.GetPlayer(source)
-            if not player or not player.Functions.GetItemByName(item.name) then return end
+            if not player or not player.Functions.GetItemByName(name) then return end
 
-            local sexMatch = player.PlayerData.charinfo.gender == 0 and "male" or "female"
+            local gender   = player.PlayerData.charinfo.gender
+            local sexLabel = gender == 0 and "male" or "female"
 
-            if sexMatch ~= item.info.sex then
-                TriggerClientEvent('mbt_meta_clothes:notify', player.PlayerData.source, { title = MBT.Locale["wrong_sex"].title, description = MBT.Locale["wrong_sex"].description .. sexMatch, type = "error", icon = "ban" })
+            if sexLabel ~= MBT.NormalizeSex(item.info and item.info.sex) then
+                TriggerClientEvent('mbt_meta_clothes:notify', source, {
+                    title       = MBT.Locale["wrong_sex"].title,
+                    description = MBT.Locale["wrong_sex"].description .. sexLabel,
+                    type = "error", icon = "ban"
+                })
                 return
             end
 
-            local index = cfg.isTopDress and item.info or item.info.index
-            TriggerClientEvent(cfg.event, player.PlayerData.source, index, player.PlayerData.charinfo.gender, item.info, item)
+            TriggerClientEvent('mbt_meta_clothes:useClothing', source, {
+                slotType   = slotType,
+                slotIndex  = isTopDress and item.info or item.info.index,
+                sex        = gender,
+                itemInfo   = item.info,
+                itemData   = item,
+                isTopDress = isTopDress or false,
+            })
         end)
-    end
 
-    local items = {}
-    for _, cfg in ipairs(ItemConfig) do
-        items[cfg.name] = {
-            name = cfg.name,
-            label = cfg.label,
-            weight = cfg.weight,
-            type = 'item',
-            image = cfg.name .. '.png',
-            unique = cfg.unique,
-            useable = true,
+        -- Derive label from slot locale key, fallback to item name
+        local localeKey
+        if slotType == "Drawables" and MBT.SlotLocaleKeys then
+            localeKey = MBT.SlotLocaleKeys.Drawables[slotIndex]
+        elseif slotType == "Props" and MBT.SlotLocaleKeys then
+            localeKey = MBT.SlotLocaleKeys.Props[slotIndex]
+        end
+        local label = (localeKey and MBT.Locale[localeKey]) or name
+
+        local slotCfg = slotType == "Drawables" and MBT.Drawables[slotIndex]
+                     or slotType == "Props"      and MBT.Props[slotIndex]
+
+        itemsToAdd[name] = {
+            name        = name,
+            label       = label,
+            weight      = (slotCfg and slotCfg["ItemWeight"]) or 100,
+            type        = 'item',
+            image       = name .. '.png',
+            unique      = isTopDress or false,
+            useable     = true,
             shouldClose = true,
-            combinable = nil,
-            description = cfg.label
+            combinable  = nil,
+            description = label,
         }
     end
-    QBCore.Functions.AddItems(items)
+
+    -- topdress (torso kit item — always registered)
+    registerItem('topdress', 'Drawables', nil, true)
+
+    -- Drawables
+    for slotIndex, slotCfg in pairs(MBT.Drawables) do
+        for _, itemName in ipairs(MBT.GetSlotItemNames(slotCfg)) do
+            registerItem(itemName, 'Drawables', slotIndex, false)
+        end
+    end
+
+    -- Props
+    for slotIndex, slotCfg in pairs(MBT.Props) do
+        for _, itemName in ipairs(MBT.GetSlotItemNames(slotCfg)) do
+            registerItem(itemName, 'Props', slotIndex, false)
+        end
+    end
+
+    QBCore.Functions.AddItems(itemsToAdd)
 end

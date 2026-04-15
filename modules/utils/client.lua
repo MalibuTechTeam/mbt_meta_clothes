@@ -56,7 +56,7 @@ function MBT.Utils.HandleProps(propIndex)
     local playerSex = MBT.Utils.GetPedSex(PlayerPedId())
     local currentProp = GetPedPropIndex(PlayerPedId(), propIndex)
     local propData = {
-        Item = MBT.Props[propIndex]["Item"],
+        Item = MBT.Props[propIndex] and MBT.GetSlotItemNames(MBT.Props[propIndex])[1] or nil,
         Index = propIndex,
         Sex = playerSex,
         Drawable = currentProp,
@@ -142,7 +142,7 @@ function MBT.Utils.HandleUndress(dressIndex)
     local playerSex = MBT.Utils.GetPedSex(PlayerPedId())
     local currentDrawable = GetPedDrawableVariation(PlayerPedId(), dressIndex)
     local dressData = {
-        Item = MBT.Drawables[dressIndex]["Item"],
+        Item = MBT.Drawables[dressIndex] and MBT.GetSlotItemNames(MBT.Drawables[dressIndex])[1] or nil,
         Index = dressIndex,
         Sex = playerSex,
         Drawable = currentDrawable,
@@ -269,19 +269,13 @@ function MBT.Utils.RandomizeDress(t)
 end
 
 ---@param ped number
----@return string
+---@return string  Always returns "male", "female", or "customSkin"
 function MBT.Utils.GetPedSex(ped)
-    local maleModel, femaleModel = `mp_m_freemode_01`, `mp_f_freemode_01`
-    local playerModel = GetEntityModel(ped)
-    if playerModel then
-        if playerModel == maleModel then 
-            return "male" 
-        elseif playerModel == femaleModel then
-            return "female"
-        else  
-            return "customSkin"
-        end
+    local playerModel = ped and GetEntityModel(ped)
+    if playerModel and MBT.GenderModels then
+        return MBT.GenderModels[playerModel] or "customSkin"
     end
+    return "customSkin"
 end
 
 
@@ -438,10 +432,10 @@ local function processSlotChange(ped, slotType, k, v, sex, currentDrawable, curr
         clothingCache[slotType][k] = { drawable = currentDrawable, texture = currentTexture }
         local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
         if isDefault then
-            if isProps and k == 0 then MBT.Utils.RestoreHairFromHatFix(ped) end
+            if isProps and MBT.Props[k] and MBT.Props[k]["ApplyHairFix"] then MBT.Utils.RestoreHairFromHatFix(ped) end
             TriggerServerEvent("mbt_meta_clothes:externalUndress", slotType, k)
         else
-            if isProps and k == 0 then MBT.Utils.ApplyHatHairFix(ped) end
+            if isProps and MBT.Props[k] and MBT.Props[k]["ApplyHairFix"] then MBT.Utils.ApplyHatHairFix(ped) end
             TriggerServerEvent("mbt_meta_clothes:externalDress", slotType, {
                 index = k,
                 drawable = currentDrawable,
@@ -538,6 +532,41 @@ exports('restoreSlot', function(slotType, slotIndex, drawable, texture)
     -- Re-add to restore state if protection is active
     if restoreProtection and restoreState and restoreState[slotType] then
         restoreState[slotType][tostring(slotIndex)] = { drawable = drawable, texture = texture or 0 }
+    end
+end)
+
+--- Register clothing state toggle pairs at runtime.
+--- Addon pack makers or other resources can call this export to add their own
+--- tuck/untuck / hat visored / jacket-open pairs without editing clothing_states.lua.
+---
+--- @param slotType string  "Drawables" | "Props" | "Hair"
+--- @param slotIndex number Slot index (ignored for "Hair")
+--- @param pairs    table   Single pair {sex, from, to} OR array of pairs {{sex,from,to}, ...}
+---
+--- Example (adds jacket open/closed pair for addon drawable 350):
+---   exports.mbt_meta_clothes:registerClothingState("Drawables", 11, {sex="male", from=350, to=351})
+exports('registerClothingState', function(slotType, slotIndex, pairs)
+    if not MBT.ClothingStates then return end
+    if slotType == "Hair" then
+        local target = MBT.ClothingStates.Hair
+        if type(pairs[1]) == "table" then
+            for _, p in ipairs(pairs) do target[#target+1] = p end
+        else
+            target[#target+1] = pairs
+        end
+        return
+    end
+    if not MBT.ClothingStates[slotType] then
+        MBT.ClothingStates[slotType] = {}
+    end
+    if not MBT.ClothingStates[slotType][slotIndex] then
+        MBT.ClothingStates[slotType][slotIndex] = {}
+    end
+    local target = MBT.ClothingStates[slotType][slotIndex]
+    if type(pairs[1]) == "table" then
+        for _, p in ipairs(pairs) do target[#target+1] = p end
+    else
+        target[#target+1] = pairs
     end
 end)
 
@@ -738,6 +767,7 @@ end
 -----------------------------------------------------------
 
 function MBT.Utils.ToggleClothingState(slotType, slotIndex)
+    if not checkCooldown() then return false end
     local ped = PlayerPedId()
     local sex = MBT.Utils.GetPedSex(ped)
     if not sex or not MBT.ClothingStates then return false end

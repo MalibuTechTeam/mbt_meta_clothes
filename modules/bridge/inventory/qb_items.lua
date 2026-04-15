@@ -1,48 +1,71 @@
 -----------------------------------------------------------
--- QB-Inventory client-side item handlers (progress bar + animation)
--- Eliminates 8 nearly identical RegisterNetEvent handlers.
+-- QB-Inventory client-side item handler
+-- Single unified event 'mbt_meta_clothes:useClothing' handles
+-- all clothing items. Animation is derived from slot config
+-- (MBT.Drawables[k]["Animation"] or MBT.Props[k]["Animation"])
+-- so adding a new slot in config automatically gets the right anim.
 -----------------------------------------------------------
 
 MBT.QbItems = {}
 
-local ItemConfig = {
-    { event = 'mbt_meta_clothes:useTopDress',  type = 'Drawables', progId = 'use_dress_kit', label = 'use_dress_kit', duration = 1200, dict = 'clothingshirt',           anim = 'try_shirt_positive_d',  flags = 51 },
-    { event = 'mbt_meta_clothes:useTrousers',  type = 'Drawables', progId = 'use_trousers',  label = 'use_trousers',  duration = 1200, dict = 're@construction',         anim = 'out_of_breath',         flags = 51 },
-    { event = 'mbt_meta_clothes:useShoes',     type = 'Drawables', progId = 'use_shoes',     label = 'use_shoes',     duration = 1200, dict = 'random@domestic',          anim = 'pickup_low',            flags = 0  },
-    { event = 'mbt_meta_clothes:useChain',     type = 'Drawables', progId = 'use_chain',     label = 'use_chain',     duration = 2500, dict = 'clothingtie',              anim = 'try_tie_positive_a',    flags = 51 },
-    { event = 'mbt_meta_clothes:useHat',       type = 'Props',     progId = 'use_hat',       label = 'use_hat',       duration = 600,  dict = 'missheist_agency2ahelmet', anim = 'take_off_helmet_stand', flags = 51 },
-    { event = 'mbt_meta_clothes:useGlasses',   type = 'Props',     progId = 'use_glasses',   label = 'use_glasses',   duration = 1200, dict = 'clothingspecs',            anim = 'take_off',              flags = 51 },
-    { event = 'mbt_meta_clothes:useEarAccess', type = 'Props',     progId = 'use_earaccess', label = 'use_earaccess', duration = 1200, dict = 'mp_cp_stolen_tut',         anim = 'b_think',               flags = 51 },
-    { event = 'mbt_meta_clothes:useWatch',     type = 'Props',     progId = 'use_watch',     label = 'use_watch',     duration = 1200, dict = 'nmt_3_rcm-10',             anim = 'cs_nigel_dual-10',      flags = 51 },
+-- Fallback animation when a slot has no ["Animation"] key configured
+local DEFAULT_ANIM = {
+    Dict     = "clothingshirt",
+    Anim     = "try_shirt_positive_d",
+    Flag     = 51,
+    Duration = 1200,
 }
 
 function MBT.QbItems.RegisterItems()
-    for _, cfg in ipairs(ItemConfig) do
-        RegisterNetEvent(cfg.event, function(indexT, sexT, itemInfoT, itemData)
-            local ped = PlayerPedId()
-            QBCore.Functions.Progressbar(cfg.progId, MBT.Locale[cfg.label], cfg.duration, false, true, {
-                disableMovement = false,
-                disableCarMovement = false,
-                disableMouse = false,
-                disableCombat = true,
-            }, {
-                animDict = cfg.dict,
-                anim = cfg.anim,
-                flags = cfg.flags,
-            }, {}, {}, function() -- Done
-                StopAnimTask(ped, cfg.dict, cfg.anim, 1.0)
-                TriggerEvent("mbt_meta_clothes:checkDress", {
-                    type = cfg.type,
-                    index = indexT,
-                    sex = sexT,
-                    itemInfo = itemInfoT
-                })
-                TriggerServerEvent('mbt_meta_clothes:removeWear', itemData.name)
-                TriggerEvent('inventory:client:ItemBox', itemData, "remove")
-            end, function() -- Cancel
-                StopAnimTask(ped, cfg.dict, cfg.anim, 1.0)
-                QBCore.Functions.Notify(Lang:t('consumables.canceled'), "error")
-            end)
+    RegisterNetEvent('mbt_meta_clothes:useClothing')
+    AddEventHandler('mbt_meta_clothes:useClothing', function(data)
+        local ped = PlayerPedId()
+
+        -- Resolve animation from config
+        local animCfg
+        if data.isTopDress then
+            -- Torso kit: use tshirt slot (8) animation
+            animCfg = MBT.Drawables[8] and MBT.Drawables[8]["Animation"]
+        elseif data.slotType == "Drawables" then
+            animCfg = MBT.Drawables[data.slotIndex] and MBT.Drawables[data.slotIndex]["Animation"]
+        else
+            animCfg = MBT.Props[data.slotIndex] and MBT.Props[data.slotIndex]["Animation"]
+        end
+        animCfg = animCfg or DEFAULT_ANIM
+
+        local dict     = animCfg.Dict     or DEFAULT_ANIM.Dict
+        local anim     = animCfg.Anim     or DEFAULT_ANIM.Anim
+        local flags    = animCfg.Flag     or DEFAULT_ANIM.Flag
+        local duration = animCfg.Duration or DEFAULT_ANIM.Duration
+
+        -- Progress bar label: try "use_{itemName}" locale key, then item name
+        local itemName = data.itemData and data.itemData.name or ""
+        local progLabel = MBT.Locale["use_" .. itemName]
+                       or MBT.Locale["use_item"]
+                       or itemName
+
+        QBCore.Functions.Progressbar('mbt_use_clothing', progLabel, duration, false, true, {
+            disableMovement    = false,
+            disableCarMovement = false,
+            disableMouse       = false,
+            disableCombat      = true,
+        }, {
+            animDict = dict,
+            anim     = anim,
+            flags    = flags,
+        }, {}, {}, function() -- Done
+            StopAnimTask(ped, dict, anim, 1.0)
+            TriggerEvent("mbt_meta_clothes:checkDress", {
+                type     = data.slotType,
+                index    = data.slotIndex,
+                sex      = data.sex,
+                itemInfo = data.itemInfo,
+            })
+            TriggerServerEvent('mbt_meta_clothes:removeWear', itemName)
+            TriggerEvent('inventory:client:ItemBox', data.itemData, "remove")
+        end, function() -- Cancel
+            StopAnimTask(ped, dict, anim, 1.0)
+            QBCore.Functions.Notify(MBT.Locale['cancel'] or 'Cancelled', "error")
         end)
-    end
+    end)
 end

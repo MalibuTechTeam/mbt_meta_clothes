@@ -5,18 +5,21 @@ local function normalizeMetadata(data)
     meta.drawable = data.drawable
     meta.texture = data.texture
     meta.palette = data.palette
-    meta.sex = data.sex
+    meta.sex = MBT.NormalizeSex(data.sex)
     meta.type = data.type
     meta.description = data.description
+    -- Store which item was used so give-back uses the exact item name (validate string)
+    meta.item_name = type(data.name) == "string" and data.name or nil
 
     if data.metadata and type(data.metadata) == "table" then
         meta.index = meta.index or data.metadata.index
         meta.drawable = meta.drawable or data.metadata.drawable
         meta.texture = meta.texture or data.metadata.texture
         meta.palette = meta.palette or data.metadata.palette
-        meta.sex = meta.sex or data.metadata.sex
+        meta.sex = meta.sex or MBT.NormalizeSex(data.metadata.sex)
         meta.type = meta.type or data.metadata.type
         meta.description = meta.description or data.metadata.description
+        meta.item_name = meta.item_name or (type(data.metadata.item_name) == "string" and data.metadata.item_name or nil)
         for k, v in pairs(data.metadata) do
             if meta[k] == nil then
                 meta[k] = v
@@ -69,7 +72,7 @@ local function applyWearingState(wearingState)
         if stored and stored.drawable then
             SetPedPropIndex(ped, k, stored.drawable, stored.texture or 0, true)
             -- Hat/hair clip fix: apply on restore if wearing hat
-            if k == 0 then
+            if MBT.Props[k] and MBT.Props[k]["ApplyHairFix"] then
                 MBT.Utils.ApplyHatHairFix(ped)
             end
         else
@@ -109,23 +112,26 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState)
     ResetEntityAlpha(PlayerPedId())
 end)
 
--- Slots owned by wearable_props — clicking them in meta_clothes NUI delegates removal there
-local WEARABLE_PROPS_SLOTS = {
-    [1]  = "mask",
-    [5]  = "bag",
-    [9]  = "smallarmor",
-}
-
 RegisterNUICallback('handleDress', function(data, cb)
     -- Delegate to wearable_props if the slot belongs to it and the resource is running
-    local wpItemType = WEARABLE_PROPS_SLOTS[data.Index]
+    local wpItemType = MBT.WearablePropsSlots and MBT.WearablePropsSlots[data.Index]
     if wpItemType and MBT.Utils.MbtWearableProps() then
+        -- Armor slot: detect which tier is actually worn via statebag
+        if data.Index == 9 then
+            if LocalPlayer.state.mbt_isWearingHeavyarmor then
+                wpItemType = "heavyarmor"
+            elseif LocalPlayer.state.mbt_isWearingMedarmor then
+                wpItemType = "medarmor"
+            else
+                wpItemType = "smallarmor"
+            end
+        end
         exports['mbt_wearable_props']:removeWearable(wpItemType)
         cb(1)
         return
     end
-    -- Torso slots (3=arms, 8=tshirt, 11=jacket) are a single kit — always undress together
-    if data.Index == 3 or data.Index == 8 or data.Index == 11 then
+    -- Torso slots are a single kit — always undress together
+    if MBT.TorsoKitSlots and MBT.TableContains(MBT.TorsoKitSlots, data.Index) then
         MBT.Utils.HandleTorsoUndress()
     else
         MBT.Utils.HandleUndress(data.Index)
@@ -215,8 +221,8 @@ AddEventHandler('mbt_meta_clothes:applyProps', function(data)
     local meta = normalizeMetadata(data)
     MBT.Utils.ExpectChange("Props", meta.index)
     SetPedPropIndex(PlayerPedId(), meta.index, meta.drawable, meta.texture, true)
-    -- Hat/hair clip fix: hide hair when putting on hat (prop 0)
-    if meta.index == 0 then
+    -- Hat/hair clip fix: hide hair when putting on hat
+    if MBT.Props[meta.index] and MBT.Props[meta.index]["ApplyHairFix"] then
         MBT.Utils.ApplyHatHairFix(PlayerPedId())
     end
     MBT.Utils.SendSlotUpdate("Props", meta.index, true)
@@ -273,7 +279,7 @@ AddEventHandler('mbt_meta_clothes:stealApplyDefault', function(stealType, slotIn
 
     if stealType == "torso" then
         -- Scatter torso props before resetting
-        for _, idx in ipairs({3, 8, 11}) do
+        for _, idx in ipairs(MBT.TorsoKitSlots) do
             MBT.ClothingProps.ScatterFromPed(ped, "Drawables", idx)
             MBT.Utils.ExpectChange("Drawables", idx)
             local default = MBT.Drawables[idx] and MBT.Drawables[idx]["Default"][sex]
@@ -298,7 +304,7 @@ AddEventHandler('mbt_meta_clothes:stealApplyDefault', function(stealType, slotIn
             ClearPedProp(ped, slotIndex)
         end
         -- Restore hair if hat was stolen
-        if slotIndex == 0 then
+        if MBT.Props[slotIndex] and MBT.Props[slotIndex]["ApplyHairFix"] then
             MBT.Utils.RestoreHairFromHatFix(ped)
         end
         MBT.Utils.SendSlotUpdate("Props", slotIndex, false)

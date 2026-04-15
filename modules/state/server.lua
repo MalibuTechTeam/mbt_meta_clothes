@@ -10,8 +10,8 @@ MBT.PlayerState = {}
 local PlayerWearing = {}
 local DirtyPlayers = {}
 local PlayerIdentifiers = {}
-local PlayerHasDbEntry = {}  -- [source] = true if player has an existing DB record
-local PlayerDripXp = {}      -- [source] = cumulative drip XP (never decreases)
+local PlayerHasDbEntry = {}
+local PlayerDripXp = {}
 local initialized = false
 
 function MBT.PlayerState.Init()
@@ -28,7 +28,6 @@ function MBT.PlayerState.Init()
                 PRIMARY KEY (identifier)
             )
         ]])
-        -- Add drip_xp column if table already exists without it
         MySQL.query([[
             ALTER TABLE mbt_player_wearing ADD COLUMN IF NOT EXISTS drip_xp INT NOT NULL DEFAULT 0
         ]])
@@ -41,6 +40,47 @@ function MBT.PlayerState.Init()
             MBT.PlayerState.SaveAllDirty()
         end
     end)
+
+    -- Periodic DNA expiry cleanup — removes stale last_worn_by entries from
+    -- in-memory wearing state for items that stay equipped for a long time.
+    -- Runs every hour; only active when DnaEnabled and DnaExpiryHours are set.
+    if MBT.DnaEnabled and MBT.DnaExpiryHours then
+        Citizen.CreateThread(function()
+            while true do
+                Wait(3600 * 1000) -- hourly
+
+                local cleaned = 0
+                for src, wearing in pairs(PlayerWearing) do
+                    for _, slotData in pairs(wearing.Drawables or {}) do
+                        if slotData and slotData.last_worn_by then
+                            local before = #slotData.last_worn_by
+                            MBT.ServerUtils.CleanExpiredDNA(slotData)
+                            local after = slotData.last_worn_by and #slotData.last_worn_by or 0
+                            if after < before then
+                                cleaned = cleaned + 1
+                                DirtyPlayers[src] = true
+                            end
+                        end
+                    end
+                    for _, slotData in pairs(wearing.Props or {}) do
+                        if slotData and slotData.last_worn_by then
+                            local before = #slotData.last_worn_by
+                            MBT.ServerUtils.CleanExpiredDNA(slotData)
+                            local after = slotData.last_worn_by and #slotData.last_worn_by or 0
+                            if after < before then
+                                cleaned = cleaned + 1
+                                DirtyPlayers[src] = true
+                            end
+                        end
+                    end
+                end
+
+                if cleaned > 0 then
+                    MBT.Debugger("DNA cleanup: purged expired entries from", cleaned, "slot(s)")
+                end
+            end
+        end)
+    end
 end
 
 function MBT.PlayerState.InitPlayer(src)
@@ -50,6 +90,7 @@ function MBT.PlayerState.InitPlayer(src)
 end
 
 function MBT.PlayerState.SetSlot(src, slotType, slotIndex, metadata)
+    slotIndex = tonumber(slotIndex) or slotIndex
     if not PlayerWearing[src] then MBT.PlayerState.InitPlayer(src) end
     PlayerWearing[src][slotType][slotIndex] = metadata
     DirtyPlayers[src] = true
@@ -59,11 +100,13 @@ function MBT.PlayerState.SetSlot(src, slotType, slotIndex, metadata)
 end
 
 function MBT.PlayerState.GetSlot(src, slotType, slotIndex)
+    slotIndex = tonumber(slotIndex) or slotIndex
     if not PlayerWearing[src] then return nil end
     return PlayerWearing[src][slotType][slotIndex]
 end
 
 function MBT.PlayerState.ClearSlot(src, slotType, slotIndex)
+    slotIndex = tonumber(slotIndex) or slotIndex
     if not PlayerWearing[src] then return nil end
     local metadata = PlayerWearing[src][slotType][slotIndex]
     PlayerWearing[src][slotType][slotIndex] = nil
@@ -143,7 +186,7 @@ function MBT.PlayerState.Save(src, identifier)
     local dripXp = PlayerDripXp[src] or 0
     MySQL.insert(
         "INSERT INTO mbt_player_wearing (identifier, wearing_data, drip_xp) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE wearing_data = VALUES(wearing_data), drip_xp = VALUES(drip_xp), updated_at = CURRENT_TIMESTAMP",
-        {identifier, data, dripXp}
+        { identifier, data, dripXp }
     )
     DirtyPlayers[src] = false
 end
@@ -163,7 +206,7 @@ function MBT.PlayerState.Load(src, identifier)
 
     local result = MySQL.query.await(
         "SELECT wearing_data, drip_xp FROM mbt_player_wearing WHERE identifier = ?",
-        {identifier}
+        { identifier }
     )
 
     if result and result[1] then

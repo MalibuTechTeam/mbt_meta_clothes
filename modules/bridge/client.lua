@@ -114,9 +114,9 @@ function MBT.SharedClient.SetupStealDress()
         stealItemsList = {}
         local stealItems = stealItemsList
 
-        -- Check torso kit (3+8+11)
+        -- Check torso kit
         local hasTorso = false
-        for _, idx in ipairs({3, 8, 11}) do
+        for _, idx in ipairs(MBT.TorsoKitSlots or {}) do
             if MBT.Drawables[idx] and MBT.Drawables[idx]["Default"][targetSex] then
                 local current = GetPedDrawableVariation(closestPlayer, idx)
                 if not MBT.TableContains(MBT.Drawables[idx]["Default"][targetSex], current) then
@@ -135,7 +135,7 @@ function MBT.SharedClient.SetupStealDress()
 
         -- Check other drawables
         for k, v in pairs(MBT.Drawables) do
-            if k ~= 3 and k ~= 8 and k ~= 11 and v["Item"] and v["Default"][targetSex] then
+            if not MBT.TableContains(MBT.TorsoKitSlots, k) and MBT.GetSlotItemNames(v)[1] and v["Default"][targetSex] then
                 local current = GetPedDrawableVariation(closestPlayer, k)
                 if not MBT.TableContains(v["Default"][targetSex], current) then
                     stealItems[#stealItems + 1] = {
@@ -149,7 +149,7 @@ function MBT.SharedClient.SetupStealDress()
 
         -- Check props
         for k, v in pairs(MBT.Props) do
-            if v["Item"] and v["Default"][targetSex] then
+            if MBT.GetSlotItemNames(v)[1] and v["Default"][targetSex] then
                 local current = GetPedPropIndex(closestPlayer, k)
                 if not MBT.TableContains(v["Default"][targetSex], current) then
                     stealItems[#stealItems + 1] = {

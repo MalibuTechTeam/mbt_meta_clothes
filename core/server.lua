@@ -259,10 +259,10 @@ RegisterNetEvent('mbt_meta_clothes:syncStealDress', function(target)
     end
     if not hasItems then return end
 
-    -- Get target sex from metadata
+    -- Get target sex from metadata (normalize against legacy raw values like 0/"m")
     local targetSex = "male"
     for _, meta in pairs(targetWearing.Drawables or {}) do
-        if meta and meta.sex then targetSex = meta.sex break end
+        if meta and meta.sex then targetSex = MBT.NormalizeSex(meta.sex) or "male" break end
     end
 
     -- Give stolen items to thief using server-authoritative state
@@ -293,12 +293,12 @@ RegisterNetEvent('mbt_meta_clothes:stealSingleItem', function(targetServerId, st
         slotIndex = idx
     end
 
-    -- Get target sex from wearing state
+    -- Get target sex from wearing state (normalize against legacy raw values like 0/"m")
     local targetSex = "male"
     local wearing = MBT.PlayerState.GetAll(targetServerId)
     if wearing then
         for _, meta in pairs(wearing.Drawables or {}) do
-            if meta and meta.sex then targetSex = meta.sex break end
+            if meta and meta.sex then targetSex = MBT.NormalizeSex(meta.sex) or "male" break end
         end
     end
 
@@ -307,11 +307,10 @@ RegisterNetEvent('mbt_meta_clothes:stealSingleItem', function(targetServerId, st
             description = MBT.Locale["stolen_clothing"] or "Stolen clothing",
             sex = targetSex, type = "DressKit"
         }
-        for _, idx in ipairs({3, 8, 11}) do
+        for _, idx in ipairs(MBT.TorsoKitSlots) do
             local meta = MBT.PlayerState.ClearSlot(targetServerId, "Drawables", idx)
             if meta then
-                local slotName = idx == 3 and "Arms" or (idx == 8 and "Tshirt" or "Jacket")
-                kitMeta[slotName] = meta
+                kitMeta[MBT.TorsoSlotNames[idx]] = meta
             end
         end
         if addItemToPlayer then
@@ -321,15 +320,19 @@ RegisterNetEvent('mbt_meta_clothes:stealSingleItem', function(targetServerId, st
 
     elseif stealType == "drawable" then
         local meta = MBT.PlayerState.ClearSlot(targetServerId, "Drawables", slotIndex)
-        if meta and MBT.Drawables[slotIndex] and MBT.Drawables[slotIndex]["Item"] and addItemToPlayer then
-            addItemToPlayer(thiefSource, MBT.Drawables[slotIndex]["Item"], 1, meta)
+        local slotCfg = MBT.Drawables[slotIndex]
+        local itemName = MBT.ResolveItemName(slotCfg, meta)
+        if meta and itemName and addItemToPlayer then
+            addItemToPlayer(thiefSource, itemName, 1, meta)
         end
         TriggerClientEvent('mbt_meta_clothes:stealApplyDefault', targetServerId, "drawable", slotIndex)
 
     elseif stealType == "prop" then
         local meta = MBT.PlayerState.ClearSlot(targetServerId, "Props", slotIndex)
-        if meta and MBT.Props[slotIndex] and MBT.Props[slotIndex]["Item"] and addItemToPlayer then
-            addItemToPlayer(thiefSource, MBT.Props[slotIndex]["Item"], 1, meta)
+        local slotCfg = MBT.Props[slotIndex]
+        local itemName = MBT.ResolveItemName(slotCfg, meta)
+        if meta and itemName and addItemToPlayer then
+            addItemToPlayer(thiefSource, itemName, 1, meta)
         end
         TriggerClientEvent('mbt_meta_clothes:stealApplyDefault', targetServerId, "prop", slotIndex)
     end

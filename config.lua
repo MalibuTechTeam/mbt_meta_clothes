@@ -131,6 +131,48 @@ MBT.Notification         = function(data)
     -- QBCore.Functions.Notify(data.description or data.title, data.type or "primary")
 end
 
+-----------------------------------------------------------
+-- Freemode Defaults
+-- Vanilla GTA V default drawable/prop values for mp_m_freemode_01 and
+-- mp_f_freemode_01. Used as a fallback when a configured slot omits
+-- the ["Default"] key, so server owners adding new slots don't have to
+-- look up the vanilla defaults manually.
+-----------------------------------------------------------
+MBT.FreemodeDefaults     = {
+    Drawables = {
+        male   = { [0]=0, [1]=0, [2]=0, [3]=15, [4]=21, [5]=0, [6]=34, [7]=0, [8]=15, [9]=0, [10]=0, [11]=15 },
+        female = { [0]=0, [1]=0, [2]=0, [3]=15, [4]=14, [5]=0, [6]=118,[7]=0, [8]=15, [9]=0, [10]=0, [11]=15 },
+    },
+    Props = {
+        male   = { [0]=-1, [1]=-1, [2]=-1, [3]=-1, [4]=-1, [5]=-1, [6]=-1, [7]=-1 },
+        female = { [0]=-1, [1]=-1, [2]=-1, [3]=-1, [4]=-1, [5]=-1, [6]=-1, [7]=-1 },
+    },
+}
+
+-----------------------------------------------------------
+-- Gender Model Mapping
+-- Model hashes that map to "male" or "female" sex strings.
+-- Extend this table to support additional ped models beyond the
+-- standard freemode characters.
+-----------------------------------------------------------
+MBT.GenderModels         = {
+    [`mp_m_freemode_01`] = "male",
+    [`mp_f_freemode_01`] = "female",
+}
+
+-----------------------------------------------------------
+-- wearable_props Integration
+-- Maps drawable component slot indices to mbt_wearable_props item types.
+-- When a player clicks one of these slots in the NUI, the action is
+-- delegated to mbt_wearable_props:removeWearable().
+-- Armor slot (9) is a special case: the actual tier is read from statebags.
+-----------------------------------------------------------
+MBT.WearablePropsSlots   = {
+    [1]  = "mask",
+    [5]  = "bag",
+    [9]  = "smallarmor", -- overridden at runtime by mbt_isWearingHeavyarmor/mbt_isWearingMedarmor statebags
+}
+
 MBT.Drawables            = {
     [3] = {
         ["Default"] = {
@@ -197,7 +239,8 @@ MBT.Props                = {
         },
         ["Animation"] = { ["Dict"] = "missheist_agency2ahelmet", ["Anim"] = "take_off_helmet_stand", ["Flag"] = 51, ["Duration"] = 600 },
         ["Item"] = "hat",
-        ["PropModel"] = "xm3_prop_xm3_hat_ron_01a"
+        ["PropModel"] = "xm3_prop_xm3_hat_ron_01a",
+        ["ApplyHairFix"] = true, -- GTA V: hats clip through hair; this hides hair drawable when hat is on. Do not add to other slots.
     },
     [1] = {
         ["Default"] = {
@@ -225,5 +268,14 @@ MBT.Props                = {
         ["Animation"] = { ["Dict"] = "nmt_3_rcm-10", ["Anim"] = "cs_nigel_dual-10", ["Flag"] = 51, ["Duration"] = 900 },
         ["Item"] = "watch",
         ["PropModel"] = "p_watch_01"
+    },
+    [7] = {
+        ["Default"] = {
+            ["male"] = { -1 },
+            ["female"] = { -1 }
+        },
+        ["Animation"] = { ["Dict"] = "nmt_3_rcm-10", ["Anim"] = "cs_nigel_dual-10", ["Flag"] = 51, ["Duration"] = 900 },
+        ["Item"] = "bracelet",
+        ["PropModel"] = "p_jewel_m_bracelet_02"
     },
 }

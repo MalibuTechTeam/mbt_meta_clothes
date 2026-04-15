@@ -31,13 +31,19 @@ function MBT.Drip.CalculateRate(src)
     for slotIndex, metadata in pairs(wearing.Drawables or {}) do
         local slotConfig = MBT.Drawables[slotIndex]
         if slotConfig and metadata and metadata.drawable then
-            local dripValues = slotConfig["DripValues"]
-            if dripValues and dripValues[metadata.drawable] then
-                rate = rate + dripValues[metadata.drawable]
-            elseif slotConfig["DefaultDrip"] then
-                rate = rate + slotConfig["DefaultDrip"]
+            -- metadata.dripValue overrides all config-based values (validate number to prevent injection)
+            if type(metadata.dripValue) == "number" then
+                rate = rate + metadata.dripValue
             else
-                rate = rate + defaultDrip
+                local drawableIdx = tonumber(metadata.drawable) or metadata.drawable
+                local dripValues = slotConfig["DripValues"]
+                if dripValues and dripValues[drawableIdx] then
+                    rate = rate + dripValues[drawableIdx]
+                elseif slotConfig["DefaultDrip"] then
+                    rate = rate + slotConfig["DefaultDrip"]
+                else
+                    rate = rate + defaultDrip
+                end
             end
         end
     end
@@ -46,13 +52,19 @@ function MBT.Drip.CalculateRate(src)
     for slotIndex, metadata in pairs(wearing.Props or {}) do
         local slotConfig = MBT.Props[slotIndex]
         if slotConfig and metadata and metadata.drawable then
-            local dripValues = slotConfig["DripValues"]
-            if dripValues and dripValues[metadata.drawable] then
-                rate = rate + dripValues[metadata.drawable]
-            elseif slotConfig["DefaultDrip"] then
-                rate = rate + slotConfig["DefaultDrip"]
+            -- metadata.dripValue overrides all config-based values (validate number)
+            if type(metadata.dripValue) == "number" then
+                rate = rate + metadata.dripValue
             else
-                rate = rate + defaultDrip
+                local drawableIdx = tonumber(metadata.drawable) or metadata.drawable
+                local dripValues = slotConfig["DripValues"]
+                if dripValues and dripValues[drawableIdx] then
+                    rate = rate + dripValues[drawableIdx]
+                elseif slotConfig["DefaultDrip"] then
+                    rate = rate + slotConfig["DefaultDrip"]
+                else
+                    rate = rate + defaultDrip
+                end
             end
         end
     end
@@ -81,15 +93,20 @@ function MBT.Drip.CalculateBreakdown(src)
         local slotConfig = MBT.Drawables[slotIndex]
         if slotConfig and metadata and metadata.drawable then
             local rate = 0
-            local dripValues = slotConfig["DripValues"]
-            if dripValues and dripValues[metadata.drawable] then
-                rate = dripValues[metadata.drawable]
-            elseif slotConfig["DefaultDrip"] then
-                rate = slotConfig["DefaultDrip"]
+            if type(metadata.dripValue) == "number" then
+                rate = metadata.dripValue
             else
-                rate = defaultDrip
+                local drawableIdx = tonumber(metadata.drawable) or metadata.drawable
+                local dripValues = slotConfig["DripValues"]
+                if dripValues and dripValues[drawableIdx] then
+                    rate = dripValues[drawableIdx]
+                elseif slotConfig["DefaultDrip"] then
+                    rate = slotConfig["DefaultDrip"]
+                else
+                    rate = defaultDrip
+                end
             end
-            
+
             if rate > 0 then
                 table.insert(breakdown, { slotType = "Drawables", slotIndex = slotIndex, rate = rate })
             end
@@ -101,15 +118,20 @@ function MBT.Drip.CalculateBreakdown(src)
         local slotConfig = MBT.Props[slotIndex]
         if slotConfig and metadata and metadata.drawable then
             local rate = 0
-            local dripValues = slotConfig["DripValues"]
-            if dripValues and dripValues[metadata.drawable] then
-                rate = dripValues[metadata.drawable]
-            elseif slotConfig["DefaultDrip"] then
-                rate = slotConfig["DefaultDrip"]
+            if type(metadata.dripValue) == "number" then
+                rate = metadata.dripValue
             else
-                rate = defaultDrip
+                local drawableIdx = tonumber(metadata.drawable) or metadata.drawable
+                local dripValues = slotConfig["DripValues"]
+                if dripValues and dripValues[drawableIdx] then
+                    rate = dripValues[drawableIdx]
+                elseif slotConfig["DefaultDrip"] then
+                    rate = slotConfig["DefaultDrip"]
+                else
+                    rate = defaultDrip
+                end
             end
-            
+
             if rate > 0 then
                 table.insert(breakdown, { slotType = "Props", slotIndex = slotIndex, rate = rate })
             end

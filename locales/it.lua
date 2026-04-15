@@ -54,6 +54,7 @@ Locales['it'] = {
     ["t_shirt"]     = "Maglietta",
     ["jacket"]      = "Giacca",
     ["watch"]       = "Orologio",
+    ["bracelet"]    = "Bracciale",
     ["top"]         = "Sopra",
 
     -----------------------------------------------------------
@@ -74,6 +75,9 @@ Locales['it'] = {
     ["use_glasses"]    = "Indossando gli occhiali",
     ["use_earaccess"]  = "Indossando gli orecchini",
     ["use_watch"]      = "Indossando l'orologio",
+    ["use_bracelet"]   = "Indossando il bracciale",
+    ["use_item"]       = "Indossando...",
+    ["cancel"]         = "Annullato",
     ["stealing"]       = "Rubando...",
     ["stealing_all"]   = "Svestendo...",
 
