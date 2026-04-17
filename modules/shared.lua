@@ -4,31 +4,57 @@ Locales = Locales or {}
 local resName = GetCurrentResourceName()
 
 -----------------------------------------------------------
--- Debugger
+-- Logging
 -----------------------------------------------------------
-local side = IsDuplicityVersion() and "^4S" or "^5C"
 
---- Log a debug message (only when MBT.Debug is true)
---- @param ... any Values to print (auto-converted to string)
+--- Serialize a single value for log output.
+--- Tables are json.encoded; everything else is tostring'd.
+local function serialize(v)
+    if type(v) == "table" then
+        local ok, s = pcall(json.encode, v)
+        return ok and s or tostring(v)
+    end
+    return tostring(v)
+end
+
+--- Return "folder/file.lua:line" of the caller at the given stack level.
+--- Strips the resource-name prefix so paths stay short.
+local function callerLoc(level)
+    local info = debug.getinfo(level, "Sl")
+    if not info then return "?" end
+    local src = info.short_src:gsub("^@@?[^/\\]+[/\\]", "")
+    return src .. ":" .. (info.currentline or "?")
+end
+
+--- HH:MM:SS timestamp on the server side; empty string on the client.
+--- Lets you correlate events in server logs without noise in F8 console.
+local function timestamp()
+    return IsDuplicityVersion() and (os.date("%H:%M:%S") .. " ") or ""
+end
+
+--- Log a debug message. Only prints when MBT.Debug = true.
+--- Tables are auto json-encoded. Shows caller location and server timestamp.
+--- @param ... any
 function MBT.Debugger(...)
     if not MBT.Debug then return end
-    local args = { ... }
     local parts = {}
-    for _, v in ipairs(args) do
-        parts[#parts + 1] = tostring(v)
+    for i = 1, select("#", ...) do
+        parts[i] = serialize(select(i, ...))
     end
-    print(("^7[%s] [%s^7] %s^0"):format(resName, side, table.concat(parts, " ")))
+    print(("^7[%s] %s^3%s^7 %s^0"):format(resName, timestamp(), callerLoc(2), table.concat(parts, " ")))
 end
 
---- Log a warning (always prints, regardless of MBT.Debug)
+--- Log a warning. Always prints regardless of MBT.Debug.
+--- Tables are auto json-encoded. Shows caller location and server timestamp.
+--- @param ... any
 function MBT.Warn(...)
-    local args = { ... }
     local parts = {}
-    for _, v in ipairs(args) do
-        parts[#parts + 1] = tostring(v)
+    for i = 1, select("#", ...) do
+        parts[i] = serialize(select(i, ...))
     end
-    print(("^3[%s] [WARN] %s^0"):format(resName, table.concat(parts, " ")))
+    print(("^3[%s] [WARN] %s%s %s^0"):format(resName, timestamp(), callerLoc(2), table.concat(parts, " ")))
 end
+
 
 -----------------------------------------------------------
 -- Utilities
