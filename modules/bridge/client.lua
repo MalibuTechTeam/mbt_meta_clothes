@@ -19,23 +19,41 @@ function MBT.SharedClient.SetupCheckDress(sexToLabel)
         if type(data.index) == "table" and data.index["Arms"] then
             isDefault = MBT.Utils.HandleTopDress(data)
         else
+            -- Normalize index to number: JSON deserializers can return string keys
+            -- e.g. OX metadata may decode index as "6" instead of 6.
+            local idx = tonumber(data.index) or data.index
+            data.index = idx
+
             assert(
-                MBT[data.type][data.index]["Default"][data.pedSex] and
-                type(MBT[data.type][data.index]["Default"][data.pedSex]) == "table",
-                "Invalid value or wrong type for key " .. data.index
+                MBT[data.type][idx] and
+                MBT[data.type][idx]["Default"][data.pedSex] and
+                type(MBT[data.type][idx]["Default"][data.pedSex]) == "table",
+                "Invalid value or wrong type for key " .. tostring(idx)
             )
 
-            if not MBT.playerWearing[data.type] or not MBT.TableContains(MBT[data.type][data.index]["Default"][data.pedSex], MBT.playerWearing[data.type][data.index]) then
+            -- Read current PED drawable directly — avoids any stale-cache edge cases
+            local ped = PlayerPedId()
+            local currentVariation
+            if data.type == "Drawables" then
+                currentVariation = GetPedDrawableVariation(ped, idx)
+            else
+                currentVariation = GetPedPropIndex(ped, idx)
+            end
+
+            if not MBT.TableContains(MBT[data.type][idx]["Default"][data.pedSex], currentVariation) then
                 isDefault = false
             end
         end
 
         if isDefault then
+            -- Prefer metadata.type ("Drawable"/"Prop"/"DressKit") over the inventory
+            -- engine's own .type field (which is always "item" in ox_inventory and
+            -- would shadow the correct value if checked first).
             local dressType
-            if data.itemInfo and data.itemInfo.type then
-                dressType = data.itemInfo.type
-            elseif data.itemInfo and data.itemInfo.metadata and data.itemInfo.metadata.type then
+            if data.itemInfo and data.itemInfo.metadata and data.itemInfo.metadata.type then
                 dressType = data.itemInfo.metadata.type
+            elseif data.itemInfo and data.itemInfo.type then
+                dressType = data.itemInfo.type
             end
 
             if not dressType then
@@ -43,6 +61,8 @@ function MBT.SharedClient.SetupCheckDress(sexToLabel)
                 MBT.Notification(MBT.Locale["undress"])
                 return
             end
+
+            MBT.Debugger("checkDress: applying dressType =", dressType)
 
             if dressType == 'Drawable' then TriggerEvent("mbt_meta_clothes:applyDress", data.itemInfo) end
             if dressType == 'Prop'     then TriggerEvent("mbt_meta_clothes:applyProps", data.itemInfo) end
@@ -176,72 +196,66 @@ function MBT.SharedClient.SetupStealDress()
     end
 
     -- NUI callbacks for steal
+    -- cb(1) viene chiamato subito; la logica steal gira in un Citizen.CreateThread
+    -- per avere pieno supporto a Wait() e animazioni.
     RegisterNUICallback('handleStealItem', function(data, cb)
         SetNuiFocus(false, false)
         SendNUIMessage({action = "stealMenu", status = false})
-
-        if stealTarget.ped and stealTarget.serverId then
-            MBT.Utils.StealSingleItem(
-                stealTarget.thiefPed,
-                stealTarget.ped,
-                stealTarget.serverId,
-                data.stealType,
-                data.slotIndex
-            )
-        end
         cb(1)
+
+        local ped    = stealTarget.thiefPed
+        local target = stealTarget.ped
+        local server = stealTarget.serverId
+        local sType  = data.stealType
+        local sIdx   = data.slotIndex
+        if ped and server then
+            Citizen.CreateThread(function()
+                MBT.Utils.StealSingleItem(ped, target, server, sType, sIdx)
+            end)
+        end
     end)
 
     RegisterNUICallback('handleStealAll', function(data, cb)
         SetNuiFocus(false, false)
         SendNUIMessage({action = "stealMenu", status = false})
-
-        if stealTarget.ped and stealTarget.serverId then
-            MBT.Utils.StealAllItems(
-                stealTarget.thiefPed,
-                stealTarget.ped,
-                stealTarget.serverId
-            )
-        end
         cb(1)
+
+        local ped    = stealTarget.thiefPed
+        local target = stealTarget.ped
+        local server = stealTarget.serverId
+        if ped and server then
+            Citizen.CreateThread(function()
+                MBT.Utils.StealAllItems(ped, target, server)
+            end)
+        end
     end)
 
     -- Multi-select confirm: NUI sends array of selected items
     RegisterNUICallback('confirmSteal', function(data, cb)
         SetNuiFocus(false, false)
         SendNUIMessage({action = "stealMenu", status = false})
+        cb(1)
 
-        if not stealTarget.ped or not stealTarget.serverId then
-            cb(1)
-            return
-        end
+        if not stealTarget.ped or not stealTarget.serverId then return end
 
         local items = data.items
-        if not items or #items == 0 then
-            cb(1)
-            return
-        end
+        if not items or #items == 0 then return end
+
+        local ped    = stealTarget.thiefPed
+        local target = stealTarget.ped
+        local server = stealTarget.serverId
 
         -- Check if all stealable items are selected → use StealAll for efficiency
         if #items >= #stealItemsList then
-            MBT.Utils.StealAllItems(
-                stealTarget.thiefPed,
-                stealTarget.ped,
-                stealTarget.serverId
-            )
+            Citizen.CreateThread(function()
+                MBT.Utils.StealAllItems(ped, target, server)
+            end)
         else
-            -- Steal each selected item sequentially
-            for _, item in ipairs(items) do
-                MBT.Utils.StealSingleItem(
-                    stealTarget.thiefPed,
-                    stealTarget.ped,
-                    stealTarget.serverId,
-                    item.stealType,
-                    item.slotIndex
-                )
-            end
+            -- Multi-select parziale: UNA animazione patdown + server event per ogni item
+            Citizen.CreateThread(function()
+                MBT.Utils.StealMultipleItems(ped, target, server, items)
+            end)
         end
-        cb(1)
     end)
 
     RegisterNUICallback('closeStealMenu', function(data, cb)

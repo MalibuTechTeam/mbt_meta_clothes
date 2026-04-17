@@ -1,29 +1,46 @@
 --- Normalize metadata from different inventory formats (OX vs QB)
+--- OX inventory wraps our metadata inside item.metadata, while QB stores it directly
+--- in item.info. OX also adds its own root-level fields (e.g. type = "item") that
+--- must NOT shadow our MBT types ("Drawable"/"Prop"/"DressKit").
 local function normalizeMetadata(data)
     local meta = {}
-    meta.index = data.index
+
+    -- Read from root level first (covers QB where item.info IS the metadata)
+    meta.index    = data.index
     meta.drawable = data.drawable
-    meta.texture = data.texture
-    meta.palette = data.palette
-    meta.sex = MBT.NormalizeSex(data.sex)
-    meta.type = data.type
+    meta.texture  = data.texture
+    meta.palette  = data.palette
+    meta.sex      = MBT.NormalizeSex(data.sex)
     meta.description = data.description
-    -- Store which item was used so give-back uses the exact item name (validate string)
     meta.item_name = type(data.name) == "string" and data.name or nil
 
+    -- Root-level type only if it's an MBT clothing type — ignore inventory engine types like "item"
+    local MBT_TYPES = { Drawable = true, Prop = true, DressKit = true }
+    if MBT_TYPES[data.type] then
+        meta.type = data.type
+    end
+
+    -- Overlay from the nested .metadata table (OX inventory format)
+    -- MBT fields always win over whatever was at root level
     if data.metadata and type(data.metadata) == "table" then
-        meta.index = meta.index or data.metadata.index
+        meta.index    = meta.index    or data.metadata.index
         meta.drawable = meta.drawable or data.metadata.drawable
-        meta.texture = meta.texture or data.metadata.texture
-        meta.palette = meta.palette or data.metadata.palette
-        meta.sex = meta.sex or MBT.NormalizeSex(data.metadata.sex)
-        meta.type = meta.type or data.metadata.type
+        meta.texture  = meta.texture  or data.metadata.texture
+        meta.palette  = meta.palette  or data.metadata.palette
+        meta.sex      = meta.sex      or MBT.NormalizeSex(data.metadata.sex)
         meta.description = meta.description or data.metadata.description
-        meta.item_name = meta.item_name or (type(data.metadata.item_name) == "string" and data.metadata.item_name or nil)
+        meta.item_name   = meta.item_name   or (type(data.metadata.item_name) == "string" and data.metadata.item_name or nil)
+
+        -- type: prefer metadata MBT type over root-level inventory type ("item")
+        if MBT_TYPES[data.metadata.type] then
+            meta.type = data.metadata.type
+        elseif not meta.type then
+            meta.type = data.metadata.type
+        end
+
+        -- Copy any remaining metadata fields not already set
         for k, v in pairs(data.metadata) do
-            if meta[k] == nil then
-                meta[k] = v
-            end
+            if meta[k] == nil then meta[k] = v end
         end
     end
 
@@ -39,6 +56,11 @@ AddEventHandler('mbt_meta_clothes:requestPedScan', function()
     -- New player: no changes needed, just scan PED and show it
     ResetEntityAlpha(PlayerPedId())
     MBT.Utils.SyncWearingState()
+    -- Safety: resume detection anche qui nel caso il flusso sia NEW player
+    -- (no restoreWearing) dopo un multichar switch
+    if MBT.Utils.ResumeHybridDetection then
+        MBT.Utils.ResumeHybridDetection()
+    end
 end)
 
 -----------------------------------------------------------
@@ -107,6 +129,20 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState)
 
     -- Apply immediately — restore guard (100ms polling, 15s) handles late appearance script changes
     applyWearingState(wearingState)
+
+    -- Riprende la detection con il cache settato sullo stato ATTESO (wearingState).
+    -- Questo è cruciale post-multichar: se l'appearance script ha applicato
+    -- qualcosa che non ci dovrebbe essere (es. vecchio cappello salvato da
+    -- esx_skin), il cache non lo congela come normale — al prossimo poll la
+    -- restoreProtection vede il diff e reverte tornando al nostro state.
+    if MBT.Utils.ResumeHybridDetection then
+        MBT.Utils.ResumeHybridDetection(wearingState)
+    end
+
+    -- Ferma il loop del bridge che manteneva PED invisibile durante il switch
+    if MBT.Utils.StopKeepPedHidden then
+        MBT.Utils.StopKeepPedHidden()
+    end
 
     -- Show PED — state is now correct
     ResetEntityAlpha(PlayerPedId())
@@ -189,8 +225,10 @@ end
 RegisterNetEvent('mbt_meta_clothes:applyDress')
 AddEventHandler('mbt_meta_clothes:applyDress', function(data)
     local meta = normalizeMetadata(data)
+    MBT.Debugger("applyDress: slot", meta.index, "drawable", meta.drawable, "texture", meta.texture, "type", meta.type)
     MBT.Utils.ExpectChange("Drawables", meta.index)
     SetPedComponentVariation(PlayerPedId(), meta.index, meta.drawable, meta.texture, meta.palette)
+    MBT.Utils.UpdatePlayerClothes() -- keep cache in sync so next checkDress sees the new state
     MBT.Utils.SendSlotUpdate("Drawables", meta.index, true)
     TriggerServerEvent("mbt_meta_clothes:storeWearing", "Drawables", meta)
 end)
@@ -200,6 +238,7 @@ AddEventHandler('mbt_meta_clothes:applyKitDress', function(data)
     local kitMetadata = {}
     for k, v in pairs(data) do
         if type(v) == "table" and v.index then
+            MBT.Debugger("applyKitDress: slot", v.index, "(", k, ") drawable", v.drawable, "texture", v.texture)
             MBT.Utils.ExpectChange("Drawables", v.index)
             SetPedComponentVariation(PlayerPedId(), v.index, v.drawable, v.texture, v.palette)
             kitMetadata[v.index] = {
@@ -225,6 +264,7 @@ AddEventHandler('mbt_meta_clothes:applyProps', function(data)
     if MBT.Props[meta.index] and MBT.Props[meta.index]["ApplyHairFix"] then
         MBT.Utils.ApplyHatHairFix(PlayerPedId())
     end
+    MBT.Utils.UpdatePlayerClothes() -- keep cache in sync so next checkDress sees the new state
     MBT.Utils.SendSlotUpdate("Props", meta.index, true)
     TriggerServerEvent("mbt_meta_clothes:storeWearing", "Props", meta)
 end)
@@ -278,9 +318,11 @@ AddEventHandler('mbt_meta_clothes:stealApplyDefault', function(stealType, slotIn
     if sex == "customSkin" then return end
 
     if stealType == "torso" then
-        -- Scatter torso props before resetting
         for _, idx in ipairs(MBT.TorsoKitSlots) do
-            MBT.ClothingProps.ScatterFromPed(ped, "Drawables", idx)
+            if MBT.ClothingPropsEnabled then
+                local propModel = MBT.Drawables[idx] and MBT.Drawables[idx]["PropModel"]
+                MBT.ClothingProps.ScatterFromPed(ped, propModel, "Drawables", idx)
+            end
             MBT.Utils.ExpectChange("Drawables", idx)
             local default = MBT.Drawables[idx] and MBT.Drawables[idx]["Default"][sex]
             if default then
@@ -289,7 +331,10 @@ AddEventHandler('mbt_meta_clothes:stealApplyDefault', function(stealType, slotIn
             MBT.Utils.SendSlotUpdate("Drawables", idx, false)
         end
     elseif stealType == "drawable" and slotIndex then
-        MBT.ClothingProps.ScatterFromPed(ped, "Drawables", slotIndex)
+        if MBT.ClothingPropsEnabled then
+            local propModel = MBT.Drawables[slotIndex] and MBT.Drawables[slotIndex]["PropModel"]
+            MBT.ClothingProps.ScatterFromPed(ped, propModel, "Drawables", slotIndex)
+        end
         MBT.Utils.ExpectChange("Drawables", slotIndex)
         local default = MBT.Drawables[slotIndex] and MBT.Drawables[slotIndex]["Default"][sex]
         if default then
@@ -297,7 +342,10 @@ AddEventHandler('mbt_meta_clothes:stealApplyDefault', function(stealType, slotIn
         end
         MBT.Utils.SendSlotUpdate("Drawables", slotIndex, false)
     elseif stealType == "prop" and slotIndex then
-        MBT.ClothingProps.ScatterFromPed(ped, "Props", slotIndex)
+        if MBT.ClothingPropsEnabled then
+            local propModel = MBT.Props[slotIndex] and MBT.Props[slotIndex]["PropModel"]
+            MBT.ClothingProps.ScatterFromPed(ped, propModel, "Props", slotIndex)
+        end
         MBT.Utils.ExpectChange("Props", slotIndex)
         local default = MBT.Props[slotIndex] and MBT.Props[slotIndex]["Default"][sex]
         if default then
@@ -317,10 +365,9 @@ end)
 -- Victim animation relay (requested by thief via server)
 -----------------------------------------------------------
 RegisterNetEvent('mbt_meta_clothes:playVictimAnim')
-AddEventHandler('mbt_meta_clothes:playVictimAnim', function(duration, targetDown)
+AddEventHandler('mbt_meta_clothes:playVictimAnim', function(duration, targetDown, dict, clip)
     local ped = PlayerPedId()
-    local dict = targetDown and "missexile3" or "missmic4"
-    local clip = targetDown and "ex03_dingy_search_case_base_michael" or "michael_tux_fidget"
+    -- dict/clip are passed from the thief's client so victim always mirrors the thief's animation set
     while not HasAnimDictLoaded(dict) do
         RequestAnimDict(dict)
         Wait(50)

@@ -34,6 +34,10 @@ RegisterNetEvent('mbt_meta_clothes:playerReady', function()
     local src = source
     MBT.Debugger("=== PLAYER READY ===", src)
 
+    -- Multicharacter: se il src aveva già uno stato caricato con un identifier
+    -- diverso, salva quello vecchio e resetta prima di caricare il nuovo char
+    MBT.PlayerState.CheckCharacterSwitch(src)
+
     MBT.PlayerState.Load(src)
 
     if MBT.PlayerState.HasDbEntry(src) then
@@ -59,8 +63,18 @@ RegisterNetEvent('mbt_meta_clothes:playerReady', function()
 
         TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, wearingState)
     else
-        MBT.Debugger("NEW player — requesting PED scan")
-        TriggerClientEvent('mbt_meta_clothes:requestPedScan', src)
+        -- NEW char (nessuna riga DB). Se è uno switch multicharacter evitiamo
+        -- il PED scan: il PED potrebbe avere ancora i drawable del char
+        -- precedente (appearance script non ha ancora applicato il nuovo skin),
+        -- e finiremmo per salvare dati SBAGLIATI sulla riga del nuovo char.
+        -- In caso di switch, applichiamo direttamente i default del config.
+        if MBT.PlayerState.ConsumeSwitchFlag(src) then
+            MBT.Debugger("NEW char via multichar switch — skipping PED scan, applying defaults")
+            TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, { Drawables = {}, Props = {} })
+        else
+            MBT.Debugger("NEW player — requesting PED scan")
+            TriggerClientEvent('mbt_meta_clothes:requestPedScan', src)
+        end
     end
 
     MBT.UpdateStateBags(src)
@@ -311,6 +325,18 @@ RegisterNetEvent('mbt_meta_clothes:stealSingleItem', function(targetServerId, st
             local meta = MBT.PlayerState.ClearSlot(targetServerId, "Drawables", idx)
             if meta then
                 kitMeta[MBT.TorsoSlotNames[idx]] = meta
+            else
+                -- PlayerState had no entry (slot was at default): always include all three
+                -- torso slots so applyKitDress resets them together (prevents arms/shirt mismatch)
+                local defaultDrawable = MBT.Drawables[idx]
+                    and MBT.Drawables[idx]["Default"]
+                    and MBT.Drawables[idx]["Default"][targetSex]
+                    and MBT.Drawables[idx]["Default"][targetSex][1]
+                if defaultDrawable ~= nil then
+                    kitMeta[MBT.TorsoSlotNames[idx]] = {
+                        index = idx, drawable = defaultDrawable, texture = 0, palette = 0
+                    }
+                end
             end
         end
         if addItemToPlayer then
@@ -339,14 +365,16 @@ RegisterNetEvent('mbt_meta_clothes:stealSingleItem', function(targetServerId, st
 end)
 
 -- S3 FIX: Proximity + rate limit on victim anim relay
-RegisterNetEvent('mbt_meta_clothes:requestVictimAnim', function(targetServerId, duration, targetDown)
+RegisterNetEvent('mbt_meta_clothes:requestVictimAnim', function(targetServerId, duration, targetDown, dict, clip)
     local src = source
     if not MBT.ServerUtils.CheckRateLimit(src, "victimAnim") then return end
     if not MBT.ServerUtils.IsValidPlayer(targetServerId) then return end
     if not MBT.ServerUtils.CheckProximity(src, targetServerId, MBT.StealDistance or 5.0) then return end
+    -- Validate dict/clip are strings (security: prevent arbitrary data injection)
+    if type(dict) ~= "string" or type(clip) ~= "string" then return end
     -- Cap duration to prevent grief
     duration = math.min(duration or 3000, MBT.VictimAnimCap or 10000)
-    TriggerClientEvent('mbt_meta_clothes:playVictimAnim', targetServerId, duration, targetDown)
+    TriggerClientEvent('mbt_meta_clothes:playVictimAnim', targetServerId, duration, targetDown, dict, clip)
 end)
 
 -----------------------------------------------------------
