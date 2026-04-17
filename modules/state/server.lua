@@ -12,6 +12,7 @@ local DirtyPlayers = {}
 local PlayerIdentifiers = {}
 local PlayerHasDbEntry = {}
 local PlayerDripXp = {}
+local PlayerJustSwitched = {} -- true quando CheckCharacterSwitch ha rilevato uno switch
 local initialized = false
 
 function MBT.PlayerState.Init()
@@ -40,6 +41,7 @@ function MBT.PlayerState.Init()
             MBT.PlayerState.SaveAllDirty()
         end
     end)
+
 
     -- Periodic DNA expiry cleanup — removes stale last_worn_by entries from
     -- in-memory wearing state for items that stay equipped for a long time.
@@ -90,6 +92,13 @@ function MBT.PlayerState.InitPlayer(src)
 end
 
 function MBT.PlayerState.SetSlot(src, slotType, slotIndex, metadata)
+    -- Safety net multicharacter: se il character è cambiato senza che gli event
+    -- framework siano scattati (alcuni multichar non emettono esx:playerLoaded
+    -- server-side), rileviamo lo switch qui e reload prima di scrivere.
+    if MBT.PlayerState.CheckCharacterSwitch(src) then
+        MBT.PlayerState.Load(src)
+    end
+
     slotIndex = tonumber(slotIndex) or slotIndex
     if not PlayerWearing[src] then MBT.PlayerState.InitPlayer(src) end
     PlayerWearing[src][slotType][slotIndex] = metadata
@@ -106,6 +115,11 @@ function MBT.PlayerState.GetSlot(src, slotType, slotIndex)
 end
 
 function MBT.PlayerState.ClearSlot(src, slotType, slotIndex)
+    -- Safety net multicharacter (vedi nota su SetSlot)
+    if MBT.PlayerState.CheckCharacterSwitch(src) then
+        MBT.PlayerState.Load(src)
+    end
+
     slotIndex = tonumber(slotIndex) or slotIndex
     if not PlayerWearing[src] then return nil end
     local metadata = PlayerWearing[src][slotType][slotIndex]
@@ -118,6 +132,11 @@ function MBT.PlayerState.ClearSlot(src, slotType, slotIndex)
 end
 
 function MBT.PlayerState.ClearAllSlots(src, slotType)
+    -- Safety net multicharacter
+    if MBT.PlayerState.CheckCharacterSwitch(src) then
+        MBT.PlayerState.Load(src)
+    end
+
     if not PlayerWearing[src] then return {} end
     local allMetadata = PlayerWearing[src][slotType] or {}
     PlayerWearing[src][slotType] = {}
@@ -184,11 +203,59 @@ function MBT.PlayerState.Save(src, identifier)
     end
     local data = json.encode(forJson)
     local dripXp = PlayerDripXp[src] or 0
-    MySQL.insert(
+
+    -- Usare la variante sincrona (.await) garantisce che il save completi
+    -- prima che il resource muoia in onResourceStop. MySQL.insert async
+    -- fire-and-forget può perdersi se la risorsa si ferma subito dopo.
+    MySQL.insert.await(
         "INSERT INTO mbt_player_wearing (identifier, wearing_data, drip_xp) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE wearing_data = VALUES(wearing_data), drip_xp = VALUES(drip_xp), updated_at = CURRENT_TIMESTAMP",
         { identifier, data, dripXp }
     )
     DirtyPlayers[src] = false
+end
+
+--- Rileva switch di character (multicharacter): se il src ha già stato caricato
+--- ma l'identifier è cambiato, salva lo stato vecchio sul suo DB row e resetta
+--- le cache. Da chiamare PRIMA di Load() in modo che lo stato del nuovo char
+--- venga caricato pulito.
+--- @param src number Player source
+--- @return boolean switched True se è stato rilevato uno switch
+function MBT.PlayerState.CheckCharacterSwitch(src)
+    if not getPlayerIdentifier then return false end
+    local oldId = PlayerIdentifiers[src]
+    if not oldId then return false end
+
+    local newId = getPlayerIdentifier(src)
+    if not newId or newId == oldId then return false end
+
+    MBT.Debugger("CheckCharacterSwitch: src", src, "identifier cambiato da", oldId, "a", newId, "- salvo e resetto")
+
+    -- Salva lo stato del vecchio character sulla sua chiave corretta
+    if DirtyPlayers[src] and PlayerWearing[src] then
+        MBT.PlayerState.Save(src, oldId)
+    end
+
+    -- Reset completo in-memory per il nuovo character
+    PlayerWearing[src] = nil
+    DirtyPlayers[src] = nil
+    PlayerIdentifiers[src] = nil
+    PlayerHasDbEntry[src] = nil
+    PlayerDripXp[src] = nil
+    -- Flag: il prossimo playerReady è dovuto a switch, NON deve fare PED scan
+    -- (il PED potrebbe avere ancora i drawable del char precedente se
+    -- l'appearance script non ha già applicato il nuovo skin)
+    PlayerJustSwitched[src] = true
+    return true
+end
+
+--- Query/consume del flag "ha appena fatto switch". Ritorna true una sola volta
+--- per switch — il flag viene azzerato dalla prima chiamata in modo che il
+--- successivo playerReady (primo login dopo drop completo) torni a comportarsi
+--- come new-player normale.
+function MBT.PlayerState.ConsumeSwitchFlag(src)
+    local was = PlayerJustSwitched[src] == true
+    PlayerJustSwitched[src] = nil
+    return was
 end
 
 function MBT.PlayerState.Load(src, identifier)
@@ -260,6 +327,7 @@ function MBT.PlayerState.Cleanup(src)
     PlayerIdentifiers[src] = nil
     PlayerHasDbEntry[src] = nil
     PlayerDripXp[src] = nil
+    PlayerJustSwitched[src] = nil
 end
 
 function MBT.PlayerState.SaveAllDirty()

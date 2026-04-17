@@ -23,3 +23,23 @@ function getPlayerIdentifier(src)
         return tostring(player.stateId)
     end
 end
+
+-----------------------------------------------------------
+-- Multicharacter switch — server-side handlers
+-----------------------------------------------------------
+
+-- ox:playerLoaded fires server-side quando un character viene caricato
+-- (compreso multicharacter switch).
+AddEventHandler('ox:playerLoaded', function(src)
+    if MBT.PlayerState.CheckCharacterSwitch(src) then
+        MBT.PlayerState.Load(src)
+    end
+end)
+
+-- Pre-logout: salva lo stato del character che sta uscendo prima che
+-- l'Ox player venga distrutto.
+AddEventHandler('ox:playerLogout', function(src)
+    if MBT.PlayerState.IsLoaded(src) then
+        MBT.PlayerState.Save(src)
+    end
+end)

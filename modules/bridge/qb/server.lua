@@ -46,3 +46,24 @@ function getPlayerIdentifier(src)
         return player.PlayerData.citizenid
     end
 end
+
+-----------------------------------------------------------
+-- Multicharacter switch — server-side handlers
+-----------------------------------------------------------
+
+-- QBCore:Server:PlayerLoaded fires server-side con il Player già pronto.
+-- Qui getPlayerIdentifier(src) restituisce SEMPRE il citizenid corretto.
+AddEventHandler('QBCore:Server:PlayerLoaded', function(Player)
+    local src = Player and Player.PlayerData and Player.PlayerData.source
+    if not src then return end
+    if MBT.PlayerState.CheckCharacterSwitch(src) then
+        MBT.PlayerState.Load(src)
+    end
+end)
+
+-- Pre-unload: salva lo stato del character che sta uscendo
+AddEventHandler('QBCore:Server:OnPlayerUnload', function(src)
+    if MBT.PlayerState.IsLoaded(src) then
+        MBT.PlayerState.Save(src)
+    end
+end)

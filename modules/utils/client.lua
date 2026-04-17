@@ -307,8 +307,50 @@ end
 local clothingCache = { Drawables = {}, Props = {} }
 local expectedChanges = {}
 local detectionRunning = false
+local detectionPaused = false
 local restoreProtection = false
 local restoreState = nil
+
+--- Pause hybrid detection (used during multicharacter transitions so that
+--- PED drawable changes from the appearance script of the new character
+--- don't get attributed to the OLD character via externalDress events).
+function MBT.Utils.PauseHybridDetection()
+    detectionPaused = true
+end
+
+--- Riprende la hybrid detection dopo una pausa (es. multichar switch).
+--- Se viene passato wearingState, il cache viene settato sullo stato ATTESO
+--- invece che dal PED corrente. Questo evita che modifiche dell'appearance
+--- script applicate durante la pausa vengano "congelate" nel cache come
+--- normali: invece, al prossimo poll, il loop vede un diff dal PED e la
+--- restoreProtection reverte quello che non dovrebbe esserci.
+function MBT.Utils.ResumeHybridDetection(wearingState)
+    if wearingState then
+        local sex = MBT.Utils.GetPedSex(PlayerPedId())
+        for k, v in pairs(MBT.Drawables) do
+            local stored = wearingState.Drawables and (wearingState.Drawables[tostring(k)] or wearingState.Drawables[k])
+            if stored and stored.drawable then
+                clothingCache.Drawables[k] = { drawable = stored.drawable, texture = stored.texture or 0 }
+            else
+                local default = v["Default"] and sex and v["Default"][sex]
+                local defaultDrawable = type(default) == "table" and default[1] or 0
+                clothingCache.Drawables[k] = { drawable = defaultDrawable, texture = 0 }
+            end
+        end
+        for k, _ in pairs(MBT.Props) do
+            local stored = wearingState.Props and (wearingState.Props[tostring(k)] or wearingState.Props[k])
+            if stored and stored.drawable then
+                clothingCache.Props[k] = { drawable = stored.drawable, texture = stored.texture or 0 }
+            else
+                -- Prop non presente = deve stare vuoto (-1)
+                clothingCache.Props[k] = { drawable = -1, texture = 0 }
+            end
+        end
+    else
+        MBT.Utils.InitClothingCache()
+    end
+    detectionPaused = false
+end
 
 --- Flag an expected internal change (prevents false positive in detection)
 function MBT.Utils.ExpectChange(slotType, slotIndex)
@@ -459,6 +501,14 @@ function MBT.Utils.StartHybridDetection()
             local pollInterval = restoreProtection and 500 or 1000
             Wait(pollInterval)
 
+            -- Pausa multicharacter: se NON c'è restoreProtection attiva, skippa
+            -- tutto il loop (non vogliamo che i drawable del nuovo char siano
+            -- attribuiti al char vecchio via externalDress).
+            -- SE invece restoreProtection è attiva, lasciamo girare il loop
+            -- così la restoreProtection può revertire le modifiche
+            -- dell'appearance script anche durante la pausa.
+            if detectionPaused and not restoreProtection then goto continue end
+
             local ped = PlayerPedId()
             if not DoesEntityExist(ped) then goto continue end
 
@@ -574,9 +624,28 @@ end)
 -- Steal functions
 -----------------------------------------------------------
 
+-- Slots considered "low on body" — use a bend-down animation instead of the standard grab
 local STEAL_ZONE_LOW = {
     Drawables = { [4] = true, [6] = true },
     Props = {}
+}
+
+-- Animations used during steal interactions.
+-- target_down  : thief searches a body on the ground / dead ped
+-- standing_low : thief grabs a low-body item (shoes, pants) from a standing victim
+-- standing_high: thief grabs an upper-body item (jacket, hat, chain) from a standing victim
+-- steal_all    : thief does a full patdown on a standing victim
+-- steal_all_down: thief searches a body for everything
+-- victim_stand : what the victim plays while being robbed standing
+-- victim_down  : what the victim plays while being robbed on the ground
+local STEAL_ANIMS = {
+    target_down    = { dict = "missexile3",        clip = "ex03_dingy_search_case_base_michael", flag = 1,  dur = 2000 },
+    standing_low   = { dict = "random@domestic",   clip = "pickup_low",                          flag = 0,  dur = 2000 },
+    standing_high  = { dict = "random@shop_robbery", clip = "robbery_action_b",                  flag = 49, dur = 2500 },
+    steal_all      = { dict = "missfbi2",            clip = "handsup_search_cop",                 flag = 49, dur = 5000 },
+    steal_all_down = { dict = "missexile3",         clip = "ex03_dingy_search_case_base_michael", flag = 1,  dur = 3000 },
+    victim_stand   = { dict = "random@mugging3",    clip = "handsup_standing_base",               flag = 49 },
+    victim_down    = { dict = "missexile3",         clip = "ex03_dingy_search_case_base_michael", flag = 1  },
 }
 
 local function isTargetDown(targetPed)
@@ -585,7 +654,8 @@ end
 
 local function getStealAnim(targetDown, stealType, slotIndex)
     if targetDown then
-        return { dict = "missexile3", clip = "ex03_dingy_search_case_base_michael", flag = 1 }, 2000
+        local a = STEAL_ANIMS.target_down
+        return { dict = a.dict, clip = a.clip, flag = a.flag }, a.dur
     end
     local isLow = false
     if stealType == "drawable" and slotIndex then
@@ -594,9 +664,11 @@ local function getStealAnim(targetDown, stealType, slotIndex)
         isLow = STEAL_ZONE_LOW.Props[slotIndex] == true
     end
     if isLow then
-        return { dict = "random@domestic", clip = "pickup_low", flag = 0 }, 2000
+        local a = STEAL_ANIMS.standing_low
+        return { dict = a.dict, clip = a.clip, flag = a.flag }, a.dur
     else
-        return { dict = "random@shop_robbery", clip = "robbery_action_b", flag = 49 }, 2500
+        local a = STEAL_ANIMS.standing_high
+        return { dict = a.dict, clip = a.clip, flag = a.flag }, a.dur
     end
 end
 
@@ -605,8 +677,8 @@ local function faceTarget(thiefPed, targetPed)
     local targetCoords = GetEntityCoords(targetPed)
     local dx = targetCoords.x - thiefCoords.x
     local dy = targetCoords.y - thiefCoords.y
-    local targetHeading = math.deg(math.atan(dx, dy))
-    if targetHeading < 0 then targetHeading = targetHeading + 360 end
+    -- GetHeadingFromVector_2d è il native GTA corretto per questo calcolo
+    local targetHeading = GetHeadingFromVector_2d(dx, dy)
     local currentHeading = GetEntityHeading(thiefPed)
     local diff = math.abs(targetHeading - currentHeading)
     if diff > 180 then diff = 360 - diff end
@@ -616,12 +688,23 @@ local function faceTarget(thiefPed, targetPed)
 end
 
 local function requestVictimAnim(targetServerId, duration, targetDown)
-    TriggerServerEvent("mbt_meta_clothes:requestVictimAnim", targetServerId, duration, targetDown)
+    local animKey = targetDown and "victim_down" or "victim_stand"
+    local a = STEAL_ANIMS[animKey]
+    TriggerServerEvent("mbt_meta_clothes:requestVictimAnim", targetServerId, duration, targetDown, a.dict, a.clip)
 end
 
 local function playStealAnimation(ped, anim, duration)
     local dict = anim.dict
-    while not HasAnimDictLoaded(dict) do RequestAnimDict(dict) Wait(50) end
+    local attempts = 0
+    while not HasAnimDictLoaded(dict) do
+        RequestAnimDict(dict)
+        Wait(50)
+        attempts = attempts + 1
+        if attempts > 100 then -- 5s timeout: dict inesistente, non bloccare il thread
+            MBT.Debugger("playStealAnimation: timeout caricamento dict", dict)
+            return
+        end
+    end
     TaskPlayAnim(ped, dict, anim.clip, 3.0, 3.0, duration, anim.flag or 49, 0, false, false, false)
     Wait(duration)
     ClearPedTasks(ped)
@@ -666,20 +749,44 @@ function MBT.Utils.StealAllItems(thiefPed, targetPed, targetServerId)
     if cancelled then return end
 
     if targetDown then
-        requestVictimAnim(targetServerId, 3000, targetDown)
-        playStealAnimation(thiefPed,
-            { dict = "missexile3", clip = "ex03_dingy_search_case_base_michael", flag = 1 },
-            3000
-        )
+        local a = STEAL_ANIMS.steal_all_down
+        requestVictimAnim(targetServerId, a.dur, targetDown)
+        playStealAnimation(thiefPed, { dict = a.dict, clip = a.clip, flag = a.flag }, a.dur)
     else
-        requestVictimAnim(targetServerId, 5000, targetDown)
-        playStealAnimation(thiefPed,
-            { dict = "random@shop_robbery", clip = "robbery_action_b", flag = 49 },
-            5000
-        )
+        local a = STEAL_ANIMS.steal_all
+        requestVictimAnim(targetServerId, a.dur, targetDown)
+        playStealAnimation(thiefPed, { dict = a.dict, clip = a.clip, flag = a.flag }, a.dur)
     end
 
     TriggerServerEvent('mbt_meta_clothes:syncStealDress', targetServerId)
+end
+
+-- Multi-select steal: una sola animazione (patdown) + un server event per ogni item selezionato.
+-- Usato da confirmSteal quando l'utente sceglie un sottoinsieme di item.
+function MBT.Utils.StealMultipleItems(thiefPed, targetPed, targetServerId, items)
+    local targetDown = isTargetDown(targetPed)
+
+    faceTarget(thiefPed, targetPed)
+
+    local cancelled = false
+    MBT.ProgressBar({
+        duration = MBT.StealAllDuration or 2500,
+        label = MBT.Locale["stealing_all"] or "Stripping clothes...",
+    }, function(result)
+        if not result then cancelled = true end
+    end)
+
+    if cancelled then return end
+
+    -- Usa sempre l'animazione steal_all (patdown completo) per multi-item
+    local a = targetDown and STEAL_ANIMS.steal_all_down or STEAL_ANIMS.steal_all
+    requestVictimAnim(targetServerId, a.dur, targetDown)
+    playStealAnimation(thiefPed, { dict = a.dict, clip = a.clip, flag = a.flag }, a.dur)
+
+    -- Manda tutti gli eventi server dopo UNA animazione
+    for _, item in ipairs(items) do
+        TriggerServerEvent("mbt_meta_clothes:stealSingleItem", targetServerId, item.stealType, item.slotIndex)
+    end
 end
 
 -----------------------------------------------------------
