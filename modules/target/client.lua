@@ -20,11 +20,18 @@ local function detectTarget()
     return nil
 end
 
---- Check if target entity can be stolen from (hands up, dead, or ragdoll)
+--- Check if target entity can be stolen from (hands up, dead, or ragdoll).
+--- Hands-up animations are configurable via MBT.HandsUpAnims in config.lua.
 local function canStealFrom(entity)
-    return IsEntityPlayingAnim(entity, "missminuteman_1ig_2", "handsup_base", 3)
-        or IsPedDeadOrDying(entity, false)
-        or IsPedRagdoll(entity)
+    if IsPedDeadOrDying(entity, false) or IsPedRagdoll(entity) then
+        return true
+    end
+    for _, anim in ipairs(MBT.HandsUpAnims or {}) do
+        if IsEntityPlayingAnim(entity, anim.dict, anim.clip, 3) then
+            return true
+        end
+    end
+    return false
 end
 
 --- Register the steal dress target on all players

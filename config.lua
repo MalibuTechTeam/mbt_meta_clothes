@@ -18,6 +18,16 @@ MBT.StealDuration        = 1500  -- ms progress bar for single item steal
 MBT.StealAllDuration     = 2500  -- ms progress bar for steal all
 MBT.VictimAnimCap        = 10000 -- ms max victim animation (anti-grief)
 
+-- Animations that count as "hands up" — target option appears only when one of these is active.
+-- Add the dict/clip used by your server's hands-up script.
+-- Common values:
+--   ESX/vanilla:  { dict = "missminuteman_1ig_2", clip = "handsup_base" }
+--   QB/ps-hands:  { dict = "random@mugging3",     clip = "handsup_base" }
+MBT.HandsUpAnims = {
+    { dict = "missminuteman_1ig_2", clip = "handsup_base"          },
+    { dict = "random@mugging3",     clip = "handsup_standing_base" },
+}
+
 -----------------------------------------------------------
 -- Security
 -----------------------------------------------------------
