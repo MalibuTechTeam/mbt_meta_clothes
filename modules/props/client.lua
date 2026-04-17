@@ -159,6 +159,7 @@ function MBT.ClothingProps.ScatterFromPed(ped, propModel, slotType, slotIndex)
 end
 
 function MBT.ClothingProps.ScatterAllFromPed(ped, sex)
+    if not MBT.ClothingPropsEnabled then return end
     if not sex or sex == "customSkin" then return end
 
     for k, v in pairs(MBT.Drawables) do
