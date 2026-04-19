@@ -47,6 +47,11 @@ import {
 
 export default function App() {
   const [visible, setVisible] = useState(false);
+  // Contatore incrementato ad ogni apertura della UI — usato come parte della
+  // key del wrapper motion così se l'utente chiude e riapre velocemente,
+  // AnimatePresence non può invertire l'exit in corso (che impedirebbe il
+  // replay dell'animazione initial). Nuova key = unmount + remount forzati.
+  const [openCount, setOpenCount] = useState(0);
   const [activeCategory, setActiveCategory] = useState<ActiveCategory>({
     id: null,
     rect: null,
@@ -96,6 +101,7 @@ export default function App() {
           d.status === true || d.status === "true" || d.status === 1;
         setVisible(isVisible);
         if (isVisible) {
+          setOpenCount((c) => c + 1); // forza remount per replayare initial anim
           setStealMode(false); // Normal UI reset
           setActiveCategory({ id: null, rect: null }); // FIX: Clear stale category on open
           if (d.wearing) setWearing(d.wearing);
@@ -122,6 +128,7 @@ export default function App() {
         const isVisible = d.status === true;
         setVisible(isVisible);
         if (isVisible) {
+          setOpenCount((c) => c + 1); // forza remount per replayare initial anim
           setStealMode(true);
           setActiveCategory({ id: null, rect: null }); // FIX: Clear stale category on open
           if (d.items) setStealItems(d.items);
@@ -427,7 +434,7 @@ export default function App() {
       <AnimatePresence>
         {visible && (
           <motion.div
-            key="main-app-ui"
+            key={`main-app-ui-${openCount}`}
             variants={{
               hidden: { opacity: 0 },
               show: { opacity: 1 },
@@ -465,6 +472,7 @@ export default function App() {
                 hairToggleable={hairToggleable}
                 stealMode={stealMode}
                 stealItems={stealItems}
+                isSlotWorn={isSlotWorn}
                 onClose={handleExitUI}
                 onCategoryClick={(id, rect) => {
                   if (activeCategory.id === id) {

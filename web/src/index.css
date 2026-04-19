@@ -12,6 +12,72 @@ body {
   height: 100vh;
 }
 
+/* Pulse ciano per layer vestiti nello stato "selected/active".
+   Animazione su opacity di un overlay brightness — evita di lottare con la
+   chain di drop-shadow già complessa del filter, e garantisce una pulsazione
+   fluida 60fps gestita dalla GPU. */
+@keyframes mbt-layer-pulse {
+  0%, 100% {
+    filter:
+      drop-shadow(0 -1px 0 rgba(255,255,255,0.6))
+      drop-shadow(0 -2px 4px rgba(255,255,255,0.25))
+      drop-shadow(0 6px 6px rgba(0,0,0,0.85))
+      drop-shadow(0 12px 24px rgba(0,0,0,0.55))
+      drop-shadow(0 0 1px rgba(0,220,255,0.35))
+      drop-shadow(0 0 4px rgba(0,220,255,0.12));
+  }
+  50% {
+    filter:
+      drop-shadow(0 -1px 0 rgba(255,255,255,0.6))
+      drop-shadow(0 -2px 4px rgba(255,255,255,0.25))
+      drop-shadow(0 6px 6px rgba(0,0,0,0.85))
+      drop-shadow(0 12px 24px rgba(0,0,0,0.55))
+      drop-shadow(0 0 2px rgba(0,220,255,0.55))
+      drop-shadow(0 0 7px rgba(0,220,255,0.22));
+  }
+}
+
+.mbt-layer-active {
+  animation: mbt-layer-pulse 2s ease-in-out infinite;
+}
+
+/* Scanner ring che si espande dal centro e sfuma — effetto HUD sci-fi.
+   Anima SOLO scale: il posizionamento/centramento è gestito dal wrapper
+   esterno, così non c'è conflitto tra transform di Tailwind e keyframe. */
+@keyframes mbt-scanner-sweep {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  20% {
+    transform: scale(0.75);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+.mbt-scanner-ring {
+  animation: mbt-scanner-sweep 3.5s ease-out infinite;
+}
+
+.mbt-scanner-ring-delay {
+  animation: mbt-scanner-sweep 3.5s ease-out infinite;
+  animation-delay: 1.75s;
+}
+
+/* Pulse "breathing" — respirazione lenta della base */
+@keyframes mbt-pedestal-breath {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+.mbt-pedestal-breath {
+  animation: mbt-pedestal-breath 4s ease-in-out infinite;
+}
+
 /* Custom scrollbar for deep dark themes */
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;

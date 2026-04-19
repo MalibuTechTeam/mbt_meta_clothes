@@ -36,6 +36,9 @@ interface MannequinProps {
   hairToggleable?: boolean;
   stealMode?: boolean;
   stealItems?: StealItem[];
+  // Usa la logica centrale di App per capire se uno slot è indossato.
+  // Necessaria per mask/bag/armor che non stanno nella wearing table ma in extraState.
+  isSlotWorn?: (slotType: "Drawables" | "Props", slotIndex: number) => boolean;
   onCategoryClick: (id: string, rect: { left: number; top: number }) => void;
   onClose: () => void;
 }
@@ -50,6 +53,7 @@ export default function Mannequin({
   hairToggleable = false,
   stealMode = false,
   stealItems = [],
+  isSlotWorn,
   onCategoryClick,
   onClose,
 }: MannequinProps) {
@@ -57,6 +61,20 @@ export default function Mannequin({
   const [selectedToSteal, setSelectedToSteal] = useState<Set<string>>(
     new Set(),
   );
+  // STEP 3: slot attualmente hoverato — illumina ciano il capo corrispondente
+  const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
+
+  // Mappa hotspot → layer keys che devono illuminarsi quando quell'hotspot è hover
+  // Le keys corrispondono a quelle di LAYER_META (formato "slotType-slotIndex")
+  const HOTSPOT_TO_LAYERS: Record<string, string[]> = {
+    head: ["Props-0", "Props-1", "Props-2", "Drawables-1"],
+    torso: ["Drawables-3", "Drawables-8", "Drawables-11"],
+    armor: ["Drawables-9"],
+    bags: ["Drawables-5"],
+    legs: ["Drawables-4"],
+    feet: ["Drawables-6"],
+    accessories: ["Drawables-7", "Props-6", "Props-7"],
+  };
 
   // All possible hotspots
   const allHotspots: Hotspot[] = [
@@ -238,36 +256,141 @@ export default function Mannequin({
         <AnimatePresence>
           {Object.entries(LAYER_META).map(([key, meta]) => {
             const [slotType, slotIndexStr] = key.split("-");
-            const worn =
-              wearing[slotType as keyof typeof wearing]?.[slotIndexStr];
+            // Usa isSlotWorn se disponibile (gestisce mask/bag/armor da extraState),
+            // fallback al check diretto su wearing per compatibilità.
+            const worn = isSlotWorn
+              ? isSlotWorn(
+                  slotType as "Drawables" | "Props",
+                  Number(slotIndexStr),
+                )
+              : wearing[slotType as keyof typeof wearing]?.[slotIndexStr];
             if (!worn) return null;
             const gender = sex === 1 ? "female" : "male";
+            // STEP 3: se lo slot hoverato è mappato a questo layer, applica glow ciano
+            const isLayerHovered =
+              hoveredSlot !== null &&
+              (HOTSPOT_TO_LAYERS[hoveredSlot] || []).includes(key);
+            // STEP 4: se lo slot attivo/selezionato è mappato a questo layer,
+            // applichiamo la classe .mbt-layer-active (keyframe animation)
+            const isLayerActive =
+              activeCategory !== null &&
+              (HOTSPOT_TO_LAYERS[activeCategory] || []).includes(key);
+            // STEP 1: ombra nera sotto il capo per farlo "poggiare" sul mannequin.
+            // STEP 2: rim light bianca sul top per staccare il capo dal fondo e
+            //         dare feel HUD (luce ambientale che colpisce dall'alto).
+            // STEP 3: glow ciano se lo slot corrispondente è hover.
+            const baseFilters = [
+              "drop-shadow(0 -1px 0 rgba(255,255,255,0.6))",     // rim light sharp
+              "drop-shadow(0 -2px 4px rgba(255,255,255,0.25))",  // rim light soft
+              "drop-shadow(0 6px 6px rgba(0,0,0,0.85))",         // ombra contact
+              "drop-shadow(0 12px 24px rgba(0,0,0,0.55))",       // ombra diffusa
+            ];
+            const hoverGlow = [
+              "drop-shadow(0 0 1.5px rgba(0,220,255,0.45))",  // filo sul bordo
+              "drop-shadow(0 0 5px rgba(0,220,255,0.18))",    // halo morbido
+            ];
+            const layerFilter = (
+              isLayerHovered ? [...baseFilters, ...hoverGlow] : baseFilters
+            ).join(" ");
             return (
-              <motion.img
+              // STEP 9: wrapper che gestisce l'animazione entry/exit con
+              // bloom ciano. L'inner <img> mantiene i suoi filter (shadow +
+              // rim light + hover/active glow) senza conflitti.
+              // NB: usiamo x:"-50%" dentro framer-motion invece della classe
+              // Tailwind -translate-x-1/2 per evitare che scale sovrascriva
+              // il centramento (framer motion compone x/scale correttamente).
+              <motion.div
                 key={`layer-${key}`}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                src={`./layers/${meta.path}_${gender}.png`}
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
+                initial={{
+                  opacity: 0,
+                  scale: 0.85,
+                  x: "-50%",
+                  filter: "drop-shadow(0 0 24px rgba(0,220,255,1)) drop-shadow(0 0 12px rgba(0,220,255,0.8))",
                 }}
+                animate={{
+                  opacity: 1,
+                  scale: 1,
+                  x: "-50%",
+                  filter: "drop-shadow(0 0 0px rgba(0,220,255,0)) drop-shadow(0 0 0px rgba(0,220,255,0))",
+                }}
+                exit={{
+                  opacity: 0,
+                  scale: 0.9,
+                  x: "-50%",
+                  filter: "drop-shadow(0 0 18px rgba(0,220,255,0.9)) drop-shadow(0 0 8px rgba(0,220,255,0.6))",
+                }}
+                transition={{ duration: 0.45, ease: "easeOut" }}
                 style={{
                   top: meta.top,
                   left: meta.left,
                   width: meta.width,
                   zIndex: meta.zIndex,
                 }}
-                className="absolute -translate-x-1/2 h-auto pointer-events-none drop-shadow-[0_5px_15px_rgba(0,0,0,0.5)]"
-                alt={`${meta.path} layer`}
-              />
+                className="absolute h-auto pointer-events-none"
+              >
+                <img
+                  src={`./layers/${meta.path}_${gender}.png`}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                  style={{
+                    // Se è active, il filter è gestito dal keyframe (.mbt-layer-active).
+                    // Se è hovered, applichiamo il filter inline con glow.
+                    // Altrimenti, solo base filters.
+                    filter: isLayerActive ? undefined : layerFilter,
+                  }}
+                  className={`w-full h-auto block transition-[filter] duration-200 ease-out ${
+                    isLayerActive ? "mbt-layer-active" : ""
+                  }`}
+                  alt={`${meta.path} layer`}
+                />
+              </motion.div>
             );
           })}
         </AnimatePresence>
 
-        {/* Pedestal shadow effect - Restored to Minimalist Original */}
-        <div className="absolute bottom-[0.5%] left-1/2 -translate-x-1/2 w-[55%] h-14 bg-gradient-to-t from-white/30 to-transparent rounded-[100%] blur-[8px] z-0 shadow-[0_25px_60px_rgba(255,255,255,0.2)] opacity-60" />
+        {/* STEP 5: Pedestal sci-fi — ambient glow + scanner rings.
+            Senza wrapper — ogni layer è figlio diretto del container mannequin,
+            come faceva il vecchio pedestal. Centramento via left-1/2 del parent. */}
+
+        {/* Layer 1: ambient radial light — mood light ciano/bianca che respira. */}
+        <div
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[65%] h-24 mbt-pedestal-breath pointer-events-none z-0"
+          style={{
+            background:
+              "radial-gradient(ellipse at 50% 100%, rgba(0,220,255,0.25) 0%, rgba(255,255,255,0.15) 35%, transparent 70%)",
+          }}
+        />
+
+        {/* Layer 2: disco di base (l'ombra "fisica" sotto i piedi) */}
+        <div
+          className="absolute bottom-[0.5%] left-1/2 -translate-x-1/2 w-[42%] h-6 rounded-[100%] blur-[6px] opacity-60 pointer-events-none z-0"
+          style={{
+            background:
+              "radial-gradient(ellipse at center, rgba(0,220,255,0.5) 0%, transparent 70%)",
+          }}
+        />
+
+        {/* Layer 3: scanner ring 1.
+            Wrapper esterno: posizionamento statico. Inner: solo scale. */}
+        <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[38%] h-4 pointer-events-none z-0">
+          <div
+            className="w-full h-full rounded-[100%] border border-cyan-400/60 mbt-scanner-ring"
+            style={{
+              boxShadow: "0 0 12px rgba(0,220,255,0.45)",
+            }}
+          />
+        </div>
+
+        {/* Layer 4: scanner ring 2 — sfasato nel tempo per continuità */}
+        <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[38%] h-4 pointer-events-none z-0">
+          <div
+            className="w-full h-full rounded-[100%] border border-cyan-400/50 mbt-scanner-ring-delay"
+            style={{
+              boxShadow: "0 0 12px rgba(0,220,255,0.4)",
+            }}
+          />
+        </div>
 
         {/* Interactive Hotspots */}
         {visibleHotspots.map((spot) => {
@@ -301,6 +424,8 @@ export default function Mannequin({
                 transform: "translate(-50%, -50%)",
               }}
               onClick={(e) => handleClick(e, spot.id)}
+              onMouseEnter={() => setHoveredSlot(spot.id)}
+              onMouseLeave={() => setHoveredSlot(null)}
             >
               <motion.div
                 animate={{

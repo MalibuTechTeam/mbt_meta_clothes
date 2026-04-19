@@ -110,9 +110,9 @@ export const LAYER_META: Record<string, LayerMeta> = {
   // Props
   "Props-0": {
     path: "hat",
-    top: "-3.5%",
+    top: "-1%",
     left: "50%",
-    width: "40%",
+    width: "19%",
     zIndex: 25,
   },
   "Props-1": {
@@ -139,9 +139,9 @@ export const LAYER_META: Record<string, LayerMeta> = {
   // Drawables
   "Drawables-1": {
     path: "mask",
-    top: "10%",
+    top: "0%",
     left: "50%",
-    width: "35%",
+    width: "25%",
     zIndex: 27,
   },
   "Drawables-5": {
@@ -158,11 +158,11 @@ export const LAYER_META: Record<string, LayerMeta> = {
     width: "24%",
     zIndex: 22,
   },
-  "Drawables-8": {
+  "Drawables-11": {
     path: "jacket",
-    top: "29%",
+    top: "0%",
     left: "50%",
-    width: "62%",
+    width: "99%",
     zIndex: 18,
   },
   "Drawables-9": {
@@ -174,16 +174,16 @@ export const LAYER_META: Record<string, LayerMeta> = {
   },
   "Drawables-4": {
     path: "pants",
-    top: "57%",
+    top: "31%",
     left: "50%",
-    width: "55%",
+    width: "65%",
     zIndex: 15,
   },
   "Drawables-6": {
     path: "shoes",
-    top: "83%",
+    top: "1%",
     left: "50%",
-    width: "50%",
+    width: "100%",
     zIndex: 12,
   },
 };
