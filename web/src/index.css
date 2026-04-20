@@ -78,6 +78,7 @@ body {
   animation: mbt-pedestal-breath 4s ease-in-out infinite;
 }
 
+
 /* Custom scrollbar for deep dark themes */
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;

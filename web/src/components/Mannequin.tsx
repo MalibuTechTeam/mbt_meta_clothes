@@ -26,6 +26,7 @@ interface Hotspot {
   left: string;
 }
 
+
 interface MannequinProps {
   activeCategory: string | null;
   wearing?: WearingState;
@@ -252,8 +253,11 @@ export default function Mannequin({
             ${stealMode ? "sepia-[0.3] hue-rotate-[320deg] brightness-[0.8]" : "drop-shadow-[0_10px_50px_rgba(255,255,255,0.15)]"}`}
         />
 
-        {/* Clothing Layers (Visual Overlays) */}
-        <AnimatePresence>
+        {/* Clothing Layers (Visual Overlays).
+            initial={false} → i capi già indossati alla prima apertura UI
+            appaiono istantaneamente (niente flash). Solo i capi aggiunti/
+            rimossi DOPO (dress/undress con UI aperta) animano con bloom. */}
+        <AnimatePresence initial={false}>
           {Object.entries(LAYER_META).map(([key, meta]) => {
             const [slotType, slotIndexStr] = key.split("-");
             // Usa isSlotWorn se disponibile (gestisce mask/bag/armor da extraState),
@@ -293,38 +297,44 @@ export default function Mannequin({
               isLayerHovered ? [...baseFilters, ...hoverGlow] : baseFilters
             ).join(" ");
             return (
-              // STEP 9: wrapper che gestisce l'animazione entry/exit con
-              // bloom ciano. L'inner <img> mantiene i suoi filter (shadow +
-              // rim light + hover/active glow) senza conflitti.
-              // NB: usiamo x:"-50%" dentro framer-motion invece della classe
-              // Tailwind -translate-x-1/2 per evitare che scale sovrascriva
-              // il centramento (framer motion compone x/scale correttamente).
+              // STEP 9: bloom SOLO in exit (quando l'utente svesté con UI
+              // aperta). Entry è solo fade/scale — con UI aperta il player
+              // non esegue dress, quindi l'entry bloom non si vedrebbe mai.
+              //
+              // IMPORTANTE: filter usa #00dcff (HEX) invece di rgba()
+              // perché framer-motion ha un bug che sbaglia a parsare le
+              // parentesi nested di rgba dentro drop-shadow, producendo
+              // "Invalid keyframe value for property filter".
+              //
+              // Initial/animate includono comunque un filter "trasparente"
+              // per dare a framer-motion una struttura coerente da
+              // interpolare verso l'exit (richiede same number di drop-shadow).
               <motion.div
                 key={`layer-${key}`}
-                initial={{
+                // Niente filter in initial/animate: crearlo al primo paint
+                // forza il browser a creare un GPU compositing layer, che
+                // ha un costo visibile come "comparsa ritardata" del capo
+                // rispetto al mannequin. Filter solo nell'exit (bloom
+                // undress) dove è l'utente a innescare l'animazione e il
+                // costo di creazione si maschera nella transizione.
+                initial={{ opacity: 0, scale: 0.95, x: "-50%" }}
+                animate={{ opacity: 1, scale: 1, x: "-50%" }}
+                exit={{
                   opacity: 0,
                   scale: 0.85,
                   x: "-50%",
-                  filter: "drop-shadow(0 0 24px rgba(0,220,255,1)) drop-shadow(0 0 12px rgba(0,220,255,0.8))",
+                  filter: "drop-shadow(0 0 18px #00dcffdd)",
                 }}
-                animate={{
-                  opacity: 1,
-                  scale: 1,
-                  x: "-50%",
-                  filter: "drop-shadow(0 0 0px rgba(0,220,255,0)) drop-shadow(0 0 0px rgba(0,220,255,0))",
-                }}
-                exit={{
-                  opacity: 0,
-                  scale: 0.9,
-                  x: "-50%",
-                  filter: "drop-shadow(0 0 18px rgba(0,220,255,0.9)) drop-shadow(0 0 8px rgba(0,220,255,0.6))",
-                }}
-                transition={{ duration: 0.45, ease: "easeOut" }}
+                transition={{ duration: 0.35, ease: "easeOut" }}
                 style={{
                   top: meta.top,
                   left: meta.left,
                   width: meta.width,
                   zIndex: meta.zIndex,
+                  // Hint al browser: prepara i compositing layer per
+                  // transform+opacity PRIMA del primo paint, così il layer
+                  // GPU è già pronto quando serve.
+                  willChange: "transform, opacity",
                 }}
                 className="absolute h-auto pointer-events-none"
               >
@@ -334,9 +344,6 @@ export default function Mannequin({
                     e.currentTarget.style.display = "none";
                   }}
                   style={{
-                    // Se è active, il filter è gestito dal keyframe (.mbt-layer-active).
-                    // Se è hovered, applichiamo il filter inline con glow.
-                    // Altrimenti, solo base filters.
                     filter: isLayerActive ? undefined : layerFilter,
                   }}
                   className={`w-full h-auto block transition-[filter] duration-200 ease-out ${
@@ -396,6 +403,25 @@ export default function Mannequin({
         {visibleHotspots.map((spot) => {
           const isActive = activeCategory === spot.id;
           const isSelected = stealMode && selectedToSteal.has(spot.id);
+          // Step A: lo slot è "occupato" se almeno uno dei layer mappati a
+          // questo hotspot è indossato. Usato per ridurre l'opacità del dot
+          // (l'item stesso è già segnale di "qui c'è qualcosa" — il dot
+          // serve di più sugli slot vuoti come CTA "qui puoi mettere qualcosa")
+          const hotspotLayers = HOTSPOT_TO_LAYERS[spot.id] || [];
+          const isOccupied =
+            !stealMode &&
+            hotspotLayers.some((layerKey) => {
+              const [slotType, slotIndexStr] = layerKey.split("-");
+              return isSlotWorn
+                ? isSlotWorn(
+                    slotType as "Drawables" | "Props",
+                    Number(slotIndexStr),
+                  )
+                : !!wearing[slotType as keyof typeof wearing]?.[slotIndexStr];
+            });
+          // Dim solo se occupato E non attivo (non voglio nascondere lo slot
+          // su cui l'utente ha cliccato). Hover restaura full via Tailwind.
+          const isDimmed = isOccupied && !isActive;
           const accentColor = stealMode
             ? isSelected
               ? "bg-red-500"
@@ -417,7 +443,9 @@ export default function Mannequin({
           return (
             <button
               key={spot.id}
-              className="absolute z-20 w-12 h-12 flex items-center justify-center group cursor-pointer"
+              className={`absolute z-20 w-12 h-12 flex items-center justify-center group cursor-pointer transition-opacity duration-300 ${
+                isDimmed ? "opacity-30 hover:opacity-100" : "opacity-100"
+              }`}
               style={{
                 top: spot.top,
                 left: spot.left,

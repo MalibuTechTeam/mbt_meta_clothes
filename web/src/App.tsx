@@ -43,6 +43,7 @@ import {
   CATEGORY_SLOTS,
   CATEGORY_SLOTS_WEARABLE,
   HOTSPOT_META,
+  LAYER_META,
 } from "./constants";
 
 export default function App() {
@@ -82,6 +83,14 @@ export default function App() {
   const [hairToggleable, setHairToggleable] = useState(false);
   const [stealMode, setStealMode] = useState(false);
   const [stealItems, setStealItems] = useState<StealItem[]>([]);
+  // Snapshot di cosa la vittima indossa, ricevuto dal server quando apre il
+  // menu steal. Usato per far vedere sul mannequin i suoi vestiti (non i nostri)
+  // durante lo steal mode.
+  const [stealWearing, setStealWearing] = useState<WearingState>({
+    Drawables: {},
+    Props: {},
+  });
+  const [stealSex, setStealSex] = useState<0 | 1>(0);
 
   const handleExitUI = useCallback(() => {
     setVisible(false);
@@ -89,6 +98,25 @@ export default function App() {
     setStealItems([]);
     setActiveCategory({ id: null, rect: null });
     fetchNui("exitUI").catch(() => {});
+  }, []);
+
+  // Preload tutte le PNG pesanti subito al mount dell'app (ancor prima che
+  // la UI sia aperta dal server). Evita il micro-lag alla prima apertura:
+  // il browser decodifica/cachea mannequin + layer in background mentre
+  // l'utente gioca, così al primo `visible=true` le immagini sono pronte.
+  useEffect(() => {
+    const paths = new Set<string>([
+      "./mannequin_male.png",
+      "./mannequin_female.png",
+    ]);
+    Object.values(LAYER_META).forEach((meta) => {
+      paths.add(`./layers/${meta.path}_male.png`);
+      paths.add(`./layers/${meta.path}_female.png`);
+    });
+    paths.forEach((src) => {
+      const img = new Image();
+      img.src = src; // avvia download + decode in background
+    });
   }, []);
 
   useEffect(() => {
@@ -132,8 +160,13 @@ export default function App() {
           setStealMode(true);
           setActiveCategory({ id: null, rect: null }); // FIX: Clear stale category on open
           if (d.items) setStealItems(d.items);
+          // Snapshot del victim wearing: cosa indossa l'obiettivo del furto.
+          // Passato al mannequin in steal mode così vedi i SUOI vestiti, non i tuoi.
+          setStealWearing(d.wearing || { Drawables: {}, Props: {} });
+          if (d.sex !== undefined) setStealSex(d.sex);
         } else {
           setStealItems([]);
+          setStealWearing({ Drawables: {}, Props: {} });
           setActiveCategory({ id: null, rect: null });
         }
       }
@@ -464,15 +497,20 @@ export default function App() {
 
               <Mannequin
                 activeCategory={activeCategory.id}
-                wearing={wearing}
-                sex={sex}
+                // In stealMode mostriamo il VICTIM (wearing+sex ricevuti dal
+                // server all'apertura dello steal menu), altrimenti il ladro.
+                wearing={stealMode ? stealWearing : wearing}
+                sex={stealMode ? stealSex : sex}
                 drip={drip}
                 wearableProps={extraState.wearableProps}
                 hairToggled={hairToggled}
                 hairToggleable={hairToggleable}
                 stealMode={stealMode}
                 stealItems={stealItems}
-                isSlotWorn={isSlotWorn}
+                // In stealMode NON passiamo isSlotWorn (che legge extraState
+                // del ladro). Il render userà il fallback sul wearing prop
+                // diretto — che è già il victim wearing.
+                isSlotWorn={stealMode ? undefined : isSlotWorn}
                 onClose={handleExitUI}
                 onCategoryClick={(id, rect) => {
                   if (activeCategory.id === id) {

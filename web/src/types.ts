@@ -103,6 +103,8 @@ export interface NUIMessageStealMenu {
   action: 'stealMenu';
   status: boolean;
   items?: StealItem[];
+  wearing?: WearingState;
+  sex?: 0 | 1;
 }
 
 export interface NUIMessageUpdateWearing {
