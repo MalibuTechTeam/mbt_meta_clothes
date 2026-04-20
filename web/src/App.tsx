@@ -33,7 +33,43 @@ import type {
   NUIMessageStealMenu,
   NUIMessageUpdateSlot,
   NUIMessageUpdateWearing,
+  UILabels,
 } from "./types";
+
+// Fallback inglese usato se il Lua non invia ancora il dizionario labels
+// (race condition tra primo render e primo NUI message). Inglese perché è
+// la lingua più universale: un server non-italiano non deve vedere testo
+// in italiano anche solo per un frame.
+const DEFAULT_LABELS: UILabels = {
+  hotspots: {
+    head: "Head & Face",
+    torso: "Torso",
+    accessories: "Accessories",
+    armor: "Body Armor",
+    bags: "Bags",
+    legs: "Pants",
+    feet: "Shoes",
+  },
+  slots: {
+    hat: "Hat",
+    glasses: "Glasses",
+    earrings: "Earrings",
+    watch: "Watch",
+    bracelet: "Bracelet",
+    mask: "Mask",
+    backpack: "Backpack",
+    armor: "Body Armor",
+    chain: "Chain",
+    top: "Top",
+    pants: "Pants",
+    shoes: "Shoes",
+  },
+  steal: {
+    stealAll: "STEAL ALL",
+    collect: "COLLECT",
+    lootingInProgress: "LOOTING IN PROGRESS",
+  },
+};
 
 import {
   DRAWABLE_SLOTS,
@@ -91,6 +127,9 @@ export default function App() {
     Props: {},
   });
   const [stealSex, setStealSex] = useState<0 | 1>(0);
+  // Dizionario UI inviato dal Lua (Locales[lang].UI). Aggiornato a ogni
+  // apertura della NUI così la lingua può cambiare a runtime senza restart.
+  const [labels, setLabels] = useState<UILabels>(DEFAULT_LABELS);
 
   const handleExitUI = useCallback(() => {
     setVisible(false);
@@ -101,9 +140,12 @@ export default function App() {
   }, []);
 
   // Preload tutte le PNG pesanti subito al mount dell'app (ancor prima che
-  // la UI sia aperta dal server). Evita il micro-lag alla prima apertura:
-  // il browser decodifica/cachea mannequin + layer in background mentre
-  // l'utente gioca, così al primo `visible=true` le immagini sono pronte.
+  // la UI sia aperta dal server). Usiamo img.decode() invece di solo .src
+  // perché .src avvia il download ma il decoding/rasterization avviene solo
+  // al primo paint del tag <img> reale — causando micro-lag "a scatti"
+  // all'apertura UI. decode() forza il browser a decodificare in background
+  // e mettere il risultato nella GPU texture cache, così al primo render
+  // dell'<img> il paint è istantaneo (solo un lookup in cache).
   useEffect(() => {
     const paths = new Set<string>([
       "./mannequin_male.png",
@@ -115,7 +157,15 @@ export default function App() {
     });
     paths.forEach((src) => {
       const img = new Image();
-      img.src = src; // avvia download + decode in background
+      img.src = src;
+      // decode() è una Promise: se il browser non la supporta, fallback
+      // silenzioso (il preload base via .src funziona comunque)
+      if (typeof img.decode === "function") {
+        img.decode().catch(() => {
+          /* asset mancante o errore decode: ignoriamo, onError sul tag
+             <img> reale nasconderà comunque l'immagine */
+        });
+      }
     });
   }, []);
 
@@ -145,6 +195,7 @@ export default function App() {
           if (d.hairToggleable !== undefined)
             setHairToggleable(d.hairToggleable);
           if (d.drip) setDrip(d.drip);
+          if (d.labels) setLabels(d.labels);
         }
         if (!isVisible) {
           setActiveCategory({ id: null, rect: null });
@@ -164,6 +215,7 @@ export default function App() {
           // Passato al mannequin in steal mode così vedi i SUOI vestiti, non i tuoi.
           setStealWearing(d.wearing || { Drawables: {}, Props: {} });
           if (d.sex !== undefined) setStealSex(d.sex);
+          if (d.labels) setLabels(d.labels);
         } else {
           setStealItems([]);
           setStealWearing({ Drawables: {}, Props: {} });
@@ -366,6 +418,13 @@ export default function App() {
   }, [hasActive, activeCategory.id, extraState.wearableProps]);
   const activeMeta =
     hasActive && activeCategory.id ? HOTSPOT_META[activeCategory.id] : null;
+  // Label localizzato della categoria attiva — preferisce labels dal Lua,
+  // fallback al label hardcoded di HOTSPOT_META (ancora italiano di base).
+  const activeMetaLabel =
+    activeCategory.id &&
+    labels.hotspots[activeCategory.id as keyof UILabels["hotspots"]]
+      ? labels.hotspots[activeCategory.id as keyof UILabels["hotspots"]]
+      : activeMeta?.label;
 
   // Stagger variants for items
   const containerVariants = {
@@ -511,6 +570,7 @@ export default function App() {
                 // del ladro). Il render userà il fallback sul wearing prop
                 // diretto — che è già il victim wearing.
                 isSlotWorn={stealMode ? undefined : isSlotWorn}
+                labels={labels}
                 onClose={handleExitUI}
                 onCategoryClick={(id, rect) => {
                   if (activeCategory.id === id) {
@@ -632,7 +692,7 @@ export default function App() {
                   >
                     <div className="absolute bottom-full left-0 w-full flex justify-between items-end pb-2">
                       <h2 className="text-white text-[1rem] font-bold tracking-wider flex items-center gap-2 px-1 drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
-                        {activeMeta.label}
+                        {activeMetaLabel}
                       </h2>
                     </div>
 

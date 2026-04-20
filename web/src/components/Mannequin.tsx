@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -17,7 +17,12 @@ import {
   PROP_SLOTS,
   LAYER_META,
 } from "../constants";
-import type { WearingState, DripState, StealItem } from "../types";
+import type {
+  WearingState,
+  DripState,
+  StealItem,
+  UILabels,
+} from "../types";
 
 interface Hotspot {
   id: string;
@@ -40,6 +45,10 @@ interface MannequinProps {
   // Usa la logica centrale di App per capire se uno slot è indossato.
   // Necessaria per mask/bag/armor che non stanno nella wearing table ma in extraState.
   isSlotWorn?: (slotType: "Drawables" | "Props", slotIndex: number) => boolean;
+  // Dizionario UI localizzato (hotspot/slot/steal). Inviato dal Lua ad ogni
+  // apertura della NUI. Se assente, il componente mostra le label di default
+  // (italiano) grazie al fallback in App.
+  labels?: UILabels;
   onCategoryClick: (id: string, rect: { left: number; top: number }) => void;
   onClose: () => void;
 }
@@ -55,6 +64,7 @@ export default function Mannequin({
   stealMode = false,
   stealItems = [],
   isSlotWorn,
+  labels,
   onCategoryClick,
   onClose,
 }: MannequinProps) {
@@ -64,6 +74,18 @@ export default function Mannequin({
   );
   // STEP 3: slot attualmente hoverato — illumina ciano il capo corrispondente
   const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
+
+  // Ritardo il mount del pedestal di 600ms così il primo render della UI
+  // (mannequin slide + layers) non compete col compositor per i continuous
+  // animations del pedestal (breath + scanner rings). Eliminando il lavoro
+  // GPU concorrente al primo open, il main thread non droppa frames.
+  // Dopo 600ms il mannequin è già a riposo, il pedestal appare con un fade
+  // naturale della sua stessa animazione breath.
+  const [pedestalReady, setPedestalReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setPedestalReady(true), 600);
+    return () => clearTimeout(t);
+  }, []);
 
   // Mappa hotspot → layer keys che devono illuminarsi quando quell'hotspot è hover
   // Le keys corrispondono a quelle di LAYER_META (formato "slotType-slotIndex")
@@ -77,15 +99,17 @@ export default function Mannequin({
     accessories: ["Drawables-7", "Props-6", "Props-7"],
   };
 
-  // All possible hotspots
+  // Label dai locale ricevuti dal Lua — con fallback inglese inline se il
+  // payload non è ancora arrivato (primo frame post-mount prima del setLabels).
+  const hotspotLabels = labels?.hotspots;
   const allHotspots: Hotspot[] = [
-    { id: "head", label: "Testa", top: "12%", left: "50%" },
-    { id: "torso", label: "Torso", top: "27%", left: "50%" },
-    { id: "armor", label: "Kevlar", top: "35%", left: "50%" },
-    { id: "bags", label: "Zaini", top: "25%", left: "60%" },
-    { id: "accessories", label: "Accessori", top: "50%", left: "33%" },
-    { id: "legs", label: "Pantaloni", top: "65%", left: "50%" },
-    { id: "feet", label: "Scarpe", top: "88%", left: "50%" },
+    { id: "head", label: hotspotLabels?.head ?? "Head & Face", top: "12%", left: "50%" },
+    { id: "torso", label: hotspotLabels?.torso ?? "Torso", top: "27%", left: "50%" },
+    { id: "armor", label: hotspotLabels?.armor ?? "Body Armor", top: "35%", left: "50%" },
+    { id: "bags", label: hotspotLabels?.bags ?? "Bags", top: "25%", left: "60%" },
+    { id: "accessories", label: hotspotLabels?.accessories ?? "Accessories", top: "50%", left: "33%" },
+    { id: "legs", label: hotspotLabels?.legs ?? "Pants", top: "65%", left: "50%" },
+    { id: "feet", label: hotspotLabels?.feet ?? "Shoes", top: "88%", left: "50%" },
   ];
 
   // Map stealType/slotIndex to Hotspot ID
@@ -192,7 +216,7 @@ export default function Mannequin({
     {
       icon: <Zap size={20} />,
       id: "stealAll",
-      label: "RUBA TUTTO",
+      label: labels?.steal?.stealAll ?? "STEAL ALL",
       active:
         selectedToSteal.size === visibleHotspots.length &&
         visibleHotspots.length > 0,
@@ -203,7 +227,7 @@ export default function Mannequin({
     {
       icon: <Hand size={20} />,
       id: "confirm",
-      label: "PRELEVA",
+      label: labels?.steal?.collect ?? "COLLECT",
       active: selectedToSteal.size > 0,
       onClick: handleConfirmSteal,
       disabled: selectedToSteal.size === 0,
@@ -236,7 +260,7 @@ export default function Mannequin({
             <div className="flex items-center gap-3 px-6 py-2 bg-red-950/80 border border-red-500/40 rounded-full shadow-[0_0_30px_rgba(239,68,68,0.3)]">
               <ShieldAlert size={18} className="text-red-500 animate-pulse" />
               <span className="text-xs font-black text-white uppercase tracking-[0.3em]">
-                SVALIGIAMENTO IN CORSO
+                {labels?.steal?.lootingInProgress ?? "LOOTING IN PROGRESS"}
               </span>
             </div>
           </motion.div>
@@ -357,47 +381,53 @@ export default function Mannequin({
         </AnimatePresence>
 
         {/* STEP 5: Pedestal sci-fi — ambient glow + scanner rings.
-            Senza wrapper — ogni layer è figlio diretto del container mannequin,
-            come faceva il vecchio pedestal. Centramento via left-1/2 del parent. */}
+            Mount ritardato di 600ms (pedestalReady) per evitare che le
+            animazioni continue (breath + scanner sweep) saturino il compositor
+            durante il primo render della UI. Al mount del pedestal il
+            mannequin è già stabile, i continuous animations partono senza
+            competere con lo slide-in. */}
+        {pedestalReady && (
+          <>
+            {/* Layer 1: ambient radial light — mood light ciano/bianca che respira. */}
+            <div
+              className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[65%] h-24 mbt-pedestal-breath pointer-events-none z-0"
+              style={{
+                background:
+                  "radial-gradient(ellipse at 50% 100%, rgba(0,220,255,0.25) 0%, rgba(255,255,255,0.15) 35%, transparent 70%)",
+              }}
+            />
 
-        {/* Layer 1: ambient radial light — mood light ciano/bianca che respira. */}
-        <div
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[65%] h-24 mbt-pedestal-breath pointer-events-none z-0"
-          style={{
-            background:
-              "radial-gradient(ellipse at 50% 100%, rgba(0,220,255,0.25) 0%, rgba(255,255,255,0.15) 35%, transparent 70%)",
-          }}
-        />
+            {/* Layer 2: disco di base (l'ombra "fisica" sotto i piedi) */}
+            <div
+              className="absolute bottom-[0.5%] left-1/2 -translate-x-1/2 w-[42%] h-6 rounded-[100%] blur-[6px] opacity-60 pointer-events-none z-0"
+              style={{
+                background:
+                  "radial-gradient(ellipse at center, rgba(0,220,255,0.5) 0%, transparent 70%)",
+              }}
+            />
 
-        {/* Layer 2: disco di base (l'ombra "fisica" sotto i piedi) */}
-        <div
-          className="absolute bottom-[0.5%] left-1/2 -translate-x-1/2 w-[42%] h-6 rounded-[100%] blur-[6px] opacity-60 pointer-events-none z-0"
-          style={{
-            background:
-              "radial-gradient(ellipse at center, rgba(0,220,255,0.5) 0%, transparent 70%)",
-          }}
-        />
+            {/* Layer 3: scanner ring 1.
+                Wrapper esterno: posizionamento statico. Inner: solo scale. */}
+            <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[38%] h-4 pointer-events-none z-0">
+              <div
+                className="w-full h-full rounded-[100%] border border-cyan-400/60 mbt-scanner-ring"
+                style={{
+                  boxShadow: "0 0 12px rgba(0,220,255,0.45)",
+                }}
+              />
+            </div>
 
-        {/* Layer 3: scanner ring 1.
-            Wrapper esterno: posizionamento statico. Inner: solo scale. */}
-        <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[38%] h-4 pointer-events-none z-0">
-          <div
-            className="w-full h-full rounded-[100%] border border-cyan-400/60 mbt-scanner-ring"
-            style={{
-              boxShadow: "0 0 12px rgba(0,220,255,0.45)",
-            }}
-          />
-        </div>
-
-        {/* Layer 4: scanner ring 2 — sfasato nel tempo per continuità */}
-        <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[38%] h-4 pointer-events-none z-0">
-          <div
-            className="w-full h-full rounded-[100%] border border-cyan-400/50 mbt-scanner-ring-delay"
-            style={{
-              boxShadow: "0 0 12px rgba(0,220,255,0.4)",
-            }}
-          />
-        </div>
+            {/* Layer 4: scanner ring 2 — sfasato nel tempo per continuità */}
+            <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[38%] h-4 pointer-events-none z-0">
+              <div
+                className="w-full h-full rounded-[100%] border border-cyan-400/50 mbt-scanner-ring-delay"
+                style={{
+                  boxShadow: "0 0 12px rgba(0,220,255,0.4)",
+                }}
+              />
+            </div>
+          </>
+        )}
 
         {/* Interactive Hotspots */}
         {visibleHotspots.map((spot) => {
