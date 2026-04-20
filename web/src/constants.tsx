@@ -130,11 +130,20 @@ export const LAYER_META: Record<string, LayerMeta> = {
     zIndex: 24,
   },
   "Props-6": {
+    // sotto il jacket (zIndex 18) — la giacca copre i polsi
     path: "watch",
-    top: "50%",
-    left: "34%",
-    width: "14%",
-    zIndex: 20,
+    top: "4%",
+    left: "51.5%",
+    width: "90%",
+    zIndex: 17,
+  },
+  "Props-7": {
+    // sotto il jacket (zIndex 18) — la giacca copre i polsi
+    path: "bracelet",
+    top: "39%",
+    left: "40%",
+    width: "17%",
+    zIndex: 17,
   },
   // Drawables
   "Drawables-1": {
@@ -167,9 +176,9 @@ export const LAYER_META: Record<string, LayerMeta> = {
   },
   "Drawables-9": {
     path: "armor",
-    top: "29%",
+    top: "13.5%",
     left: "50%",
-    width: "60%",
+    width: "39%",
     zIndex: 19,
   },
   "Drawables-4": {
