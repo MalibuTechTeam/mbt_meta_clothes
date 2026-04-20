@@ -418,23 +418,34 @@ RegisterCommand("toggleUndress", function()
         -- Determine sex as numeric (0=male, 1=female) for NUI mannequin image
         local sexNumeric = (sex == "female") and 1 or 0
 
-        -- Build toggleable slots list: which slots have ClothingStates configured
+        -- Build toggleable slots list: which slots have ClothingStates configured.
+        -- Solo Drawables e Props interessano per gli slot indicizzati; Hair ha
+        -- una struttura diversa (flat array, non per-slot) e non va iterata qui.
+        -- IMPORTANTE: ogni stato ha un campo `sex` — dobbiamo filtrarli per
+        -- il sesso del player, altrimenti un maschio con drawable X finisce
+        -- marcato toggleable quando esiste solo uno stato female con from=X
+        -- (falso positivo che fa apparire l'icona di toggle per item non
+        -- toggleabili per quel sesso).
         local toggleableSlots = { Drawables = {}, Props = {} }
         if MBT.ClothingStates then
-            for slotType, slots in pairs(MBT.ClothingStates) do
-                for slotIndex, states in pairs(slots) do
-                    if #states > 0 then
-                        local currentDrawable
-                        if slotType == "Drawables" then
-                            currentDrawable = GetPedDrawableVariation(ped, slotIndex)
-                        else
-                            currentDrawable = GetPedPropIndex(ped, slotIndex)
-                        end
-                        -- Check if current drawable has a toggle state
-                        for _, state in ipairs(states) do
-                            if state.from == currentDrawable or state.to == currentDrawable then
-                                toggleableSlots[slotType][tostring(slotIndex)] = true
-                                break
+            for _, slotType in ipairs({ "Drawables", "Props" }) do
+                local slots = MBT.ClothingStates[slotType]
+                if slots then
+                    for slotIndex, states in pairs(slots) do
+                        if #states > 0 then
+                            local currentDrawable
+                            if slotType == "Drawables" then
+                                currentDrawable = GetPedDrawableVariation(ped, slotIndex)
+                            else
+                                currentDrawable = GetPedPropIndex(ped, slotIndex)
+                            end
+                            for _, state in ipairs(states) do
+                                -- Match solo se sesso combacia (o se lo stato non specifica sesso)
+                                local sexMatches = (not state.sex) or state.sex == sex
+                                if sexMatches and (state.from == currentDrawable or state.to == currentDrawable) then
+                                    toggleableSlots[slotType][tostring(slotIndex)] = true
+                                    break
+                                end
                             end
                         end
                     end

@@ -130,9 +130,13 @@ function MBT.SharedClient.SetupStealDress()
             thiefPed = ped
         }
 
-        -- Build items list for NUI
+        -- Build items list for NUI + victim wearing snapshot
+        -- La NUI usa victimWearing per mostrare cosa indossa la vittima sul
+        -- mannequin durante lo steal mode (altrimenti mostrerebbe i drawable
+        -- del ladro, cosa che confonde totalmente l'utente).
         stealItemsList = {}
         local stealItems = stealItemsList
+        local victimWearing = { Drawables = {}, Props = {} }
 
         -- Check torso kit
         local hasTorso = false
@@ -141,7 +145,13 @@ function MBT.SharedClient.SetupStealDress()
                 local current = GetPedDrawableVariation(closestPlayer, idx)
                 if not MBT.TableContains(MBT.Drawables[idx]["Default"][targetSex], current) then
                     hasTorso = true
-                    break
+                    -- Cattura ogni slot torso non-default del victim
+                    victimWearing.Drawables[tostring(idx)] = {
+                        index = idx,
+                        drawable = current,
+                        texture = GetPedTextureVariation(closestPlayer, idx),
+                        palette = GetPedPaletteVariation(closestPlayer, idx),
+                    }
                 end
             end
         end
@@ -163,6 +173,12 @@ function MBT.SharedClient.SetupStealDress()
                         stealType = "drawable",
                         slotIndex = k
                     }
+                    victimWearing.Drawables[tostring(k)] = {
+                        index = k,
+                        drawable = current,
+                        texture = GetPedTextureVariation(closestPlayer, k),
+                        palette = GetPedPaletteVariation(closestPlayer, k),
+                    }
                 end
             end
         end
@@ -176,6 +192,11 @@ function MBT.SharedClient.SetupStealDress()
                         label = MBT.Locale[MBT.SlotLocaleKeys.Props[k]] or ("Prop " .. k),
                         stealType = "prop",
                         slotIndex = k
+                    }
+                    victimWearing.Props[tostring(k)] = {
+                        index = k,
+                        drawable = current,
+                        texture = GetPedPropTextureIndex(closestPlayer, k),
                     }
                 end
             end
@@ -191,7 +212,9 @@ function MBT.SharedClient.SetupStealDress()
         SendNUIMessage({
             action = "stealMenu",
             status = true,
-            items = stealItems
+            items = stealItems,
+            wearing = victimWearing,
+            sex = targetSex == "female" and 1 or 0,
         })
     end
 
