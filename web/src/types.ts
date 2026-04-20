@@ -58,6 +58,7 @@ export interface NUIMessageUI {
   hairToggled?: boolean;
   hairToggleable?: boolean;
   drip?: DripState;
+  labels?: UILabels;
 }
 
 export interface NUIMessageHairToggleUpdate {
@@ -105,6 +106,43 @@ export interface NUIMessageStealMenu {
   items?: StealItem[];
   wearing?: WearingState;
   sex?: 0 | 1;
+  labels?: UILabels;
+}
+
+/**
+ * Dizionario stringhe UI inviato dal Lua (dal locale attivo) ad ogni
+ * apertura della NUI. Unica fonte di verità per le traduzioni frontend.
+ * Lato Lua vive in Locales[lang].UI (vedi locales/en.lua, locales/it.lua).
+ */
+export interface UILabels {
+  hotspots: {
+    head: string;
+    torso: string;
+    accessories: string;
+    armor: string;
+    bags: string;
+    legs: string;
+    feet: string;
+  };
+  slots: {
+    hat: string;
+    glasses: string;
+    earrings: string;
+    watch: string;
+    bracelet: string;
+    mask: string;
+    backpack: string;
+    armor: string;
+    chain: string;
+    top: string;
+    pants: string;
+    shoes: string;
+  };
+  steal: {
+    stealAll: string;
+    collect: string;
+    lootingInProgress: string;
+  };
 }
 
 export interface NUIMessageUpdateWearing {

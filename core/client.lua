@@ -470,7 +470,10 @@ RegisterCommand("toggleUndress", function()
             armor = armorState,
             wearableProps = resourceState,
             toggleableSlots = toggleableSlots,
-            hairToggleable = hairToggleable
+            hairToggleable = hairToggleable,
+            -- UI labels dal locale attivo (hotspots, slot names, steal strings).
+            -- Un solo source of truth per lingua: il Lua pilota, React consuma.
+            labels = MBT.Locale.UI or {},
         })
     end
 end, false)

@@ -93,4 +93,38 @@ Locales['en'] = {
     ["drip_info"]    = "🔥 Drip: %s (Lv.%d) | XP: %d | Rate: +%d/tick",
     ["drip_label"]   = "Drip",
     ["drip_unknown"] = "Unknown",
+
+    -----------------------------------------------------------
+    -- UI (inviato al frontend React via NUI — non usato dal Lua)
+    -----------------------------------------------------------
+    ["UI"] = {
+        ["hotspots"] = {
+            ["head"]        = "Head & Face",
+            ["torso"]       = "Torso",
+            ["accessories"] = "Accessories",
+            ["armor"]       = "Body Armor",
+            ["bags"]        = "Bags",
+            ["legs"]        = "Pants",
+            ["feet"]        = "Shoes",
+        },
+        ["slots"] = {
+            ["hat"]      = "Hat",
+            ["glasses"]  = "Glasses",
+            ["earrings"] = "Earrings",
+            ["watch"]    = "Watch",
+            ["bracelet"] = "Bracelet",
+            ["mask"]     = "Mask",
+            ["backpack"] = "Backpack",
+            ["armor"]    = "Body Armor",
+            ["chain"]    = "Chain",
+            ["top"]      = "Top",
+            ["pants"]    = "Pants",
+            ["shoes"]    = "Shoes",
+        },
+        ["steal"] = {
+            ["stealAll"]           = "STEAL ALL",
+            ["collect"]            = "COLLECT",
+            ["lootingInProgress"]  = "LOOTING IN PROGRESS",
+        },
+    },
 }
