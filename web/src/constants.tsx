@@ -117,16 +117,16 @@ export const LAYER_META: Record<string, LayerMeta> = {
   },
   "Props-1": {
     path: "glasses",
-    top: "13%",
+    top: "4.5%",
     left: "50%",
-    width: "28%",
-    zIndex: 26,
+    width: "10%",
+    zIndex: 24,
   },
   "Props-2": {
     path: "earrings",
-    top: "15%",
+    top: "6%",
     left: "50%",
-    width: "20%",
+    width: "13%",
     zIndex: 24,
   },
   "Props-6": {
@@ -153,9 +153,9 @@ export const LAYER_META: Record<string, LayerMeta> = {
   },
   "Drawables-7": {
     path: "chain",
-    top: "31%",
+    top: "14%",
     left: "50%",
-    width: "24%",
+    width: "10%",
     zIndex: 22,
   },
   "Drawables-11": {
