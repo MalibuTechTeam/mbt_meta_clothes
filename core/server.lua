@@ -32,52 +32,11 @@ MBT.PlayerState.Init()
 
 RegisterNetEvent('mbt_meta_clothes:playerReady', function()
     local src = source
-    MBT.Debugger("=== PLAYER READY ===", src)
-
-    -- Multicharacter: se il src aveva già uno stato caricato con un identifier
-    -- diverso, salva quello vecchio e resetta prima di caricare il nuovo char
-    MBT.PlayerState.CheckCharacterSwitch(src)
-
-    MBT.PlayerState.Load(src)
-
-    if MBT.PlayerState.HasDbEntry(src) then
-        local wearingState = MBT.PlayerState.GetAll(src)
-        MBT.Debugger("EXISTING player — restoring from DB:", json.encode(wearingState))
-
-        for k, v in pairs(MBT.Drawables) do
-            local stored = wearingState.Drawables and wearingState.Drawables[k]
-            if stored and stored.drawable then
-                MBT.Debugger("  Drawable slot", k, "= drawable:", stored.drawable, "texture:", stored.texture)
-            else
-                MBT.Debugger("  Drawable slot", k, "= EMPTY (will force default)")
-            end
-        end
-        for k, v in pairs(MBT.Props) do
-            local stored = wearingState.Props and wearingState.Props[k]
-            if stored and stored.drawable then
-                MBT.Debugger("  Prop slot", k, "= drawable:", stored.drawable)
-            else
-                MBT.Debugger("  Prop slot", k, "= EMPTY (will force default)")
-            end
-        end
-
-        TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, wearingState)
-    else
-        -- NEW char (nessuna riga DB). Se è uno switch multicharacter evitiamo
-        -- il PED scan: il PED potrebbe avere ancora i drawable del char
-        -- precedente (appearance script non ha ancora applicato il nuovo skin),
-        -- e finiremmo per salvare dati SBAGLIATI sulla riga del nuovo char.
-        -- In caso di switch, applichiamo direttamente i default del config.
-        if MBT.PlayerState.ConsumeSwitchFlag(src) then
-            MBT.Debugger("NEW char via multichar switch — skipping PED scan, applying defaults")
-            TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, { Drawables = {}, Props = {} })
-        else
-            MBT.Debugger("NEW player — requesting PED scan")
-            TriggerClientEvent('mbt_meta_clothes:requestPedScan', src)
-        end
-    end
-
-    MBT.UpdateStateBags(src)
+    print(("^5[mbt_meta_clothes][playerReady] src=%s (triggered by client)^0"):format(src))
+    -- Logica condivisa con il server bridge esx:playerLoaded — entrambi i flow
+    -- (client manda playerReady oppure server riceve esx:playerLoaded direttamente)
+    -- chiamano la stessa funzione, debounced per evitare doppio push.
+    MBT.PlayerState.PushStateToClient(src)
 end)
 
 -----------------------------------------------------------
@@ -92,6 +51,59 @@ RegisterNetEvent('mbt_meta_clothes:syncInitialWearing', function(wearingData)
     -- Only process for NEW players (no DB entry)
     if MBT.PlayerState.HasDbEntry(src) then
         MBT.Debugger("syncInitialWearing: EXISTING player, skipping PED scan")
+        return
+    end
+
+    -- BARE-PED SANITY CHECK (strict — 2026-05-05 fix)
+    --
+    -- Se il scan cattura uno stato in cui >50% delle slot non-default hanno
+    -- drawable=0, significa che è stato eseguito su un PED parzialmente
+    -- vestito (illenium-appearance / fivem-appearance non ha ancora finito
+    -- di applicare l'outfit, ma ha già applicato qualche slot — tipico nei
+    -- char nuovi appena creati dove appearance async load > 2.5s).
+    --
+    -- Il check precedente accettava la row se almeno 1 slot non-default
+    -- aveva drawable > 0 — troppo permissivo. Risultato: row con (es.) solo
+    -- pantaloni starter al drawable 35 ma slot 1, 3, 8, 11 a 0 → al
+    -- restoreWearing il player è nudo dalla cintola in su.
+    --
+    -- Nuovo threshold: tipico outfit reale ha 4-8+ slot non-default con
+    -- drawable > 0. Bare freemode ha 0-2. Settiamo MIN a 2 con check
+    -- aggiuntivo che almeno 50% delle slot scansionate sono non-zero.
+    local meaningfulSlotCount = 0
+    local zeroSlotCount = 0
+    local totalSlotCount = 0
+    for _, slots in pairs(wearingData) do
+        if type(slots) == "table" then
+            for _, metadata in pairs(slots) do
+                if type(metadata) == "table" and metadata.drawable then
+                    totalSlotCount = totalSlotCount + 1
+                    if metadata.drawable > 0 then
+                        meaningfulSlotCount = meaningfulSlotCount + 1
+                    else
+                        zeroSlotCount = zeroSlotCount + 1
+                    end
+                end
+            end
+        end
+    end
+
+    -- Reject conditions (any one triggers):
+    --   1. Empty scan (totalSlotCount == 0) — nothing to save anyway
+    --   2. Less than 2 slots have drawable > 0 (canonical bare PED)
+    --   3. More than 50% of scanned slots are zero (likely partial apply)
+    local MIN_MEANINGFUL = 2
+    local rejected, reason = false, nil
+    if totalSlotCount == 0 then
+        rejected, reason = true, 'empty scan'
+    elseif meaningfulSlotCount < MIN_MEANINGFUL then
+        rejected, reason = true, ('only %d non-zero slot(s), need ≥%d'):format(meaningfulSlotCount, MIN_MEANINGFUL)
+    elseif zeroSlotCount > meaningfulSlotCount then
+        rejected, reason = true, ('%d zero vs %d non-zero — likely partial appearance apply'):format(zeroSlotCount, meaningfulSlotCount)
+    end
+
+    if rejected then
+        print(("^3[mbt_meta_clothes] WARN: syncInitialWearing REJECTED for src=%s — %s. DB row NOT created (avoid storing partial bare-PED state).^0"):format(src, reason))
         return
     end
 
