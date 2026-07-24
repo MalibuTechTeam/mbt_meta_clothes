@@ -315,7 +315,7 @@ local restoreState = nil
 --- PED drawable changes from the appearance script of the new character
 --- don't get attributed to the OLD character via externalDress events).
 function MBT.Utils.PauseHybridDetection()
-    detectionPaused = true
+    if MBT.SnapshotClient then MBT.SnapshotClient.Pause('legacy') end
 end
 
 --- Insurance net per la visibilità del PED.
@@ -362,36 +362,14 @@ end
 --- normali: invece, al prossimo poll, il loop vede un diff dal PED e la
 --- restoreProtection reverte quello che non dovrebbe esserci.
 function MBT.Utils.ResumeHybridDetection(wearingState)
-    if wearingState then
-        local sex = MBT.Utils.GetPedSex(PlayerPedId())
-        for k, v in pairs(MBT.Drawables) do
-            local stored = wearingState.Drawables and (wearingState.Drawables[tostring(k)] or wearingState.Drawables[k])
-            if stored and stored.drawable then
-                clothingCache.Drawables[k] = { drawable = stored.drawable, texture = stored.texture or 0 }
-            else
-                local default = v["Default"] and sex and v["Default"][sex]
-                local defaultDrawable = type(default) == "table" and default[1] or 0
-                clothingCache.Drawables[k] = { drawable = defaultDrawable, texture = 0 }
-            end
-        end
-        for k, _ in pairs(MBT.Props) do
-            local stored = wearingState.Props and (wearingState.Props[tostring(k)] or wearingState.Props[k])
-            if stored and stored.drawable then
-                clothingCache.Props[k] = { drawable = stored.drawable, texture = stored.texture or 0 }
-            else
-                -- Prop non presente = deve stare vuoto (-1)
-                clothingCache.Props[k] = { drawable = -1, texture = 0 }
-            end
-        end
-    else
-        MBT.Utils.InitClothingCache()
-    end
-    detectionPaused = false
+    if MBT.SnapshotClient then MBT.SnapshotClient.Resume('legacy', wearingState) end
 end
 
 --- Flag an expected internal change (prevents false positive in detection)
 function MBT.Utils.ExpectChange(slotType, slotIndex)
-    expectedChanges[slotType .. "_" .. tostring(slotIndex)] = true
+    if MBT.SnapshotClient then
+        return MBT.SnapshotClient.ExpectInternalSlot(slotType, slotIndex, 3000)
+    end
 end
 
 --- Initialize clothing cache from current PED state
@@ -417,49 +395,14 @@ end
 --- Scan current PED and send wearing state to server (for NEW players)
 --- This captures what the player is wearing from the appearance script
 function MBT.Utils.SyncWearingState()
-    local ped = PlayerPedId()
-    local sex = MBT.Utils.GetPedSex(ped)
-    if not sex or sex == "customSkin" then return end
-
-    local wearingData = { Drawables = {}, Props = {} }
-
-    for k, v in pairs(MBT.Drawables) do
-        local current = GetPedDrawableVariation(ped, k)
-        if not MBT.TableContains(v["Default"][sex], current) then
-            wearingData.Drawables[k] = {
-                index = k,
-                drawable = current,
-                texture = GetPedTextureVariation(ped, k),
-                palette = GetPedPaletteVariation(ped, k),
-                sex = sex,
-                type = "Drawable"
-            }
-        end
-    end
-
-    for k, v in pairs(MBT.Props) do
-        local current = GetPedPropIndex(ped, k)
-        if not MBT.TableContains(v["Default"][sex], current) then
-            wearingData.Props[k] = {
-                index = k,
-                drawable = current,
-                texture = GetPedPropTextureIndex(ped, k),
-                sex = sex,
-                type = "Prop"
-            }
-        end
-    end
-
-    TriggerServerEvent("mbt_meta_clothes:syncInitialWearing", wearingData)
+    if MBT.SnapshotClient then MBT.SnapshotClient.ForceInitialScan(0) end
 end
 
 --- Enable restore protection (prevents appearance script from overriding our state)
 function MBT.Utils.EnableRestoreProtection(wearingState, durationMs)
-    restoreProtection = true
-    restoreState = wearingState
+    if MBT.SnapshotClient then MBT.SnapshotClient.SetRestoreProtection(true, wearingState) end
     Citizen.SetTimeout(durationMs or 15000, function()
-        restoreProtection = false
-        restoreState = nil
+        if MBT.SnapshotClient then MBT.SnapshotClient.SetRestoreProtection(false) end
     end)
 end
 
@@ -512,22 +455,15 @@ local function processSlotChange(ped, slotType, k, v, sex, currentDrawable, curr
         local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
         if isDefault then
             if isProps and MBT.Props[k] and MBT.Props[k]["ApplyHairFix"] then MBT.Utils.RestoreHairFromHatFix(ped) end
-            TriggerServerEvent("mbt_meta_clothes:externalUndress", slotType, k)
         else
             if isProps and MBT.Props[k] and MBT.Props[k]["ApplyHairFix"] then MBT.Utils.ApplyHatHairFix(ped) end
-            TriggerServerEvent("mbt_meta_clothes:externalDress", slotType, {
-                index = k,
-                drawable = currentDrawable,
-                texture = currentTexture,
-                sex = sex,
-                type = isProps and "Prop" or "Drawable"
-            })
         end
     end
 end
 
 --- Start the Hybrid Detection polling loop
 function MBT.Utils.StartHybridDetection()
+    if MBT.SnapshotClient then return MBT.SnapshotClient.Start() end
     if detectionRunning then return end
     detectionRunning = true
 
@@ -611,16 +547,9 @@ end)
 --- @param drawable number new drawable value (-1 for cleared props, 0 for default components)
 --- @param texture number new texture value
 exports('suppressSlot', function(slotType, slotIndex, drawable, texture)
-    MBT.Utils.ExpectChange(slotType, slotIndex)
-    -- Update cache so detection won't see a diff
-    if clothingCache[slotType] then
-        clothingCache[slotType][slotIndex] = { drawable = drawable or 0, texture = texture or 0 }
-    end
-    -- Remove from restore state so restore protection won't revert it
-    if restoreProtection and restoreState and restoreState[slotType] then
-        restoreState[slotType][tostring(slotIndex)] = nil
-        restoreState[slotType][slotIndex] = nil
-    end
+    if not MBT.SnapshotClient then return end
+    local canonical = { drawable = drawable or 0, texture = texture or 0, palette = 0 }
+    MBT.SnapshotClient.Suppress(slotType, slotIndex, canonical)
 end)
 
 --- Restore a slot into restore protection tracking and update cache.
@@ -630,13 +559,9 @@ end)
 --- @param drawable number restored drawable value
 --- @param texture number restored texture value
 exports('restoreSlot', function(slotType, slotIndex, drawable, texture)
-    MBT.Utils.ExpectChange(slotType, slotIndex)
-    if clothingCache[slotType] then
-        clothingCache[slotType][slotIndex] = { drawable = drawable or 0, texture = texture or 0 }
-    end
-    -- Re-add to restore state if protection is active
-    if restoreProtection and restoreState and restoreState[slotType] then
-        restoreState[slotType][tostring(slotIndex)] = { drawable = drawable, texture = texture or 0 }
+    if MBT.SnapshotClient then
+        MBT.SnapshotClient.RestoreSuppressed(slotType, slotIndex)
+        MBT.SnapshotClient.ExpectInternalSlot(slotType, slotIndex, 3000)
     end
 end)
 

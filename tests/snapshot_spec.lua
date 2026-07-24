@@ -78,6 +78,25 @@ local function snapshotPayload(context, seq, visual, baseRevision)
     }
 end
 
+local function snapshotClientFixture()
+    local fakeNow = 0
+    local current = fullVisual('male')
+    local sent = {}
+    local client = MBT.SnapshotClient.New({
+        now = function() return fakeNow end,
+        capture = function() return current end,
+        model = function() return maleModel end,
+        send = function(payload) sent[#sent + 1] = payload end,
+    })
+    return {
+        client = client,
+        sent = sent,
+        visual = function() return current end,
+        setVisual = function(visual) current = visual end,
+        advance = function(ms) fakeNow = fakeNow + ms end,
+    }
+end
+
 for model, sex in pairs(MBT.GenderModels) do
     if sex == 'male' then maleModel = model break end
 end
@@ -321,6 +340,122 @@ local cases = {
             Assert.equal(false, ack.ok)
             Assert.equal('wrong_session', ack.code)
             Assert.equal(nil, fixture.coordinator:GetContext(src))
+        end,
+    },
+    {
+        name = 'client debounces a stable change and retries the identical request',
+        run = function()
+            local fixture = snapshotClientFixture()
+            local client = fixture.client
+            client:SetContext({ session = 7, revision = 3 }, { Drawables = {}, Props = {} })
+            client:Resume('startup')
+            client:Tick()
+            Assert.equal(0, #fixture.sent)
+
+            local changed = fullVisual('male')
+            changed.Drawables[11] = { drawable = 101, texture = 2, palette = 0 }
+            fixture.setVisual(changed)
+            client:Tick()
+            fixture.advance(MBT.SnapshotDebounce or 400)
+            client:Tick()
+            Assert.equal(1, #fixture.sent)
+            Assert.equal(1, fixture.sent[1].seq)
+            Assert.equal(3, fixture.sent[1].baseRevision)
+            Assert.equal(nil, fixture.sent[1].visual)
+            Assert.truthy(type(fixture.sent[1].Drawables) == 'table')
+
+            fixture.advance(MBT.SnapshotAckTimeout or 2000)
+            client:Tick()
+            Assert.equal(2, #fixture.sent)
+            Assert.same(fixture.sent[1], fixture.sent[2])
+        end,
+    },
+    {
+        name = 'client adopts positive and stale-revision rebase acknowledgements',
+        run = function()
+            local fixture = snapshotClientFixture()
+            local client = fixture.client
+            client:SetContext({ session = 8, revision = 2 }, { Drawables = {}, Props = {} })
+            client:Resume('startup')
+            local changed = fullVisual('male')
+            changed.Props[0] = { drawable = 4, texture = 0, palette = 0 }
+            fixture.setVisual(changed)
+            client:Tick()
+            fixture.advance(MBT.SnapshotDebounce or 400)
+            client:Tick()
+            local fingerprint = MBT.Snapshot.Fingerprint(changed)
+            Assert.equal(true, client:HandleAck({
+                ok = true,
+                code = 'accepted',
+                session = 8,
+                seq = 1,
+                revision = 3,
+                fingerprint = fingerprint,
+                visual = changed,
+            }))
+            Assert.equal(3, client:GetContext().revision)
+            client:Tick()
+            Assert.equal(1, #fixture.sent)
+
+            local newerServer = fullVisual('male')
+            newerServer.Drawables[11] = { drawable = 150, texture = 0, palette = 0 }
+            fixture.advance(500)
+            fixture.setVisual(fullVisual('male'))
+            client:Tick()
+            fixture.advance(MBT.SnapshotDebounce or 400)
+            client:Tick()
+            Assert.equal(2, #fixture.sent)
+            Assert.equal(false, client:HandleAck({
+                ok = false,
+                code = 'stale_revision',
+                session = 8,
+                seq = 2,
+                revision = 4,
+                fingerprint = MBT.Snapshot.Fingerprint(newerServer),
+                visual = newerServer,
+            }))
+            Assert.equal(4, client:GetContext().revision)
+        end,
+    },
+    {
+        name = 'client pause restore internal guards and suppression block false snapshots',
+        run = function()
+            local fixture = snapshotClientFixture()
+            local client = fixture.client
+            client:SetContext({ session = 9, revision = 1 }, { Drawables = {}, Props = {} })
+            client:Resume('startup')
+            local changed = fullVisual('male')
+            changed.Props[0] = { drawable = 9, texture = 0, palette = 0 }
+            fixture.setVisual(changed)
+
+            client:Pause('character')
+            client:Tick()
+            fixture.advance(1000)
+            client:Tick()
+            Assert.equal(0, #fixture.sent)
+            client:Resume('character')
+            client:SetRestoreProtection(true)
+            client:Tick()
+            Assert.equal(0, #fixture.sent)
+            client:SetRestoreProtection(false)
+            local token = client:BeginInternal('dress', 500)
+            fixture.advance(600)
+            client:Tick()
+            fixture.advance(MBT.SnapshotDebounce or 400)
+            client:Tick()
+            Assert.equal(1, #fixture.sent)
+            client:EndInternal(token)
+
+            local suppressedFixture = snapshotClientFixture()
+            local suppressed = suppressedFixture.client
+            suppressed:SetContext({ session = 10, revision = 1 }, { Drawables = {}, Props = {} })
+            suppressed:Resume('startup')
+            suppressed:Suppress('Props', 0, { drawable = -1, texture = 0, palette = 0 })
+            suppressedFixture.setVisual(changed)
+            suppressed:Tick()
+            suppressedFixture.advance(1000)
+            suppressed:Tick()
+            Assert.equal(0, #suppressedFixture.sent)
         end,
     },
 }

@@ -20,6 +20,8 @@ shared_scripts {
     'locales/*.lua',
     'config.lua',
     'modules/snapshot/shared.lua',
+    -- Testable client state machine; runtime adapter activates client-side only.
+    'modules/snapshot/client.lua',
     'data/clothing_states.lua',
 }
 
