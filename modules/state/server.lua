@@ -265,7 +265,17 @@ function MBT.PlayerState.Load(src, identifier)
         end
     end
     if not identifier then
-        MBT.PlayerState.InitPlayer(src)
+        -- IDENTIFIER NIL — non azzerare lo stato! Il caller (es. PushStateToClient)
+        -- ha la sua logica di retry e si aspetta di poter ritentare. Se chiamassimo
+        -- InitPlayer qui, perderemmo PlayerWearing del char precedente (che potrebbe
+        -- non essere ancora stato salvato) e PlayerHasDbEntry resterebbe stantio
+        -- → restoreWearing inviato vuoto al client → player nudo.
+        --
+        -- Init a vuoto SOLO se PlayerWearing[src] non esiste ancora (truly first call).
+        if not PlayerWearing[src] then
+            MBT.PlayerState.InitPlayer(src)
+        end
+        print(("^3[mbt_meta_clothes][PlayerState.Load] WARN: src=%s identifier nil — skipping load, preservando stato corrente^0"):format(src))
         return
     end
 
@@ -296,15 +306,54 @@ function MBT.PlayerState.Load(src, identifier)
                     normalized.Props[tonumber(k) or k] = v
                 end
             end
+
+            -- BARE-DATA CORRUPTION DETECTION
+            -- Rileva la firma del bug bare-PED: una row con slot drawable presenti
+            -- ma TUTTI con drawable=0. È sempre il risultato di un syncInitialWearing
+            -- eseguito su PED nudo prima dell'apply dello skin script (vedi commento
+            -- su syncInitialWearing in core/server.lua). Una pulizia legittima fatta
+            -- da meta_clothes lascia gli slot rimossi (ClearSlot), non valori a 0.
+            --
+            -- Cancella la row corrotta dal DB e tratta come DB MISS → al prossimo
+            -- requestPedScan il player verrà ri-scansionato con le clothes corrette.
+            local hasNonZero = false
+            local totalSlots = 0
+            for _, slot in pairs(normalized.Drawables) do
+                if type(slot) == "table" and slot.drawable then
+                    totalSlots = totalSlots + 1
+                    if slot.drawable > 0 then hasNonZero = true; break end
+                end
+            end
+            if not hasNonZero then
+                for _, slot in pairs(normalized.Props) do
+                    if type(slot) == "table" and slot.drawable then
+                        totalSlots = totalSlots + 1
+                        if slot.drawable > 0 then hasNonZero = true; break end
+                    end
+                end
+            end
+
+            if totalSlots > 0 and not hasNonZero then
+                print(("^3[mbt_meta_clothes][PlayerState.Load] WARN: corrupted bare-data row detected for identifier=%s (%d slots all drawable=0). Deleting row and treating as DB MISS.^0"):format(tostring(identifier), totalSlots))
+                MySQL.query.await("DELETE FROM mbt_player_wearing WHERE identifier = ?", { identifier })
+                MBT.PlayerState.InitPlayer(src)
+                PlayerHasDbEntry[src] = false
+                DirtyPlayers[src] = false
+                return
+            end
+
             PlayerWearing[src] = normalized
         else
             MBT.Debugger("PlayerState: corrupted DB data for", identifier, "- resetting")
             MBT.PlayerState.InitPlayer(src)
         end
         PlayerHasDbEntry[src] = true
+        -- Branch trace SEMPRE stampato (no MBT.Debug gate) per debug visibilità
+        print(("^5[mbt_meta_clothes][PlayerState.Load] src=%s identifier=%s -> DB HIT (HasDbEntry=true)^0"):format(src, tostring(identifier)))
     else
         MBT.PlayerState.InitPlayer(src)
         PlayerHasDbEntry[src] = false
+        print(("^5[mbt_meta_clothes][PlayerState.Load] src=%s identifier=%s -> DB MISS (HasDbEntry=false, switch flag=%s)^0"):format(src, tostring(identifier), tostring(PlayerJustSwitched[src] == true)))
     end
 
     DirtyPlayers[src] = false
@@ -342,3 +391,96 @@ function MBT.PlayerState.SaveAllDirty()
         MBT.Debugger("PlayerState: Periodic save — saved", count, "players")
     end
 end
+
+-----------------------------------------------------------
+-- Push state to client (load + decide branch + trigger client event)
+-----------------------------------------------------------
+-- Estratto da playerReady handler così sia il client (via playerReady event)
+-- sia il server (via esx:playerLoaded bridge handler) possono guidare il push.
+-- Indispensabile per multichar che bypassano il client-side esx:playerLoaded
+-- chain (es. mbt_character fast-switch): senza questo, il ped resta in pausa
+-- finché il watchdog client non scatta a 5s.
+--
+-- Idempotente: se chiamato di nuovo entro 500ms per lo stesso src, no-op.
+-- Questo evita doppio push quando entrambi i flow (server bridge + client
+-- playerReady) firano per lo stesso load event.
+local lastPushAt = {} -- [src] = GetGameTimer()
+
+--- Carica lo stato del player dal DB (se non già fatto), decide quale branch
+--- prendere (restoreWearing existing/empty oppure requestPedScan) e triggera
+--- il client event corrispondente. Idempotente con debounce 500ms.
+--- @param src number Player source
+--- @param attempt number Internal: counter retry (default 1)
+function MBT.PlayerState.PushStateToClient(src, attempt)
+    if not src or src <= 0 then return end
+    attempt = attempt or 1
+
+    -- IDENTIFIER READINESS GUARD
+    -- Alcuni multichar (mbt_character, esx_multicharacter veloce ecc.) emettono
+    -- esx:onPlayerJoined PRIMA che ESX.GetPlayerFromId(src).identifier sia
+    -- popolato. Nei 50-300ms successivi xPlayer è parzialmente inizializzato
+    -- ma .identifier è ancora nil. Se proseguiamo:
+    --   1. CheckCharacterSwitch vede newId=nil → ritorna false (non rileva lo switch)
+    --   2. Load vede identifier=nil → early return con InitPlayer (AZZERA PlayerWearing)
+    --   3. PlayerHasDbEntry resta TRUE (residuo del char precedente)
+    --   4. PushStateToClient invia restoreWearing con state VUOTO → player nudo
+    --
+    -- Soluzione: retry esponenziale fino a 1.5s. Se dopo 1.5s ancora nil,
+    -- abbandoniamo silenziosamente — un altro evento (es. esx:playerLoaded
+    -- che firerà più tardi) rilancerà PushStateToClient.
+    if not getPlayerIdentifier or not getPlayerIdentifier(src) then
+        if attempt >= 8 then
+            print(("^3[mbt_meta_clothes][PushStateToClient] WARN: src=%s identifier still nil after %d attempts (~%dms) — abbandono, attendo prossimo trigger^0"):format(src, attempt, attempt * 200))
+            return
+        end
+        Citizen.SetTimeout(200, function()
+            -- Verifica che il player non si sia disconnesso nel frattempo
+            if GetPlayerName(src) then
+                MBT.PlayerState.PushStateToClient(src, attempt + 1)
+            end
+        end)
+        return
+    end
+
+    local now = GetGameTimer()
+    if lastPushAt[src] and (now - lastPushAt[src]) < 500 then
+        -- Debounce: skip silenziosamente. Già pushato di recente.
+        return
+    end
+    lastPushAt[src] = now
+
+    -- Multicharacter safety: rileva eventuale switch identifier prima di Load
+    MBT.PlayerState.CheckCharacterSwitch(src)
+    MBT.PlayerState.Load(src)
+
+    if MBT.PlayerState.HasDbEntry(src) then
+        local wearingState = MBT.PlayerState.GetAll(src)
+        print(("^5[mbt_meta_clothes][PushStateToClient] src=%s -> restoreWearing (existing DB row)^0"):format(src))
+        TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, wearingState)
+    else
+        -- Sia "truly new player" sia "switched-to new char" → requestPedScan.
+        --
+        -- In passato lo switch-flag triggherava un restoreWearing vuoto per
+        -- "ripulire" il PED dai drawable del char precedente. Ma applyWearingState
+        -- vuoto applica i DEFAULT degli MBT.Drawables (slot 3 = 15, ecc.) → questo
+        -- combatte contro illenium-appearance che sta applicando il vero skin del
+        -- nuovo char e li sovrascrive con default vanilla.
+        --
+        -- Soluzione: requestPedScan ha un delay 2.5s che lascia respirare illenium
+        -- prima di catturare lo stato. Il bare-PED guard server-side rifiuta scan
+        -- "tutto a 0" così non corrompiamo il DB se illenium tarda. Funziona sia
+        -- per primo login che per switch.
+        local switched = MBT.PlayerState.ConsumeSwitchFlag(src)
+        print(("^5[mbt_meta_clothes][PushStateToClient] src=%s -> requestPedScan (new char, switched=%s)^0"):format(src, tostring(switched)))
+        TriggerClientEvent('mbt_meta_clothes:requestPedScan', src)
+    end
+
+    if MBT.UpdateStateBags then
+        MBT.UpdateStateBags(src)
+    end
+end
+
+--- Cleanup del debounce quando il player si disconnette
+AddEventHandler('playerDropped', function()
+    lastPushAt[source] = nil
+end)

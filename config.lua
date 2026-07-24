@@ -4,10 +4,10 @@ MBT                      = MBT or {}
 -- General Settings
 -----------------------------------------------------------
 MBT.Debug                = true -- Enable debug prints in server/client console
-MBT.Language             = 'en' -- Language: 'en', 'it' (add your own in locales/)
-MBT.MenuKey              = "J"  -- Keybind to open the clothing menu
-MBT.ActionCooldown       = 1500 -- ms between actions (prevents animation spam)
-MBT.TargetEnabled        = true -- Auto-detects ox_target, qb-target, or qtarget
+MBT.Language             = 'en'  -- Language: 'en', 'it' (add your own in locales/)
+MBT.MenuKey              = "J"   -- Keybind to open the clothing menu
+MBT.ActionCooldown       = 1500  -- ms between actions (prevents animation spam)
+MBT.TargetEnabled        = true  -- Auto-detects ox_target, qb-target, or qtarget
 
 -----------------------------------------------------------
 -- Stealing
@@ -23,8 +23,8 @@ MBT.VictimAnimCap        = 10000 -- ms max victim animation (anti-grief)
 -- Common values:
 --   ESX/vanilla:  { dict = "missminuteman_1ig_2", clip = "handsup_base" }
 --   QB/ps-hands:  { dict = "random@mugging3",     clip = "handsup_base" }
-MBT.HandsUpAnims = {
-    { dict = "missminuteman_1ig_2", clip = "handsup_base"          },
+MBT.HandsUpAnims         = {
+    { dict = "missminuteman_1ig_2", clip = "handsup_base" },
     { dict = "random@mugging3",     clip = "handsup_standing_base" },
 }
 
@@ -39,6 +39,7 @@ MBT.RateLimitMax         = 5    -- Max calls per window per player
 -----------------------------------------------------------
 MBT.StateSaveInterval    = 300   -- Seconds between periodic dirty saves (5 min)
 MBT.RestoreProtection    = 15000 -- ms to protect restored state from external overwrites
+MBT.PedRevealDelay       = 2000  -- ms to keep PED hidden after restore (covers appearance script late apply + our re-apply, prevents visible blink). Keep <= 4500 (the bridge keepPedHidden loop caps at 5000ms before auto-recovery).
 
 -----------------------------------------------------------
 -- DNA Forensics
@@ -150,12 +151,12 @@ end
 -----------------------------------------------------------
 MBT.FreemodeDefaults     = {
     Drawables = {
-        male   = { [0]=0, [1]=0, [2]=0, [3]=15, [4]=21, [5]=0, [6]=34, [7]=0, [8]=15, [9]=0, [10]=0, [11]=15 },
-        female = { [0]=0, [1]=0, [2]=0, [3]=15, [4]=14, [5]=0, [6]=118,[7]=0, [8]=15, [9]=0, [10]=0, [11]=15 },
+        male   = { [0] = 0, [1] = 0, [2] = 0, [3] = 15, [4] = 21, [5] = 0, [6] = 34, [7] = 0, [8] = 15, [9] = 0, [10] = 0, [11] = 15 },
+        female = { [0] = 0, [1] = 0, [2] = 0, [3] = 15, [4] = 14, [5] = 0, [6] = 118, [7] = 0, [8] = 15, [9] = 0, [10] = 0, [11] = 15 },
     },
     Props = {
-        male   = { [0]=-1, [1]=-1, [2]=-1, [3]=-1, [4]=-1, [5]=-1, [6]=-1, [7]=-1 },
-        female = { [0]=-1, [1]=-1, [2]=-1, [3]=-1, [4]=-1, [5]=-1, [6]=-1, [7]=-1 },
+        male   = { [0] = -1, [1] = -1, [2] = -1, [3] = -1, [4] = -1, [5] = -1, [6] = -1, [7] = -1 },
+        female = { [0] = -1, [1] = -1, [2] = -1, [3] = -1, [4] = -1, [5] = -1, [6] = -1, [7] = -1 },
     },
 }
 
@@ -178,9 +179,9 @@ MBT.GenderModels         = {
 -- Armor slot (9) is a special case: the actual tier is read from statebags.
 -----------------------------------------------------------
 MBT.WearablePropsSlots   = {
-    [1]  = "mask",
-    [5]  = "bag",
-    [9]  = "smallarmor", -- overridden at runtime by mbt_isWearingHeavyarmor/mbt_isWearingMedarmor statebags
+    [1] = "mask",
+    [5] = "bag",
+    [9] = "smallarmor",  -- overridden at runtime by mbt_isWearingHeavyarmor/mbt_isWearingMedarmor statebags
 }
 
 MBT.Drawables            = {

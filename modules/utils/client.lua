@@ -318,6 +318,43 @@ function MBT.Utils.PauseHybridDetection()
     detectionPaused = true
 end
 
+--- Insurance net per la visibilità del PED.
+---
+--- Tutti i path che settano alpha=0 sul ped (loadingScreenOff, esx:playerLoaded,
+--- multichar:pauseDetection, QB/OX playerLoaded) si aspettano che ENTRO 5s
+--- arrivi un evento dal server (restoreWearing o requestPedScan) che resetti
+--- alpha=255. Se quell'evento non arriva (rete persa, multichar fast-switch
+--- che non triggera correttamente, race condition non prevista, server crash),
+--- il ped rimane invisibile per sempre.
+---
+--- Questo watchdog scatta dopo 5s: se il ped è ancora alpha=0, lo riporta
+--- visibile + ferma eventuale loop keepPedHidden + riprende la detection.
+--- Stampa un WARN sempre visibile (non gated da MBT.Debug) così l'edge case
+--- è visibile in console e il bug a monte può essere investigato.
+---
+--- Idempotente: se il ped è già visibile (alpha > 0), no-op silenzioso.
+--- Safe da chiamare in più handler concorrenti — solo il primo che trova
+--- alpha=0 effettua il recovery, gli altri trovano alpha=255 e non fanno nulla.
+---
+--- @param reason string|nil Etichetta diagnostica per il log
+function MBT.Utils.SchedulePedVisibilityWatchdog(reason)
+    Citizen.CreateThread(function()
+        Citizen.Wait(5000)
+        local ped = PlayerPedId()
+        if not DoesEntityExist(ped) then return end
+        if GetEntityAlpha(ped) > 0 then return end -- già visibile, tutto ok
+        print(("^3[mbt_meta_clothes] WARN: ped still alpha=0 after 5s (reason=%s) — auto-recovering visibility^0"):format(tostring(reason or "unknown")))
+        ResetEntityAlpha(ped)
+        SetEntityAlpha(ped, 255, false)
+        if MBT.Utils.StopKeepPedHidden then
+            MBT.Utils.StopKeepPedHidden()
+        end
+        if MBT.Utils.ResumeHybridDetection then
+            MBT.Utils.ResumeHybridDetection()
+        end
+    end)
+end
+
 --- Riprende la hybrid detection dopo una pausa (es. multichar switch).
 --- Se viene passato wearingState, il cache viene settato sullo stato ATTESO
 --- invece che dal PED corrente. Questo evita che modifiche dell'appearance
@@ -493,6 +530,24 @@ end
 function MBT.Utils.StartHybridDetection()
     if detectionRunning then return end
     detectionRunning = true
+
+    -- Avvia il loop in pausa: il loop NON genererà externalDress/externalUndress
+    -- finché restoreWearing o requestPedScan non avrà chiamato ResumeHybridDetection.
+    --
+    -- Senza questa pausa iniziale, c'è una finestra tra il start del loop e
+    -- l'arrivo del primo restoreWearing in cui l'appearance script (illenium,
+    -- fivem-appearance, qb-clothing ecc.) applica il SUO skin sul PED. Il loop
+    -- vede currentDrawable != cached, entra nel branch finale `else` (perché
+    -- restoreProtection non è ancora attiva), e MANDA externalDress al server.
+    -- Risultato: il server SetSlot con i drawable di illenium PRIMA di inviare
+    -- il vero restoreWearing — il restoreWearing che arriva poi include quei
+    -- drawable, e il player rilogga vestito come illenium dice anziché come
+    -- meta_clothes (es: occhiali tolti via meta_clothes ma rimessi da illenium
+    -- al relog perché illenium-appearance ha ancora gli occhiali nel suo skin).
+    --
+    -- Resume puntuale: restoreWearing handler e requestPedScan handler già
+    -- chiamano ResumeHybridDetection → loop riprende con cache corretto.
+    detectionPaused = true
 
     Citizen.CreateThread(function()
         Wait(500)

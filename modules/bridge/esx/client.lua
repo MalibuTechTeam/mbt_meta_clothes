@@ -11,6 +11,11 @@ AddEventHandler('esx:loadingScreenOff', function()
     playerReadySent = true
 
     SetEntityAlpha(PlayerPedId(), 0, false)
+    -- Watchdog: se entro 5s nessun restoreWearing/requestPedScan resetta alpha,
+    -- forza la visibilità per non lasciare il player invisibile.
+    if MBT.Utils.SchedulePedVisibilityWatchdog then
+        MBT.Utils.SchedulePedVisibilityWatchdog("loadingScreenOff")
+    end
     Citizen.Wait(2000)
     MBT.Utils.UpdatePlayerClothes()
     MBT.Utils.Target()
@@ -37,17 +42,40 @@ AddEventHandler('mbt_meta_clothes:multichar:pauseDetection', function()
 
     -- Protezione extra: durante il switch il model swap crea un nuovo PED
     -- che è visibile di default. Loop di 5s che mantiene alpha=0 così anche
-    -- il nuovo PED resta invisibile finché restoreWearing non chiama
-    -- ResetEntityAlpha (che setta keepPedHidden=false tramite una exit-flag).
+    -- il nuovo PED resta invisibile finché restoreWearing/requestPedScan
+    -- chiama StopKeepPedHidden (exit flag) e fa ResetEntityAlpha.
+    --
+    -- RESILIENCE FALLBACK: se il loop scade SENZA che keepPedHidden venga
+    -- resettato (cioè nessun evento restoreWearing/requestPedScan è arrivato
+    -- entro 5s — può succedere con multichar fast-switch o eventi persi),
+    -- forziamo manualmente alpha=255 + resume detection per non lasciare il
+    -- player invisibile. WARN sempre stampato per visibilità del bug a monte.
     keepPedHidden = true
     Citizen.CreateThread(function()
         local startTime = GetGameTimer()
+        local stoppedNormally = false
         while keepPedHidden and GetGameTimer() - startTime < 5000 do
             local ped = PlayerPedId()
             if DoesEntityExist(ped) and GetEntityAlpha(ped) > 0 then
                 SetEntityAlpha(ped, 0, false)
             end
+            if not keepPedHidden then
+                stoppedNormally = true
+                break
+            end
             Wait(50)
+        end
+        if not stoppedNormally and keepPedHidden then
+            print("^3[mbt_meta_clothes] WARN: keepPedHidden 5s timer expired without restoreWearing/requestPedScan — auto-recovering ped visibility^0")
+            keepPedHidden = false
+            local ped = PlayerPedId()
+            if DoesEntityExist(ped) then
+                ResetEntityAlpha(ped)
+                SetEntityAlpha(ped, 255, false)
+            end
+            if MBT.Utils.ResumeHybridDetection then
+                MBT.Utils.ResumeHybridDetection()
+            end
         end
     end)
 end)
@@ -79,6 +107,10 @@ AddEventHandler('esx:playerLoaded', function()
     -- modifica tardiva dell'appearance script, revertendola al nostro state.
     -- Stesso principio delle armi: le applichi subito, nessuno le tocca.
     SetEntityAlpha(PlayerPedId(), 0, false)
+    -- Watchdog insurance net (vedi commento in loadingScreenOff)
+    if MBT.Utils.SchedulePedVisibilityWatchdog then
+        MBT.Utils.SchedulePedVisibilityWatchdog("esx:playerLoaded")
+    end
     MBT.Utils.UpdatePlayerClothes()
     MBT.Utils.Target()
     TriggerServerEvent("mbt_meta_clothes:playerReady")
