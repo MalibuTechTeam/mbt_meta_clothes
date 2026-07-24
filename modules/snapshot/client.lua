@@ -29,6 +29,8 @@ function SnapshotClient.New(deps)
     local nextSeq = 0
     local acknowledgedFingerprint
     local acknowledgedVisual
+    local baselineWearing
+    local baselineModel
     local candidateFingerprint
     local candidateSince
     local pending
@@ -103,14 +105,37 @@ function SnapshotClient.New(deps)
         candidateSince = nil
     end
 
+    local function refreshBaselineModel()
+        if not restoreActive or not baselineWearing then return end
+        local model = modelProvider()
+        if not model or model == baselineModel then return end
+        local sex = MBT.GenderModels[model]
+        if not sex then return end
+        setBaseline(MBT.Snapshot.VisualFromWearing(baselineWearing, sex))
+        baselineModel = model
+    end
+
     function coordinator:SetContext(nextContext, wearingState)
         if type(nextContext) ~= 'table' or nextContext.session == nil
             or type(nextContext.revision) ~= 'number' then return false end
-        context = { session = nextContext.session, revision = nextContext.revision }
-        nextSeq = 0
-        pending = nil
-        forceInitialAt = nil
-        rejectionCount = 0
+        local sameSession = context and context.session == nextContext.session
+        if sameSession then
+            if context.revision ~= nextContext.revision then pending = nil end
+            context.revision = nextContext.revision
+        else
+            context = { session = nextContext.session, revision = nextContext.revision }
+            nextSeq = 0
+            pending = nil
+            forceInitialAt = nil
+            rejectionCount = 0
+            internalTokens = {}
+            expectedSlots = {}
+            suppressions = { Drawables = {}, Props = {} }
+            restoreGeneration = restoreGeneration + 1
+            restoreActive = false
+            baselineWearing = nil
+            baselineModel = nil
+        end
         pauses.wrong_session = nil
 
         local raw = capture()
@@ -118,6 +143,8 @@ function SnapshotClient.New(deps)
         if type(raw) == 'table' and raw.visual then model = raw.model or model end
         local sex = MBT.GenderModels[model]
         if wearingState and sex then
+            baselineWearing = wearingState
+            baselineModel = model
             setBaseline(MBT.Snapshot.VisualFromWearing(wearingState, sex))
         elseif nextContext.visual then
             setBaseline(nextContext.visual)
@@ -176,6 +203,12 @@ function SnapshotClient.New(deps)
         if not active and expectedGeneration and expectedGeneration ~= restoreGeneration then
             return false
         end
+        if not active and restoreActive and deps.enforce and acknowledgedVisual then
+            cleanupExpiringGuards(now())
+            refreshBaselineModel()
+            deps.enforce(acknowledgedVisual, guardReason)
+            acknowledgedFingerprint = MBT.Snapshot.Fingerprint(acknowledgedVisual)
+        end
         restoreGeneration = restoreGeneration + 1
         restoreActive = active == true
         if restoreActive then pending = nil end
@@ -184,7 +217,11 @@ function SnapshotClient.New(deps)
             local model = modelProvider()
             if type(raw) == 'table' and raw.visual then model = raw.model or model end
             local sex = MBT.GenderModels[model]
-            if sex then setBaseline(MBT.Snapshot.VisualFromWearing(wearingState, sex)) end
+            if sex then
+                baselineWearing = wearingState
+                baselineModel = model
+                setBaseline(MBT.Snapshot.VisualFromWearing(wearingState, sex))
+            end
         end
         if not restoreActive then
             candidateFingerprint = nil
@@ -261,8 +298,10 @@ function SnapshotClient.New(deps)
         local at = now()
         cleanupExpiringGuards(at)
         if not context or next(pauses) then return end
+        if forceInitialAt and at < forceInitialAt then return end
         if restoreActive then
             if deps.enforce and acknowledgedVisual then
+                refreshBaselineModel()
                 deps.enforce(acknowledgedVisual, guardReason)
                 acknowledgedFingerprint = MBT.Snapshot.Fingerprint(acknowledgedVisual)
             end
@@ -432,4 +471,8 @@ end)
 
 AddEventHandler('onResourceStop', function(resourceName)
     if resourceName == GetCurrentResourceName() then running = false end
+end)
+
+AddEventHandler('onResourceStart', function(resourceName)
+    if resourceName == GetCurrentResourceName() then SnapshotClient.Start() end
 end)

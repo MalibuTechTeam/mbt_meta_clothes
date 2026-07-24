@@ -12,6 +12,7 @@ local DirtyPlayers = {}
 local PlayerIdentifiers = {}
 local PlayerRevisions = {}
 local PlayerHasDbEntry = {}
+local PlayerHasBaseline = {}
 local PlayerDripXp = {}
 local PlayerJustSwitched = {} -- true quando CheckCharacterSwitch ha rilevato uno switch
 local initialized = false
@@ -91,6 +92,7 @@ function MBT.PlayerState.InitPlayer(src)
     PlayerDripXp[src] = PlayerDripXp[src] or 0
     PlayerRevisions[src] = PlayerRevisions[src] or 0
     DirtyPlayers[src] = false
+    PlayerHasBaseline[src] = PlayerHasBaseline[src] or false
 end
 
 local function touchRevision(src)
@@ -339,6 +341,7 @@ function MBT.PlayerState.CheckCharacterSwitch(src)
     DirtyPlayers[src] = nil
     PlayerIdentifiers[src] = nil
     PlayerHasDbEntry[src] = nil
+    PlayerHasBaseline[src] = nil
     PlayerDripXp[src] = nil
     -- Flag: il prossimo playerReady è dovuto a switch, NON deve fare PED scan
     -- (il PED potrebbe avere ancora i drawable del char precedente se
@@ -440,6 +443,7 @@ function MBT.PlayerState.Load(src, identifier)
                 MySQL.query.await("DELETE FROM mbt_player_wearing WHERE identifier = ?", { identifier })
                 MBT.PlayerState.InitPlayer(src)
                 PlayerHasDbEntry[src] = false
+                PlayerHasBaseline[src] = false
                 DirtyPlayers[src] = false
                 return
             end
@@ -450,11 +454,13 @@ function MBT.PlayerState.Load(src, identifier)
             MBT.PlayerState.InitPlayer(src)
         end
         PlayerHasDbEntry[src] = true
+        PlayerHasBaseline[src] = true
         -- Branch trace SEMPRE stampato (no MBT.Debug gate) per debug visibilità
         print(("^5[mbt_meta_clothes][PlayerState.Load] src=%s identifier=%s -> DB HIT (HasDbEntry=true)^0"):format(src, tostring(identifier)))
     else
         MBT.PlayerState.InitPlayer(src)
         PlayerHasDbEntry[src] = false
+        PlayerHasBaseline[src] = false
         print(("^5[mbt_meta_clothes][PlayerState.Load] src=%s identifier=%s -> DB MISS (HasDbEntry=false, switch flag=%s)^0"):format(src, tostring(identifier), tostring(PlayerJustSwitched[src] == true)))
     end
 
@@ -469,6 +475,15 @@ function MBT.PlayerState.HasDbEntry(src)
     return PlayerHasDbEntry[src] == true
 end
 
+
+function MBT.PlayerState.HasBaseline(src)
+    return PlayerHasBaseline[src] == true
+end
+
+function MBT.PlayerState.MarkBaseline(src)
+    PlayerHasBaseline[src] = true
+end
+
 function MBT.PlayerState.Cleanup(src, discard)
     if DirtyPlayers[src] and not discard then
         MBT.PlayerState.Save(src)
@@ -478,6 +493,7 @@ function MBT.PlayerState.Cleanup(src, discard)
     PlayerIdentifiers[src] = nil
     PlayerRevisions[src] = nil
     PlayerHasDbEntry[src] = nil
+    PlayerHasBaseline[src] = nil
     PlayerDripXp[src] = nil
     PlayerJustSwitched[src] = nil
 end
@@ -563,7 +579,7 @@ function MBT.PlayerState.PushStateToClient(src, attempt)
     local context = MBT.SnapshotServer.Activate(src, MBT.PlayerState.GetIdentifier(src))
     if not context then return end
 
-    if MBT.PlayerState.HasDbEntry(src) then
+    if MBT.PlayerState.HasBaseline(src) then
         local wearingState = MBT.PlayerState.GetAll(src)
         print(("^5[mbt_meta_clothes][PushStateToClient] src=%s -> restoreWearing (existing DB row)^0"):format(src))
         TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, wearingState, context)

@@ -223,7 +223,7 @@ function SnapshotServer.New(deps)
         end
 
         if payload.initial then
-            if playerState.HasDbEntry and playerState.HasDbEntry(src) then
+            if playerState.HasBaseline and playerState.HasBaseline(src) then
                 return remember(state, payload.seq, requestFingerprint,
                     reject(src, state, payload, 'initial_not_allowed'))
             end
@@ -249,6 +249,7 @@ function SnapshotServer.New(deps)
             revision = playerState.CommitSnapshot(src, nextState, changes)
             scheduleSave(src, state)
         end
+        if payload.initial and playerState.MarkBaseline then playerState.MarkBaseline(src) end
         local canonicalVisual, canonicalFingerprint = canonicalState(src, sex)
         return remember(state, payload.seq, requestFingerprint, {
             ok = true,

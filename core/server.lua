@@ -68,7 +68,7 @@ RegisterNetEvent('mbt_meta_clothes:syncInitialWearing', function(wearingData)
     if not MBT.ServerUtils.CheckRateLimit(src, "syncInitialWearing") then return end
 
     -- Only process for NEW players (no DB entry)
-    if MBT.PlayerState.HasDbEntry(src) then
+    if MBT.PlayerState.HasBaseline(src) then
         MBT.Debugger("syncInitialWearing: EXISTING player, skipping PED scan")
         return
     end
@@ -140,6 +140,7 @@ RegisterNetEvent('mbt_meta_clothes:syncInitialWearing', function(wearingData)
             end
         end
     end
+    MBT.PlayerState.MarkBaseline(src)
 end)
 
 -----------------------------------------------------------

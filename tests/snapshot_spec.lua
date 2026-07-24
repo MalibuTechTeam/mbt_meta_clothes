@@ -25,18 +25,22 @@ local function fullVisual(sex)
 end
 
 local maleModel
+local femaleModel
 
 local function snapshotServerFixture()
     local data = {}
     local revisions = {}
     local identifiers = {}
     local liveIdentifiers = {}
+    local baselines = {}
     local saves = 0
     local timers = {}
     local store = {
         GetRevision = function(src) return revisions[src] or 0 end,
         GetIdentifier = function(src) return identifiers[src] end,
         IsLoaded = function(src) return data[src] ~= false end,
+        HasBaseline = function(src) return baselines[src] == true end,
+        MarkBaseline = function(src) baselines[src] = true end,
         GetAll = function(src) return data[src] or { Drawables = {}, Props = {} } end,
         CommitSnapshot = function(src, nextState, changes)
             Assert.truthy(#changes > 0)
@@ -81,11 +85,12 @@ end
 local function snapshotClientFixture()
     local fakeNow = 0
     local current = fullVisual('male')
+    local currentModel = maleModel
     local sent = {}
     local client = MBT.SnapshotClient.New({
         now = function() return fakeNow end,
         capture = function() return current end,
-        model = function() return maleModel end,
+        model = function() return currentModel end,
         send = function(payload) sent[#sent + 1] = payload end,
     })
     return {
@@ -93,12 +98,16 @@ local function snapshotClientFixture()
         sent = sent,
         visual = function() return current end,
         setVisual = function(visual) current = visual end,
+        setModel = function(model) currentModel = model end,
         advance = function(ms) fakeNow = fakeNow + ms end,
     }
 end
 
 for model, sex in pairs(MBT.GenderModels) do
     if sex == 'male' then maleModel = model break end
+end
+for model, sex in pairs(MBT.GenderModels) do
+    if sex == 'female' then femaleModel = model break end
 end
 
 local cases = {
@@ -374,6 +383,9 @@ local cases = {
             local outfitPayload = snapshotPayload(context, 2, outfit)
             outfitPayload.initial = true
             Assert.equal('accepted', fixture.coordinator:Handle(src, outfitPayload).code)
+            local repeated = snapshotPayload(context, 3, outfit, 1)
+            repeated.initial = true
+            Assert.equal('initial_not_allowed', fixture.coordinator:Handle(src, repeated).code)
         end,
     },
     {
@@ -506,6 +518,102 @@ local cases = {
             client:Tick()
             Assert.equal(0, #fixture.sent)
             client:SetRestoreProtection(false, nil, currentGeneration)
+        end,
+    },
+    {
+        name = 'client preserves sequence across duplicate context readiness',
+        run = function()
+            local fixture = snapshotClientFixture()
+            local client = fixture.client
+            client:SetContext({ session = 12, revision = 0 }, { Drawables = {}, Props = {} })
+            client:Resume('startup')
+            local firstVisual = fullVisual('male')
+            firstVisual.Drawables[11] = { drawable = 101, texture = 0, palette = 0 }
+            fixture.setVisual(firstVisual)
+            client:Tick()
+            fixture.advance(MBT.SnapshotDebounce or 400)
+            client:Tick()
+            client:HandleAck({
+                ok = true,
+                session = 12,
+                seq = 1,
+                revision = 1,
+                visual = firstVisual,
+                fingerprint = MBT.Snapshot.Fingerprint(firstVisual),
+            })
+
+            client:SetContext({ session = 12, revision = 1 })
+            local secondVisual = fullVisual('male')
+            secondVisual.Drawables[11] = { drawable = 102, texture = 0, palette = 0 }
+            fixture.setVisual(secondVisual)
+            fixture.advance(500)
+            client:Tick()
+            fixture.advance(MBT.SnapshotDebounce or 400)
+            client:Tick()
+            Assert.equal(2, fixture.sent[#fixture.sent].seq)
+        end,
+    },
+    {
+        name = 'client blocks normal submissions until initial scan deadline',
+        run = function()
+            local fixture = snapshotClientFixture()
+            local client = fixture.client
+            client:SetContext({ session = 13, revision = 0 })
+            client:Resume('startup')
+            client:ForceInitialScan(2500)
+            local partial = fullVisual('male')
+            partial.Drawables[11] = { drawable = 101, texture = 0, palette = 0 }
+            fixture.setVisual(partial)
+            client:Tick()
+            fixture.advance(2499)
+            client:Tick()
+            Assert.equal(0, #fixture.sent)
+            fixture.advance(1)
+            client:Tick()
+            fixture.advance(MBT.SnapshotDebounce or 400)
+            client:Tick()
+            Assert.equal(true, fixture.sent[1].initial)
+        end,
+    },
+    {
+        name = 'new client session clears suppression state',
+        run = function()
+            local fixture = snapshotClientFixture()
+            local client = fixture.client
+            client:SetContext({ session = 14, revision = 0 }, { Drawables = {}, Props = {} })
+            client:Resume('startup')
+            client:Suppress('Props', 0, { drawable = -1, texture = 0, palette = 0 })
+            client:SetContext({ session = 15, revision = 0 }, { Drawables = {}, Props = {} })
+            local changed = fullVisual('male')
+            changed.Props[0] = { drawable = 8, texture = 0, palette = 0 }
+            fixture.setVisual(changed)
+            client:Tick()
+            fixture.advance(MBT.SnapshotDebounce or 400)
+            client:Tick()
+            Assert.equal(1, #fixture.sent)
+        end,
+    },
+    {
+        name = 'restore refreshes defaults after model change and enforces on exit',
+        run = function()
+            local fakeNow = 0
+            local model = maleModel
+            local enforced = {}
+            local client = MBT.SnapshotClient.New({
+                now = function() return fakeNow end,
+                model = function() return model end,
+                capture = function() return fullVisual(model == femaleModel and 'female' or 'male') end,
+                send = function() end,
+                enforce = function(target) enforced[#enforced + 1] = target.Drawables[4].drawable end,
+            })
+            client:SetContext({ session = 16, revision = 0 }, { Drawables = {}, Props = {} })
+            client:Resume('startup')
+            local generation = client:SetRestoreProtection(true, { Drawables = {}, Props = {} })
+            model = femaleModel
+            client:Tick()
+            Assert.equal(14, enforced[1])
+            client:SetRestoreProtection(false, nil, generation)
+            Assert.equal(14, enforced[2])
         end,
     },
 }

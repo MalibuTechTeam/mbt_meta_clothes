@@ -50,10 +50,17 @@ end
 -- onResourceStart is handled by the framework bridge (esx/qb/ox client.lua)
 -- to avoid duplicate playerReady events
 
+local restoreGeneration = 0
+
+RegisterNetEvent('mbt_meta_clothes:multichar:pauseDetection', function()
+    restoreGeneration = restoreGeneration + 1
+end)
+
 -- Server requests PED scan (new players only, after Load completed)
 RegisterNetEvent('mbt_meta_clothes:requestPedScan')
 AddEventHandler('mbt_meta_clothes:requestPedScan', function(context)
     if not context or not MBT.SnapshotClient.SetContext(context) then return end
+    restoreGeneration = restoreGeneration + 1
     -- New player: lascia che l'appearance script applichi il SUO skin,
     -- POI scansiona il PED per popolare il nostro state.
 
@@ -139,8 +146,6 @@ end
 -- uno vecchio. CRITICO per multichar fast-switch (char1 -> char2 -> char1
 -- in 1-2s): senza questo guard, i re-apply di char1 firerebbero mentre sei
 -- già su char2 e gli applicherebbero i drawable di char1.
-local restoreGeneration = 0
-
 RegisterNetEvent('mbt_meta_clothes:restoreWearing')
 AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, context)
     if not wearingState then return end
