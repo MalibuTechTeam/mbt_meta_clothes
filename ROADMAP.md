@@ -19,14 +19,18 @@ the candidate section are not automatically part of the 2.0 release scope.
       PED replacement, resource restart, and duplicate framework readiness events.
 - [x] Complete Lua parser checks, `git diff --check`, web lint, and independent
       protocol/lifecycle code review.
-- [ ] Run `mbt_snapshot_selftest` in an actual Cfx server with `MBT.Debug = true`.
-- [ ] Complete end-to-end verification: six-or-more-slot outfit then relog, rich
-      jacket metadata, rejected toggle rollback, rapid character A-to-B switch,
-      abrupt disconnect, unchanged-player idle period, and resource restart while
-      connected.
+- [x] Run `mbt_snapshot_selftest` in an actual Cfx server with `MBT.Debug = true`
+      (`28/28` passed on 2026-07-24).
+- [x] Verify the primary relog case: logout without jacket and reconnect without
+      the jacket being duplicated on the PED and in inventory.
+- [ ] Complete the remaining end-to-end verification: six-or-more-slot external
+      outfit, rich jacket metadata, rejected toggle rollback, rapid character
+      A-to-B switch, abrupt disconnect, unchanged-player idle period, and resource
+      restart while connected.
 
-Until the two runtime checks above pass, snapshot synchronization is implemented
-and statically reviewed, but is not considered release-verified.
+The primary relog defect is now runtime-verified. Snapshot synchronization is not
+considered release-verified across all lifecycle paths until the remaining scenario
+matrix above passes.
 
 ## P0 - Release blockers
 
