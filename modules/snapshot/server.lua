@@ -11,6 +11,30 @@ local function copyAck(ack, code)
     return copied
 end
 
+local function boundedPayload(value)
+    local seen = {}
+    local nodes = 0
+    local function walk(current, depth)
+        nodes = nodes + 1
+        if nodes > 256 or depth > 6 then return false end
+        local currentType = type(current)
+        if currentType == 'table' then
+            if seen[current] then return false end
+            seen[current] = true
+            for key, nested in pairs(current) do
+                local keyType = type(key)
+                if keyType ~= 'string' and keyType ~= 'number' then return false end
+                if not walk(nested, depth + 1) then return false end
+            end
+            seen[current] = nil
+            return true
+        end
+        return currentType == 'string' or currentType == 'number'
+            or currentType == 'boolean' or currentType == 'nil'
+    end
+    return walk(value, 1)
+end
+
 function SnapshotServer.New(deps)
     assert(type(deps) == 'table', 'snapshot server dependencies are required')
     local playerState = assert(deps.PlayerState, 'PlayerState dependency is required')
@@ -39,6 +63,11 @@ function SnapshotServer.New(deps)
             seq = type(payload) == 'table' and payload.seq or nil,
             revision = playerState.GetRevision(src),
         }
+    end
+
+    local function canonicalState(src, sex)
+        local visual = MBT.Snapshot.VisualFromWearing(playerState.GetAll(src), sex)
+        return visual, visual and MBT.Snapshot.Fingerprint(visual) or nil
     end
 
     local function remember(state, seq, fingerprint, ack)
@@ -93,6 +122,15 @@ function SnapshotServer.New(deps)
         if not state then return reject(src, nil, payload, 'no_session') end
         if type(payload) ~= 'table' then return reject(src, state, payload, 'malformed') end
 
+        local identifier = playerState.GetIdentifier(src)
+        local loaded = not playerState.IsLoaded or playerState.IsLoaded(src)
+        if not loaded or not identifier or identifier ~= state.identifier then
+            state.saveGeneration = state.saveGeneration + 1
+            sessions[src] = nil
+            return reject(src, state, payload, 'wrong_session')
+        end
+        if not boundedPayload(payload) then return reject(src, state, payload, 'malformed') end
+
         local encodedOk, encoded = pcall(encode, payload)
         if not encodedOk or type(encoded) ~= 'string' then
             return reject(src, state, payload, 'malformed')
@@ -102,7 +140,8 @@ function SnapshotServer.New(deps)
         end
         for key in pairs(payload) do
             if key ~= 'session' and key ~= 'seq' and key ~= 'baseRevision'
-                and key ~= 'model' and key ~= 'visual' and key ~= 'initial' then
+                and key ~= 'model' and key ~= 'Drawables' and key ~= 'Props'
+                and key ~= 'initial' then
                 return reject(src, state, payload, 'malformed')
             end
         end
@@ -118,7 +157,10 @@ function SnapshotServer.New(deps)
 
         local sex = MBT.GenderModels[payload.model]
         if not sex then return reject(src, state, payload, 'unsupported_model') end
-        local visual, reason = MBT.Snapshot.Canonicalize(payload.visual, payload.model)
+        local visual, reason = MBT.Snapshot.Canonicalize({
+            Drawables = payload.Drawables,
+            Props = payload.Props,
+        }, payload.model)
         if not visual then return reject(src, state, payload, reason) end
         local requestFingerprint = table.concat({
             tostring(payload.session),
@@ -143,14 +185,18 @@ function SnapshotServer.New(deps)
         local nextState, changes, changed = MBT.Snapshot.Reconcile(current, visual, sex)
         local revision = playerState.GetRevision(src)
         if changed and payload.baseRevision ~= revision then
-            return remember(state, payload.seq, requestFingerprint,
-                reject(src, state, payload, 'stale_revision'))
+            local rebaseVisual, rebaseFingerprint = canonicalState(src, sex)
+            local ack = reject(src, state, payload, 'stale_revision')
+            ack.visual = rebaseVisual
+            ack.fingerprint = rebaseFingerprint
+            return remember(state, payload.seq, requestFingerprint, ack)
         end
 
         if changed then
             revision = playerState.CommitSnapshot(src, nextState, changes)
             scheduleSave(src, state)
         end
+        local canonicalVisual, canonicalFingerprint = canonicalState(src, sex)
         return remember(state, payload.seq, requestFingerprint, {
             ok = true,
             code = changed and 'accepted' or 'no_change',
@@ -158,7 +204,14 @@ function SnapshotServer.New(deps)
             seq = payload.seq,
             revision = revision,
             changed = changed,
+            fingerprint = canonicalFingerprint,
+            visual = canonicalVisual,
         })
+    end
+
+    function coordinator:CancelPendingSave(src)
+        local state = sessions[src]
+        if state then state.saveGeneration = state.saveGeneration + 1 end
     end
 
     function coordinator:Cleanup(src)
@@ -188,6 +241,7 @@ local production = SnapshotServer.New({
 function SnapshotServer.Activate(src, identifier) return production:Activate(src, identifier) end
 function SnapshotServer.GetContext(src) return production:GetContext(src) end
 function SnapshotServer.Handle(src, payload) return production:Handle(src, payload) end
+function SnapshotServer.CancelPendingSave(src) return production:CancelPendingSave(src) end
 function SnapshotServer.Cleanup(src) return production:Cleanup(src) end
 function SnapshotServer.OnRevisionChanged(src, revision)
     return production:OnRevisionChanged(src, revision)

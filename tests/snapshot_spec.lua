@@ -35,6 +35,7 @@ local function snapshotServerFixture()
     local store = {
         GetRevision = function(src) return revisions[src] or 0 end,
         GetIdentifier = function(src) return identifiers[src] end,
+        IsLoaded = function(src) return data[src] ~= false end,
         GetAll = function(src) return data[src] or { Drawables = {}, Props = {} } end,
         CommitSnapshot = function(src, nextState, changes)
             Assert.truthy(#changes > 0)
@@ -60,12 +61,14 @@ local function snapshotServerFixture()
 end
 
 local function snapshotPayload(context, seq, visual, baseRevision)
+    visual = visual or fullVisual('male')
     return {
         session = context.session,
         seq = seq,
         baseRevision = baseRevision == nil and context.revision or baseRevision,
         model = maleModel,
-        visual = visual or fullVisual('male'),
+        Drawables = visual.Drawables,
+        Props = visual.Props,
     }
 end
 
@@ -93,6 +96,9 @@ local cases = {
             visual.Drawables[99] = nil
             visual.Drawables[11].item_name = 'forged'
             Assert.equal('extra_field', select(2, MBT.Snapshot.Canonicalize(visual, maleModel)))
+            visual = fullVisual('male')
+            visual.Drawables['11'] = visual.Drawables[11]
+            Assert.equal('duplicate_slot', select(2, MBT.Snapshot.Canonicalize(visual, maleModel)))
         end,
     },
     {
@@ -225,6 +231,8 @@ local cases = {
             Assert.equal(true, ack.ok)
             Assert.equal('accepted', ack.code)
             Assert.equal(1, ack.revision)
+            Assert.truthy(type(ack.fingerprint) == 'string')
+            Assert.truthy(type(ack.visual) == 'table')
             local duplicate = fixture.coordinator:Handle(src, payload)
             Assert.equal(true, duplicate.ok)
             Assert.equal('duplicate', duplicate.code)
@@ -239,17 +247,21 @@ local cases = {
         run = function()
             local fixture = snapshotServerFixture()
             local src = 42
+            fixture.setIdentifier(src, 'char1')
             local context = fixture.coordinator:Activate(src, 'char1')
             local visual = fullVisual('male')
             visual.Drawables[11] = { drawable = 101, texture = 0, palette = 0 }
             local stale = fixture.coordinator:Handle(src, snapshotPayload(context, 1, visual, 9))
             Assert.equal(false, stale.ok)
             Assert.equal('stale_revision', stale.code)
+            Assert.truthy(type(stale.fingerprint) == 'string')
+            Assert.truthy(type(stale.visual) == 'table')
             local acceptedNoOp = fixture.coordinator:Handle(src, snapshotPayload(context, 2, fullVisual('male'), 0))
             Assert.equal(true, acceptedNoOp.ok)
             local lower = fixture.coordinator:Handle(src, snapshotPayload(context, 1, visual, 0))
             Assert.equal('stale_sequence', lower.code)
             local rotated = fixture.coordinator:Activate(src, 'char2')
+            fixture.setIdentifier(src, 'char2')
             Assert.truthy(rotated.session ~= context.session)
             local wrong = fixture.coordinator:Handle(src, snapshotPayload(context, 2, visual, 0))
             Assert.equal('wrong_session', wrong.code)
@@ -260,12 +272,13 @@ local cases = {
         run = function()
             local fixture = snapshotServerFixture()
             local src = 44
+            fixture.setIdentifier(src, 'char1')
             local context = fixture.coordinator:Activate(src, 'char1')
             local malformed = snapshotPayload(context, 1)
             malformed.forged = true
             Assert.equal('malformed', fixture.coordinator:Handle(src, malformed).code)
             local oversized = snapshotPayload(context, 1)
-            oversized.visual.Drawables[11].padding = string.rep('x', (MBT.SnapshotMaxPayload or 16384) + 1)
+            oversized.Drawables[11].padding = string.rep('x', (MBT.SnapshotMaxPayload or 16384) + 1)
             Assert.equal('oversized', fixture.coordinator:Handle(src, oversized).code)
         end,
     },
@@ -274,6 +287,7 @@ local cases = {
         run = function()
             local fixture = snapshotServerFixture()
             local src = 43
+            fixture.setIdentifier(src, 'char1')
             local context = fixture.coordinator:Activate(src, 'char1')
             local noChange = fixture.coordinator:Handle(src, snapshotPayload(context, 1))
             Assert.equal(true, noChange.ok)
@@ -284,9 +298,23 @@ local cases = {
             changed.Props[0] = { drawable = 2, texture = 0, palette = 0 }
             fixture.coordinator:Handle(src, snapshotPayload(context, 2, changed))
             Assert.equal(1, #fixture.timers)
-            fixture.coordinator:Cleanup(src)
+            fixture.coordinator:CancelPendingSave(src)
             fixture.timers[1]()
             Assert.equal(0, fixture.saveCount())
+        end,
+    },
+    {
+        name = 'invalidates session when the authoritative identifier drifts',
+        run = function()
+            local fixture = snapshotServerFixture()
+            local src = 45
+            fixture.setIdentifier(src, 'char1')
+            local context = fixture.coordinator:Activate(src, 'char1')
+            fixture.setIdentifier(src, 'char2')
+            local ack = fixture.coordinator:Handle(src, snapshotPayload(context, 1))
+            Assert.equal(false, ack.ok)
+            Assert.equal('wrong_session', ack.code)
+            Assert.equal(nil, fixture.coordinator:GetContext(src))
         end,
     },
 }

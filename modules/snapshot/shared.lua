@@ -57,9 +57,8 @@ local function sameVisual(left, right)
 end
 
 local function resolveSex(model)
-    local normalized = MBT.NormalizeSex(model)
-    if normalized then return normalized end
-    return MBT.GenderModels and MBT.GenderModels[model] or nil
+    local mapped = MBT.GenderModels and MBT.GenderModels[model] or nil
+    return MBT.NormalizeSex(mapped)
 end
 
 --- Validate and normalize a full managed PED visual snapshot.
@@ -83,12 +82,15 @@ function MBT.Snapshot.Canonicalize(visual, model)
         local supplied = visual[slotType]
         if type(supplied) ~= 'table' then return nil, 'missing_slot_type' end
         local configured = slotConfig(slotType)
+        local seen = {}
 
         for rawIndex in pairs(supplied) do
             local slotIndex = tonumber(rawIndex)
             if not slotIndex or configured[slotIndex] == nil then
                 return nil, 'extra_slot'
             end
+            if seen[slotIndex] then return nil, 'duplicate_slot' end
+            seen[slotIndex] = true
         end
 
         for _, slotIndex in ipairs(sortedKeys(configured)) do
