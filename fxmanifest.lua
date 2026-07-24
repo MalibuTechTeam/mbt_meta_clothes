@@ -19,6 +19,7 @@ shared_scripts {
     'modules/shared.lua',
     'locales/*.lua',
     'config.lua',
+    'modules/snapshot/shared.lua',
     'data/clothing_states.lua',
 }
 
@@ -37,6 +38,8 @@ server_scripts {
     'modules/bridge/**/server.lua',
     -- 6. Core server logic
     'core/**/server.lua',
+    -- 7. Deterministic server-console self-tests (debug only)
+    'tests/snapshot_spec.lua',
 }
 
 client_scripts {

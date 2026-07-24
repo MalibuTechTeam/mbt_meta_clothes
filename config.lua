@@ -41,6 +41,21 @@ MBT.StateSaveInterval    = 300   -- Seconds between periodic dirty saves (5 min)
 MBT.RestoreProtection    = 15000 -- ms to protect restored state from external overwrites
 MBT.PedRevealDelay       = 2000  -- ms to keep PED hidden after restore (covers appearance script late apply + our re-apply, prevents visible blink). Keep <= 4500 (the bridge keepPedHidden loop caps at 5000ms before auto-recovery).
 
+-- Hybrid snapshot synchronization. The client polls locally but submits only
+-- stable full-state changes; the server remains authoritative for metadata.
+MBT.SnapshotPollInterval        = 1000
+MBT.SnapshotRestorePollInterval = 500
+MBT.SnapshotDebounce            = 400
+MBT.SnapshotAckTimeout          = 2000
+MBT.SnapshotWriteBehind         = 5000
+MBT.SnapshotMaxPayload          = 16384
+MBT.SnapshotBounds             = {
+    componentDrawable = { min = 0, max = 4095 },
+    propDrawable = { min = -1, max = 4095 },
+    texture = { min = 0, max = 255 },
+    palette = { min = 0, max = 3 },
+}
+
 -----------------------------------------------------------
 -- DNA Forensics
 -----------------------------------------------------------
