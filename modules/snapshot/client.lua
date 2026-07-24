@@ -135,6 +135,8 @@ function SnapshotClient.New(deps)
             restoreActive = false
             baselineWearing = nil
             baselineModel = nil
+            acknowledgedVisual = nil
+            acknowledgedFingerprint = nil
         end
         pauses.wrong_session = nil
 
@@ -142,10 +144,10 @@ function SnapshotClient.New(deps)
         local model = modelProvider()
         if type(raw) == 'table' and raw.visual then model = raw.model or model end
         local sex = MBT.GenderModels[model]
-        if wearingState and sex then
+        if wearingState then
             baselineWearing = wearingState
             baselineModel = model
-            setBaseline(MBT.Snapshot.VisualFromWearing(wearingState, sex))
+            if sex then setBaseline(MBT.Snapshot.VisualFromWearing(wearingState, sex)) end
         elseif nextContext.visual then
             setBaseline(nextContext.visual)
         else
@@ -174,6 +176,8 @@ function SnapshotClient.New(deps)
             local model = modelProvider()
             if type(raw) == 'table' and raw.visual then model = raw.model or model end
             local sex = MBT.GenderModels[model]
+            baselineWearing = wearingState
+            baselineModel = model
             if sex then setBaseline(MBT.Snapshot.VisualFromWearing(wearingState, sex)) end
         end
     end
@@ -217,9 +221,9 @@ function SnapshotClient.New(deps)
             local model = modelProvider()
             if type(raw) == 'table' and raw.visual then model = raw.model or model end
             local sex = MBT.GenderModels[model]
+            baselineWearing = wearingState
+            baselineModel = model
             if sex then
-                baselineWearing = wearingState
-                baselineModel = model
                 setBaseline(MBT.Snapshot.VisualFromWearing(wearingState, sex))
             end
         end

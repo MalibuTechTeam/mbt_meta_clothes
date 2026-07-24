@@ -61,6 +61,7 @@ RegisterNetEvent('mbt_meta_clothes:requestPedScan')
 AddEventHandler('mbt_meta_clothes:requestPedScan', function(context)
     if not context or not MBT.SnapshotClient.SetContext(context) then return end
     restoreGeneration = restoreGeneration + 1
+    local myGen = restoreGeneration
     -- New player: lascia che l'appearance script applichi il SUO skin,
     -- POI scansiona il PED per popolare il nostro state.
 
@@ -86,6 +87,7 @@ AddEventHandler('mbt_meta_clothes:requestPedScan', function(context)
     -- finché illenium non finisce di applicare. La camera del selector copre
     -- normalmente questi 2s.
     Citizen.SetTimeout(MBT.PedRevealDelay or 2000, function()
+        if myGen ~= restoreGeneration then return end
         if MBT.Utils.StopKeepPedHidden then
             MBT.Utils.StopKeepPedHidden()
         end
