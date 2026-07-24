@@ -207,11 +207,13 @@ function SnapshotClient.New(deps)
         if not active and expectedGeneration and expectedGeneration ~= restoreGeneration then
             return false
         end
-        if not active and restoreActive and deps.enforce and acknowledgedVisual then
+        if not active and restoreActive then
             cleanupExpiringGuards(now())
             refreshBaselineModel()
-            deps.enforce(acknowledgedVisual, guardReason)
-            acknowledgedFingerprint = MBT.Snapshot.Fingerprint(acknowledgedVisual)
+            if deps.enforce and acknowledgedVisual then
+                deps.enforce(acknowledgedVisual, guardReason)
+                acknowledgedFingerprint = MBT.Snapshot.Fingerprint(acknowledgedVisual)
+            end
         end
         restoreGeneration = restoreGeneration + 1
         restoreActive = active == true
@@ -304,8 +306,8 @@ function SnapshotClient.New(deps)
         if not context or next(pauses) then return end
         if forceInitialAt and at < forceInitialAt then return end
         if restoreActive then
+            refreshBaselineModel()
             if deps.enforce and acknowledgedVisual then
-                refreshBaselineModel()
                 deps.enforce(acknowledgedVisual, guardReason)
                 acknowledgedFingerprint = MBT.Snapshot.Fingerprint(acknowledgedVisual)
             end
