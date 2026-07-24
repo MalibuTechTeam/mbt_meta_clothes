@@ -216,6 +216,32 @@ RegisterNetEvent('mbt_meta_clothes:externalUndress', function(slotType, slotInde
     end
 end)
 
+RegisterNetEvent('mbt_meta_clothes:updateInternalVisual', function(slotType, slotIndex, visual, requestToken)
+    local src = source
+    if not MBT.ServerUtils.CheckRateLimit(src, 'internalVisual') then return end
+    local valid, index = MBT.ServerUtils.ValidateSlot(slotType, slotIndex)
+    if not valid or type(visual) ~= 'table' then return end
+    local current = MBT.PlayerState.GetSlot(src, slotType, index)
+    if not MBT.Snapshot.IsAllowedToggle(current, slotType, index, visual) then return end
+    local changed, revision = MBT.PlayerState.UpdateSlotVisual(src, slotType, index, visual)
+    if not changed then return end
+    local context = MBT.SnapshotServer.GetContext(src)
+    if context then
+        TriggerClientEvent('mbt_meta_clothes:authoritativeVisual', src, {
+            session = context.session,
+            revision = revision,
+            slotType = slotType,
+            slotIndex = index,
+            visual = {
+                drawable = visual.drawable,
+                texture = visual.texture,
+                palette = visual.palette or 0,
+            },
+            token = type(requestToken) == 'number' and requestToken or nil,
+        })
+    end
+end)
+
 -----------------------------------------------------------
 -- Player Dropped (save state + cleanup)
 -----------------------------------------------------------

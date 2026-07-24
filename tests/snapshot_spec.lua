@@ -616,6 +616,58 @@ local cases = {
             Assert.equal(14, enforced[2])
         end,
     },
+    {
+        name = 'validates only configured persistent toggle transitions',
+        run = function()
+            local current = {
+                index = 11,
+                drawable = 29,
+                texture = 2,
+                palette = 0,
+                sex = 'male',
+                item_name = 'jacket',
+            }
+            Assert.equal(true, MBT.Snapshot.IsAllowedToggle(current, 'Drawables', 11, {
+                drawable = 30,
+                texture = 2,
+                palette = 0,
+            }))
+            Assert.equal(false, MBT.Snapshot.IsAllowedToggle(current, 'Drawables', 11, {
+                drawable = 300,
+                texture = 2,
+                palette = 0,
+            }))
+            Assert.equal(false, MBT.Snapshot.IsAllowedToggle(current, 'Drawables', 11, {
+                drawable = 30,
+                texture = 9,
+                palette = 0,
+            }))
+        end,
+    },
+    {
+        name = 'client applies authoritative toggle revision to its baseline',
+        run = function()
+            local fixture = snapshotClientFixture()
+            local client = fixture.client
+            local wearing = {
+                Drawables = {
+                    [11] = { drawable = 29, texture = 2, palette = 0, sex = 'male', item_name = 'jacket' },
+                },
+                Props = {},
+            }
+            client:SetContext({ session = 17, revision = 4 }, wearing)
+            client:Resume('startup')
+            Assert.equal(true, client:ApplyAuthoritativeVisual({
+                session = 17,
+                revision = 5,
+                slotType = 'Drawables',
+                slotIndex = 11,
+                visual = { drawable = 30, texture = 2, palette = 0 },
+            }))
+            Assert.equal(5, client:GetContext().revision)
+            Assert.equal(30, wearing.Drawables[11].drawable)
+        end,
+    },
 }
 
 RegisterCommand('mbt_snapshot_selftest', function(source)

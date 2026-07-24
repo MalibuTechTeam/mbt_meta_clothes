@@ -250,10 +250,62 @@ function SnapshotClient.New(deps)
         end
     end
 
+    function coordinator:SuppressOwnedSlot(slotType, slotIndex)
+        slotIndex = tonumber(slotIndex) or slotIndex
+        local canonical = acknowledgedVisual and acknowledgedVisual[slotType]
+            and acknowledgedVisual[slotType][slotIndex]
+        if not canonical then
+            local visual = captureCanonical()
+            canonical = visual and visual[slotType] and visual[slotType][slotIndex]
+        end
+        if canonical then self:Suppress(slotType, slotIndex, canonical) end
+    end
+
     function coordinator:RestoreSuppressed(slotType, slotIndex)
         if suppressions[slotType] then
             suppressions[slotType][tonumber(slotIndex) or slotIndex] = nil
         end
+    end
+
+
+    function coordinator:ApplyAuthoritativeVisual(update)
+        if type(update) ~= 'table' or not context or update.session ~= context.session
+            or type(update.revision) ~= 'number' or update.revision < context.revision then return false end
+        local slotType = update.slotType
+        local slotIndex = tonumber(update.slotIndex)
+        local visual = update.visual
+        if not slotIndex or (slotType ~= 'Drawables' and slotType ~= 'Props')
+            or type(visual) ~= 'table' then return false end
+        context.revision = update.revision
+        pending = nil
+        if update.token then internalTokens[update.token] = nil end
+        expectedSlots[slotKey(slotType, slotIndex)] = nil
+        if acknowledgedVisual and acknowledgedVisual[slotType]
+            and acknowledgedVisual[slotType][slotIndex] then
+            acknowledgedVisual[slotType][slotIndex] = {
+                drawable = visual.drawable,
+                texture = visual.texture,
+                palette = visual.palette or 0,
+            }
+            acknowledgedFingerprint = MBT.Snapshot.Fingerprint(acknowledgedVisual)
+        end
+        if suppressions[slotType] and suppressions[slotType][slotIndex] then
+            suppressions[slotType][slotIndex] = {
+                drawable = visual.drawable,
+                texture = visual.texture,
+                palette = visual.palette or 0,
+            }
+        end
+        local metadata = baselineWearing and baselineWearing[slotType]
+            and (baselineWearing[slotType][slotIndex] or baselineWearing[slotType][tostring(slotIndex)])
+        if metadata then
+            metadata.drawable = visual.drawable
+            metadata.texture = visual.texture
+            metadata.palette = visual.palette or 0
+        end
+        candidateFingerprint = nil
+        candidateSince = nil
+        return true
     end
 
     function coordinator:ForceInitialScan(delayMs)
@@ -448,10 +500,16 @@ function SnapshotClient.SetRestoreProtection(active, wearingState, expectedGener
     return production:SetRestoreProtection(active, wearingState, expectedGeneration)
 end
 function SnapshotClient.Suppress(slotType, slotIndex, visual) return production:Suppress(slotType, slotIndex, visual) end
+function SnapshotClient.SuppressOwnedSlot(slotType, slotIndex)
+    return production:SuppressOwnedSlot(slotType, slotIndex)
+end
 function SnapshotClient.RestoreSuppressed(slotType, slotIndex)
     return production:RestoreSuppressed(slotType, slotIndex)
 end
 function SnapshotClient.ForceInitialScan(delayMs) return production:ForceInitialScan(delayMs) end
+function SnapshotClient.ApplyAuthoritativeVisual(update)
+    return production:ApplyAuthoritativeVisual(update)
+end
 
 function SnapshotClient.Start()
     if running then return end
@@ -473,6 +531,10 @@ end)
 
 RegisterNetEvent('mbt_meta_clothes:multichar:pauseDetection', function()
     production:Pause('character')
+end)
+
+RegisterNetEvent('mbt_meta_clothes:authoritativeVisual', function(update)
+    production:ApplyAuthoritativeVisual(update)
 end)
 
 AddEventHandler('onResourceStop', function(resourceName)

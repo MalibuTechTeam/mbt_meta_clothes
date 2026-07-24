@@ -553,8 +553,7 @@ end)
 --- @param texture number new texture value
 exports('suppressSlot', function(slotType, slotIndex, drawable, texture)
     if not MBT.SnapshotClient then return end
-    local canonical = { drawable = drawable or 0, texture = texture or 0, palette = 0 }
-    MBT.SnapshotClient.Suppress(slotType, slotIndex, canonical)
+    MBT.SnapshotClient.SuppressOwnedSlot(slotType, slotIndex)
 end)
 
 --- Restore a slot into restore protection tracking and update cache.
@@ -895,27 +894,39 @@ function MBT.Utils.ToggleClothingState(slotType, slotIndex)
                 -- Play toggle-specific animation: prefer ToggleAnimation, fallback to Animation
                 local slotConfig = slotType == "Drawables" and MBT.Drawables[slotIndex] or MBT.Props[slotIndex]
                 local toggleAnim = slotConfig and (slotConfig["ToggleAnimation"] or slotConfig["Animation"])
+                local token = MBT.SnapshotClient and MBT.SnapshotClient.BeginInternal('toggle', 5000)
+                local function applyToggle()
+                    if not token then MBT.Utils.ExpectChange(slotType, slotIndex) end
+                    if slotType == "Drawables" then
+                        SetPedComponentVariation(ped, slotIndex, newDrawable, currentTexture, 0)
+                    else
+                        SetPedPropIndex(ped, slotIndex, newDrawable, currentTexture, true)
+                    end
+                    local visual
+                    if slotType == "Drawables" then
+                        visual = {
+                            drawable = GetPedDrawableVariation(ped, slotIndex),
+                            texture = GetPedTextureVariation(ped, slotIndex),
+                            palette = GetPedPaletteVariation(ped, slotIndex),
+                        }
+                    else
+                        visual = {
+                            drawable = GetPedPropIndex(ped, slotIndex),
+                            texture = GetPedPropTextureIndex(ped, slotIndex),
+                            palette = 0,
+                        }
+                    end
+                    TriggerServerEvent('mbt_meta_clothes:updateInternalVisual', slotType, slotIndex, visual, token)
+                end
                 if toggleAnim then
                     MBT.Utils.PlayEmote({
                         Dict = toggleAnim["Dict"],
                         Anim = toggleAnim["Anim"],
                         Flag = toggleAnim["Flag"],
                         Dur  = toggleAnim["Duration"]
-                    }, function()
-                        MBT.Utils.ExpectChange(slotType, slotIndex)
-                        if slotType == "Drawables" then
-                            SetPedComponentVariation(ped, slotIndex, newDrawable, currentTexture, 0)
-                        else
-                            SetPedPropIndex(ped, slotIndex, newDrawable, currentTexture, true)
-                        end
-                    end)
+                    }, applyToggle)
                 else
-                    MBT.Utils.ExpectChange(slotType, slotIndex)
-                    if slotType == "Drawables" then
-                        SetPedComponentVariation(ped, slotIndex, newDrawable, currentTexture, 0)
-                    else
-                        SetPedPropIndex(ped, slotIndex, newDrawable, currentTexture, true)
-                    end
+                    applyToggle()
                 end
                 return true
             end
