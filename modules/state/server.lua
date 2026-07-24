@@ -332,6 +332,7 @@ function MBT.PlayerState.CheckCharacterSwitch(src)
     if DirtyPlayers[src] and PlayerWearing[src] then
         MBT.PlayerState.Save(src, oldId)
     end
+    if MBT.SnapshotServer then MBT.SnapshotServer.Cleanup(src) end
 
     -- Reset completo in-memory per il nuovo character
     PlayerWearing[src] = nil
@@ -551,14 +552,21 @@ function MBT.PlayerState.PushStateToClient(src, attempt)
     end
     lastPushAt[src] = now
 
-    -- Multicharacter safety: rileva eventuale switch identifier prima di Load
-    MBT.PlayerState.CheckCharacterSwitch(src)
-    MBT.PlayerState.Load(src)
+    -- Multicharacter safety: reload only for a new/unloaded identifier. A
+    -- duplicate readiness event must not overwrite newer dirty memory from DB.
+    local identifier = getPlayerIdentifier(src)
+    local switched = MBT.PlayerState.CheckCharacterSwitch(src)
+    if switched or not MBT.PlayerState.IsLoaded(src)
+        or MBT.PlayerState.GetIdentifier(src) ~= identifier then
+        MBT.PlayerState.Load(src, identifier)
+    end
+    local context = MBT.SnapshotServer.Activate(src, MBT.PlayerState.GetIdentifier(src))
+    if not context then return end
 
     if MBT.PlayerState.HasDbEntry(src) then
         local wearingState = MBT.PlayerState.GetAll(src)
         print(("^5[mbt_meta_clothes][PushStateToClient] src=%s -> restoreWearing (existing DB row)^0"):format(src))
-        TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, wearingState)
+        TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, wearingState, context)
     else
         -- Sia "truly new player" sia "switched-to new char" → requestPedScan.
         --
@@ -572,9 +580,9 @@ function MBT.PlayerState.PushStateToClient(src, attempt)
         -- prima di catturare lo stato. Il bare-PED guard server-side rifiuta scan
         -- "tutto a 0" così non corrompiamo il DB se illenium tarda. Funziona sia
         -- per primo login che per switch.
-        local switched = MBT.PlayerState.ConsumeSwitchFlag(src)
-        print(("^5[mbt_meta_clothes][PushStateToClient] src=%s -> requestPedScan (new char, switched=%s)^0"):format(src, tostring(switched)))
-        TriggerClientEvent('mbt_meta_clothes:requestPedScan', src)
+        local justSwitched = MBT.PlayerState.ConsumeSwitchFlag(src)
+        print(("^5[mbt_meta_clothes][PushStateToClient] src=%s -> requestPedScan (new char, switched=%s)^0"):format(src, tostring(justSwitched)))
+        TriggerClientEvent('mbt_meta_clothes:requestPedScan', src, context)
     end
 
     if MBT.UpdateStateBags then

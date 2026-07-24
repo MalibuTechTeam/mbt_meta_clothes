@@ -26,6 +26,18 @@ end
 
 MBT.PlayerState.Init()
 
+-- Resource restart recovery for every supported framework. Identifier
+-- readiness remains guarded inside PushStateToClient.
+AddEventHandler('onResourceStart', function(resourceName)
+    if resourceName ~= GetCurrentResourceName() then return end
+    SetTimeout(1000, function()
+        for _, playerId in ipairs(GetPlayers()) do
+            local src = tonumber(playerId)
+            if src then MBT.PlayerState.PushStateToClient(src) end
+        end
+    end)
+end)
+
 -----------------------------------------------------------
 -- Player Ready (load state from DB, send restore to client)
 -----------------------------------------------------------

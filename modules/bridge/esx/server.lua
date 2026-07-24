@@ -102,6 +102,7 @@ AddEventHandler('esx:playerLogout', function(src)
     if MBT.PlayerState.IsLoaded(src) then
         MBT.PlayerState.Save(src)
     end
+    MBT.SnapshotServer.Cleanup(src)
     -- Server-side watchdog: se entro 4s nessun playerLoaded/onPlayerJoined
     -- ha resettato pendingPauseSince[src], significa che la catena del
     -- multichar si è rotta e il client è bloccato in pausa. Forziamo manualmente
@@ -128,6 +129,7 @@ AddEventHandler('esx:playerDropped', function(src)
     if MBT.PlayerState.IsLoaded(src) then
         MBT.PlayerState.Save(src)
     end
+    MBT.SnapshotServer.Cleanup(src)
 end)
 
 -- playerDropped (FiveM nativo): cleanup del watchdog tracking se il player

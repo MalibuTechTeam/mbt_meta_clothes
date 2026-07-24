@@ -38,6 +38,7 @@ function SnapshotClient.New(deps)
     local expectedSlots = {}
     local suppressions = { Drawables = {}, Props = {} }
     local restoreActive = false
+    local restoreGeneration = 0
     local forceInitialAt
     local retryAfter = 0
     local rejectionCount = 0
@@ -53,6 +54,12 @@ function SnapshotClient.New(deps)
         for key, expiresAt in pairs(expectedSlots) do
             if expiresAt <= at then expectedSlots[key] = nil end
         end
+    end
+
+    local function guardReason(slotType, slotIndex)
+        if next(internalTokens) then return 'internal' end
+        if suppressions[slotType] and suppressions[slotType][slotIndex] then return 'suppressed' end
+        if expectedSlots[slotKey(slotType, slotIndex)] then return 'expected' end
     end
 
     local function captureCanonical()
@@ -165,7 +172,11 @@ function SnapshotClient.New(deps)
         expectedSlots[slotKey(slotType, slotIndex)] = now() + (timeoutMs or 3000)
     end
 
-    function coordinator:SetRestoreProtection(active, wearingState)
+    function coordinator:SetRestoreProtection(active, wearingState, expectedGeneration)
+        if not active and expectedGeneration and expectedGeneration ~= restoreGeneration then
+            return false
+        end
+        restoreGeneration = restoreGeneration + 1
         restoreActive = active == true
         if restoreActive then pending = nil end
         if wearingState and context then
@@ -179,6 +190,7 @@ function SnapshotClient.New(deps)
             candidateFingerprint = nil
             candidateSince = nil
         end
+        return restoreGeneration
     end
 
     function coordinator:IsRestoreProtected()
@@ -235,13 +247,28 @@ function SnapshotClient.New(deps)
         end
         if type(ack.revision) == 'number' then context.revision = ack.revision end
         if ack.visual then setBaseline(ack.visual) end
+        if ack.code == 'empty_initial' or ack.code == 'bare_initial'
+            or ack.code == 'partial_initial' then
+            forceInitialAt = now() + 2500
+            retryAfter = forceInitialAt
+        else
+            forceInitialAt = nil
+        end
         return false
     end
 
     function coordinator:Tick()
         local at = now()
         cleanupExpiringGuards(at)
-        if not context or next(pauses) or restoreActive or next(internalTokens) or at < retryAfter then return end
+        if not context or next(pauses) then return end
+        if restoreActive then
+            if deps.enforce and acknowledgedVisual then
+                deps.enforce(acknowledgedVisual, guardReason)
+                acknowledgedFingerprint = MBT.Snapshot.Fingerprint(acknowledgedVisual)
+            end
+            return
+        end
+        if next(internalTokens) or at < retryAfter then return end
         if pending then
             if at - pending.sentAt >= (MBT.SnapshotAckTimeout or 2000) then
                 send(pending.payload)
@@ -310,6 +337,44 @@ local function capturePed()
     return { model = model, visual = visual }
 end
 
+local function enforcePed(target, getGuardReason)
+    local ped = PlayerPedId()
+    if not DoesEntityExist(ped) then return end
+    for slotIndex, slot in pairs(target.Drawables or {}) do
+        local reason = getGuardReason('Drawables', slotIndex)
+        if reason == 'expected' then
+            slot.drawable = GetPedDrawableVariation(ped, slotIndex)
+            slot.texture = GetPedTextureVariation(ped, slotIndex)
+            slot.palette = GetPedPaletteVariation(ped, slotIndex)
+        elseif not reason then
+            local drawable = GetPedDrawableVariation(ped, slotIndex)
+            local texture = GetPedTextureVariation(ped, slotIndex)
+            local palette = GetPedPaletteVariation(ped, slotIndex)
+            if drawable ~= slot.drawable or texture ~= slot.texture or palette ~= (slot.palette or 0) then
+                SetPedComponentVariation(ped, slotIndex, slot.drawable, slot.texture, slot.palette or 0)
+            end
+        end
+    end
+    for slotIndex, slot in pairs(target.Props or {}) do
+        local reason = getGuardReason('Props', slotIndex)
+        if reason == 'expected' then
+            slot.drawable = GetPedPropIndex(ped, slotIndex)
+            slot.texture = GetPedPropTextureIndex(ped, slotIndex)
+            slot.palette = 0
+        elseif not reason then
+            local drawable = GetPedPropIndex(ped, slotIndex)
+            local texture = GetPedPropTextureIndex(ped, slotIndex)
+            if drawable ~= slot.drawable or texture ~= slot.texture then
+                if slot.drawable == -1 then
+                    ClearPedProp(ped, slotIndex)
+                else
+                    SetPedPropIndex(ped, slotIndex, slot.drawable, slot.texture, true)
+                end
+            end
+        end
+    end
+end
+
 local production = SnapshotClient.New({
     now = GetGameTimer,
     capture = capturePed,
@@ -320,6 +385,7 @@ local production = SnapshotClient.New({
     send = function(payload)
         TriggerServerEvent('mbt_meta_clothes:submitSnapshot', payload)
     end,
+    enforce = enforcePed,
 })
 
 local running = false
@@ -333,8 +399,8 @@ function SnapshotClient.EndInternal(token, expectedState) return production:EndI
 function SnapshotClient.ExpectInternalSlot(slotType, slotIndex, timeoutMs)
     return production:ExpectInternalSlot(slotType, slotIndex, timeoutMs)
 end
-function SnapshotClient.SetRestoreProtection(active, wearingState)
-    return production:SetRestoreProtection(active, wearingState)
+function SnapshotClient.SetRestoreProtection(active, wearingState, expectedGeneration)
+    return production:SetRestoreProtection(active, wearingState, expectedGeneration)
 end
 function SnapshotClient.Suppress(slotType, slotIndex, visual) return production:Suppress(slotType, slotIndex, visual) end
 function SnapshotClient.RestoreSuppressed(slotType, slotIndex)
@@ -358,6 +424,10 @@ end
 
 RegisterNetEvent('mbt_meta_clothes:snapshotAck', function(ack)
     production:HandleAck(ack)
+end)
+
+RegisterNetEvent('mbt_meta_clothes:multichar:pauseDetection', function()
+    production:Pause('character')
 end)
 
 AddEventHandler('onResourceStop', function(resourceName)

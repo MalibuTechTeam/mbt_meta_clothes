@@ -343,6 +343,40 @@ local cases = {
         end,
     },
     {
+        name = 'reuses context for duplicate readiness and rotates on character change',
+        run = function()
+            local fixture = snapshotServerFixture()
+            local src = 46
+            fixture.setIdentifier(src, 'char1')
+            local first = fixture.coordinator:Activate(src, 'char1')
+            local duplicate = fixture.coordinator:Activate(src, 'char1')
+            Assert.equal(first.session, duplicate.session)
+            Assert.equal(first.revision, duplicate.revision)
+            fixture.setIdentifier(src, 'char2')
+            local rotated = fixture.coordinator:Activate(src, 'char2')
+            Assert.truthy(rotated.session ~= first.session)
+        end,
+    },
+    {
+        name = 'initial snapshots reject bare PED and accept a stable outfit',
+        run = function()
+            local fixture = snapshotServerFixture()
+            local src = 47
+            fixture.setIdentifier(src, 'char1')
+            local context = fixture.coordinator:Activate(src, 'char1')
+            local barePayload = snapshotPayload(context, 1)
+            barePayload.initial = true
+            Assert.equal('empty_initial', fixture.coordinator:Handle(src, barePayload).code)
+
+            local outfit = fullVisual('male')
+            outfit.Drawables[11] = { drawable = 101, texture = 0, palette = 0 }
+            outfit.Props[0] = { drawable = 5, texture = 0, palette = 0 }
+            local outfitPayload = snapshotPayload(context, 2, outfit)
+            outfitPayload.initial = true
+            Assert.equal('accepted', fixture.coordinator:Handle(src, outfitPayload).code)
+        end,
+    },
+    {
         name = 'client debounces a stable change and retries the identical request',
         run = function()
             local fixture = snapshotClientFixture()
@@ -456,6 +490,22 @@ local cases = {
             suppressedFixture.advance(1000)
             suppressed:Tick()
             Assert.equal(0, #suppressedFixture.sent)
+        end,
+    },
+    {
+        name = 'client ignores an expired restore generation',
+        run = function()
+            local fixture = snapshotClientFixture()
+            local client = fixture.client
+            client:SetContext({ session = 11, revision = 1 }, { Drawables = {}, Props = {} })
+            client:Resume('startup')
+            local oldGeneration = client:SetRestoreProtection(true)
+            local currentGeneration = client:SetRestoreProtection(true)
+            Assert.truthy(currentGeneration ~= oldGeneration)
+            Assert.equal(false, client:SetRestoreProtection(false, nil, oldGeneration))
+            client:Tick()
+            Assert.equal(0, #fixture.sent)
+            client:SetRestoreProtection(false, nil, currentGeneration)
         end,
     },
 }

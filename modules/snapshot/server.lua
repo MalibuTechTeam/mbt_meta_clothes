@@ -11,6 +11,27 @@ local function copyAck(ack, code)
     return copied
 end
 
+local function validInitialSnapshot(visual, sex)
+    local meaningful = 0
+    local zero = 0
+    local total = 0
+    for _, slotType in ipairs({ 'Drawables', 'Props' }) do
+        local configured = slotType == 'Drawables' and MBT.Drawables or MBT.Props
+        for slotIndex, config in pairs(configured) do
+            local slot = visual[slotType][slotIndex]
+            local defaults = config.Default and config.Default[sex]
+            if not MBT.TableContains(defaults or {}, slot.drawable) then
+                total = total + 1
+                if slot.drawable > 0 then meaningful = meaningful + 1 else zero = zero + 1 end
+            end
+        end
+    end
+    if total == 0 then return false, 'empty_initial' end
+    if meaningful < 2 then return false, 'bare_initial' end
+    if zero > meaningful then return false, 'partial_initial' end
+    return true
+end
+
 local function boundedPayload(value, maxStringBytes)
     local seen = {}
     local nodes = 0
@@ -199,6 +220,18 @@ function SnapshotServer.New(deps)
                 return copyAck(state.lastAck, 'duplicate')
             end
             return reject(src, state, payload, 'sequence_conflict')
+        end
+
+        if payload.initial then
+            if playerState.HasDbEntry and playerState.HasDbEntry(src) then
+                return remember(state, payload.seq, requestFingerprint,
+                    reject(src, state, payload, 'initial_not_allowed'))
+            end
+            local initialOk, initialReason = validInitialSnapshot(visual, sex)
+            if not initialOk then
+                return remember(state, payload.seq, requestFingerprint,
+                    reject(src, state, payload, initialReason))
+            end
         end
 
         local current = playerState.GetAll(src) or { Drawables = {}, Props = {} }

@@ -52,7 +52,8 @@ end
 
 -- Server requests PED scan (new players only, after Load completed)
 RegisterNetEvent('mbt_meta_clothes:requestPedScan')
-AddEventHandler('mbt_meta_clothes:requestPedScan', function()
+AddEventHandler('mbt_meta_clothes:requestPedScan', function(context)
+    if not context or not MBT.SnapshotClient.SetContext(context) then return end
     -- New player: lascia che l'appearance script applichi il SUO skin,
     -- POI scansiona il PED per popolare il nostro state.
 
@@ -62,15 +63,15 @@ AddEventHandler('mbt_meta_clothes:requestPedScan', function()
     if MBT.Utils.ResumeHybridDetection then
         MBT.Utils.ResumeHybridDetection()
     end
+    MBT.SnapshotClient.Resume('character')
+    MBT.SnapshotClient.SetRestoreProtection(false)
 
     -- IMPORTANTE: il scan del PED è ritardato di 2.5s per dare tempo a
     -- illenium-appearance (o qualunque skin script) di applicare il vero
     -- outfit del char. Senza delay, il scan cattura uno stato BARE (modello
     -- default appena spawnato) e lo salva come baseline → al prossimo
     -- restoreWearing il player apparirebbe nudo per sempre.
-    Citizen.SetTimeout(2500, function()
-        MBT.Utils.SyncWearingState()
-    end)
+    MBT.SnapshotClient.ForceInitialScan(2500)
 
     -- Mostra il PED solo dopo PedRevealDelay (default 2s), così illenium ha
     -- tempo di applicare il suo skin completo PRIMA che il player veda. Senza
@@ -141,8 +142,18 @@ end
 local restoreGeneration = 0
 
 RegisterNetEvent('mbt_meta_clothes:restoreWearing')
-AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState)
+AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, context)
     if not wearingState then return end
+
+    -- Legacy watchdog unblock: no context means this is not an authoritative
+    -- restore and must never apply an empty state over the active character.
+    if not context then
+        if MBT.Utils.ResumeHybridDetection then MBT.Utils.ResumeHybridDetection() end
+        if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
+        ResetEntityAlpha(PlayerPedId())
+        SetEntityAlpha(PlayerPedId(), 255, false)
+        return
+    end
 
     -- Normalize JSON string keys to numeric (json.decode creates "3" not 3)
     local normalized = { Drawables = {}, Props = {} }
@@ -153,6 +164,8 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState)
         normalized.Props[tonumber(k) or k] = v
     end
     wearingState = normalized
+    if not MBT.SnapshotClient.SetContext(context, wearingState) then return end
+    MBT.SnapshotClient.Resume('character')
 
     -- Bump generation: invalida ogni re-apply pendente del restore precedente
     restoreGeneration = restoreGeneration + 1

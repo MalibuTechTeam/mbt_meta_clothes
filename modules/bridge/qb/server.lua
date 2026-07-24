@@ -56,14 +56,14 @@ end
 AddEventHandler('QBCore:Server:PlayerLoaded', function(Player)
     local src = Player and Player.PlayerData and Player.PlayerData.source
     if not src then return end
-    if MBT.PlayerState.CheckCharacterSwitch(src) then
-        MBT.PlayerState.Load(src)
-    end
+    MBT.PlayerState.PushStateToClient(src)
 end)
 
 -- Pre-unload: salva lo stato del character che sta uscendo
 AddEventHandler('QBCore:Server:OnPlayerUnload', function(src)
+    TriggerClientEvent('mbt_meta_clothes:multichar:pauseDetection', src)
     if MBT.PlayerState.IsLoaded(src) then
         MBT.PlayerState.Save(src)
     end
+    MBT.SnapshotServer.Cleanup(src)
 end)

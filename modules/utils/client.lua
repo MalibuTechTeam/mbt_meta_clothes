@@ -400,9 +400,14 @@ end
 
 --- Enable restore protection (prevents appearance script from overriding our state)
 function MBT.Utils.EnableRestoreProtection(wearingState, durationMs)
-    if MBT.SnapshotClient then MBT.SnapshotClient.SetRestoreProtection(true, wearingState) end
+    local generation
+    if MBT.SnapshotClient then
+        generation = MBT.SnapshotClient.SetRestoreProtection(true, wearingState)
+    end
     Citizen.SetTimeout(durationMs or 15000, function()
-        if MBT.SnapshotClient then MBT.SnapshotClient.SetRestoreProtection(false) end
+        if MBT.SnapshotClient then
+            MBT.SnapshotClient.SetRestoreProtection(false, nil, generation)
+        end
     end)
 end
 
