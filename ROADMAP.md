@@ -5,6 +5,29 @@ Baseline: `feat/v2.0.0` at commit `627511f`.
 This roadmap separates release blockers from product improvements. Items in
 the candidate section are not automatically part of the 2.0 release scope.
 
+## Relog and managed-slot snapshot synchronization
+
+- [x] Implement one canonical full snapshot for all configured drawable and prop
+      slots, with debounce, one in-flight request, ACK/retry, payload bounds, and
+      no database write while the PED is unchanged.
+- [x] Bind snapshots to a server-issued character session and authoritative state
+      revision so late multichar or pre-inventory snapshots cannot overwrite newer
+      state.
+- [x] Preserve rich item metadata when the visual state is unchanged, and persist
+      only sanitized visual metadata for externally changed slots.
+- [x] Protect restore, internal dress/toggle operations, temporary prop suppression,
+      PED replacement, resource restart, and duplicate framework readiness events.
+- [x] Complete Lua parser checks, `git diff --check`, web lint, and independent
+      protocol/lifecycle code review.
+- [ ] Run `mbt_snapshot_selftest` in an actual Cfx server with `MBT.Debug = true`.
+- [ ] Complete end-to-end verification: six-or-more-slot outfit then relog, rich
+      jacket metadata, rejected toggle rollback, rapid character A-to-B switch,
+      abrupt disconnect, unchanged-player idle period, and resource restart while
+      connected.
+
+Until the two runtime checks above pass, snapshot synchronization is implemented
+and statically reviewed, but is not considered release-verified.
+
 ## P0 - Release blockers
 
 - [ ] Make dress and undress operations server-authoritative.
