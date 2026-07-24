@@ -39,6 +39,13 @@ RegisterNetEvent('mbt_meta_clothes:playerReady', function()
     MBT.PlayerState.PushStateToClient(src)
 end)
 
+RegisterNetEvent('mbt_meta_clothes:submitSnapshot', function(payload)
+    local src = source
+    if not MBT.ServerUtils.CheckRateLimit(src, 'snapshot') then return end
+    local ack = MBT.SnapshotServer.Handle(src, payload)
+    TriggerClientEvent('mbt_meta_clothes:snapshotAck', src, ack)
+end)
+
 -----------------------------------------------------------
 -- Sync Initial Wearing (PED scan for NEW players only)
 -----------------------------------------------------------
@@ -214,6 +221,7 @@ AddEventHandler('playerDropped', function(reason)
         MBT.Debugger("Wearing state at disconnect:", json.encode(wearingState))
     end
 
+    MBT.SnapshotServer.Cleanup(src)
     MBT.PlayerState.Cleanup(src)
     MBT.Debugger("PlayerState: Cleaned up", src)
 end)

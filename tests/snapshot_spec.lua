@@ -25,6 +25,50 @@ local function fullVisual(sex)
 end
 
 local maleModel
+
+local function snapshotServerFixture()
+    local data = {}
+    local revisions = {}
+    local identifiers = {}
+    local saves = 0
+    local timers = {}
+    local store = {
+        GetRevision = function(src) return revisions[src] or 0 end,
+        GetIdentifier = function(src) return identifiers[src] end,
+        GetAll = function(src) return data[src] or { Drawables = {}, Props = {} } end,
+        CommitSnapshot = function(src, nextState, changes)
+            Assert.truthy(#changes > 0)
+            data[src] = nextState
+            revisions[src] = (revisions[src] or 0) + 1
+            return revisions[src]
+        end,
+        Save = function() saves = saves + 1 end,
+    }
+    local coordinator = MBT.SnapshotServer.New({
+        PlayerState = store,
+        schedule = function(_, callback) timers[#timers + 1] = callback end,
+        encode = function(value) return json.encode(value) end,
+        saveDelay = 5000,
+        newSession = function(generation) return generation end,
+    })
+    return {
+        coordinator = coordinator,
+        setIdentifier = function(src, identifier) identifiers[src] = identifier end,
+        timers = timers,
+        saveCount = function() return saves end,
+    }
+end
+
+local function snapshotPayload(context, seq, visual, baseRevision)
+    return {
+        session = context.session,
+        seq = seq,
+        baseRevision = baseRevision == nil and context.revision or baseRevision,
+        model = maleModel,
+        visual = visual or fullVisual('male'),
+    }
+end
+
 for model, sex in pairs(MBT.GenderModels) do
     if sex == 'male' then maleModel = model break end
 end
@@ -165,6 +209,84 @@ local cases = {
             Assert.equal(1, MBT.PlayerState.CommitSnapshot(src, nextState, {}))
             Assert.equal(1, MBT.PlayerState.GetRevision(src))
             MBT.PlayerState.Cleanup(src, true)
+        end,
+    },
+    {
+        name = 'accepts, acknowledges, and deduplicates a snapshot',
+        run = function()
+            local fixture = snapshotServerFixture()
+            local src = 41
+            fixture.setIdentifier(src, 'char1:license')
+            local context = fixture.coordinator:Activate(src, 'char1:license')
+            local visual = fullVisual('male')
+            visual.Drawables[11] = { drawable = 101, texture = 0, palette = 0 }
+            local payload = snapshotPayload(context, 1, visual)
+            local ack = fixture.coordinator:Handle(src, payload)
+            Assert.equal(true, ack.ok)
+            Assert.equal('accepted', ack.code)
+            Assert.equal(1, ack.revision)
+            local duplicate = fixture.coordinator:Handle(src, payload)
+            Assert.equal(true, duplicate.ok)
+            Assert.equal('duplicate', duplicate.code)
+            Assert.equal(1, duplicate.revision)
+            Assert.equal(1, #fixture.timers)
+            fixture.timers[1]()
+            Assert.equal(1, fixture.saveCount())
+        end,
+    },
+    {
+        name = 'rejects stale ordering, revision, and wrong character session',
+        run = function()
+            local fixture = snapshotServerFixture()
+            local src = 42
+            local context = fixture.coordinator:Activate(src, 'char1')
+            local visual = fullVisual('male')
+            visual.Drawables[11] = { drawable = 101, texture = 0, palette = 0 }
+            local stale = fixture.coordinator:Handle(src, snapshotPayload(context, 1, visual, 9))
+            Assert.equal(false, stale.ok)
+            Assert.equal('stale_revision', stale.code)
+            local acceptedNoOp = fixture.coordinator:Handle(src, snapshotPayload(context, 2, fullVisual('male'), 0))
+            Assert.equal(true, acceptedNoOp.ok)
+            local lower = fixture.coordinator:Handle(src, snapshotPayload(context, 1, visual, 0))
+            Assert.equal('stale_sequence', lower.code)
+            local rotated = fixture.coordinator:Activate(src, 'char2')
+            Assert.truthy(rotated.session ~= context.session)
+            local wrong = fixture.coordinator:Handle(src, snapshotPayload(context, 2, visual, 0))
+            Assert.equal('wrong_session', wrong.code)
+        end,
+    },
+    {
+        name = 'rejects malformed and oversized payloads',
+        run = function()
+            local fixture = snapshotServerFixture()
+            local src = 44
+            local context = fixture.coordinator:Activate(src, 'char1')
+            local malformed = snapshotPayload(context, 1)
+            malformed.forged = true
+            Assert.equal('malformed', fixture.coordinator:Handle(src, malformed).code)
+            local oversized = snapshotPayload(context, 1)
+            oversized.visual.Drawables[11].padding = string.rep('x', (MBT.SnapshotMaxPayload or 16384) + 1)
+            Assert.equal('oversized', fixture.coordinator:Handle(src, oversized).code)
+        end,
+    },
+    {
+        name = 'acknowledges no-op and cancels stale write-behind timers',
+        run = function()
+            local fixture = snapshotServerFixture()
+            local src = 43
+            local context = fixture.coordinator:Activate(src, 'char1')
+            local noChange = fixture.coordinator:Handle(src, snapshotPayload(context, 1))
+            Assert.equal(true, noChange.ok)
+            Assert.equal('no_change', noChange.code)
+            Assert.equal(0, #fixture.timers)
+
+            local changed = fullVisual('male')
+            changed.Props[0] = { drawable = 2, texture = 0, palette = 0 }
+            fixture.coordinator:Handle(src, snapshotPayload(context, 2, changed))
+            Assert.equal(1, #fixture.timers)
+            fixture.coordinator:Cleanup(src)
+            fixture.timers[1]()
+            Assert.equal(0, fixture.saveCount())
         end,
     },
 }

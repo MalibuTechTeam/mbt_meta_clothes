@@ -29,16 +29,18 @@ server_scripts {
     'modules/utils/server.lua',
     -- 2. Player wearing state manager (MBT.PlayerState)
     'modules/state/server.lua',
-    -- 3. Shared inventory give functions (MBT.GiveItems)
+    -- 3. Acknowledged snapshot protocol (MBT.SnapshotServer)
+    'modules/snapshot/server.lua',
+    -- 4. Shared inventory give functions (MBT.GiveItems)
     'modules/bridge/inventory/give_items.lua',
     'modules/bridge/inventory/qb_useable.lua',
-    -- 4. Drip reputation engine (MBT.Drip)
+    -- 5. Drip reputation engine (MBT.Drip)
     'modules/drip/server.lua',
-    -- 5. Framework bridges (one activates based on resource check)
+    -- 6. Framework bridges (one activates based on resource check)
     'modules/bridge/**/server.lua',
-    -- 6. Core server logic
+    -- 7. Core server logic
     'core/**/server.lua',
-    -- 7. Deterministic server-console self-tests (debug only)
+    -- 8. Deterministic server-console self-tests (debug only)
     'tests/snapshot_spec.lua',
 }
 
