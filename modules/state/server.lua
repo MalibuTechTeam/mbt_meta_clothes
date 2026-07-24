@@ -275,10 +275,6 @@ end
 function MBT.PlayerState.Save(src, identifier)
     if not PlayerWearing[src] then return end
 
-    if MBT.SnapshotServer and MBT.SnapshotServer.CancelPendingSave then
-        MBT.SnapshotServer.CancelPendingSave(src)
-    end
-
     identifier = identifier or PlayerIdentifiers[src]
     if not identifier then
         if getPlayerIdentifier then
@@ -311,6 +307,9 @@ function MBT.PlayerState.Save(src, identifier)
         { identifier, data, dripXp }
     )
     DirtyPlayers[src] = false
+    if MBT.SnapshotServer and MBT.SnapshotServer.CancelPendingSave then
+        MBT.SnapshotServer.CancelPendingSave(src)
+    end
 end
 
 --- Rileva switch di character (multicharacter): se il src ha già stato caricato

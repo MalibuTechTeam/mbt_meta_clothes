@@ -30,6 +30,7 @@ local function snapshotServerFixture()
     local data = {}
     local revisions = {}
     local identifiers = {}
+    local liveIdentifiers = {}
     local saves = 0
     local timers = {}
     local store = {
@@ -51,10 +52,15 @@ local function snapshotServerFixture()
         encode = function(value) return json.encode(value) end,
         saveDelay = 5000,
         newSession = function(generation) return generation end,
+        getIdentifier = function(src) return liveIdentifiers[src] end,
     })
     return {
         coordinator = coordinator,
-        setIdentifier = function(src, identifier) identifiers[src] = identifier end,
+        setIdentifier = function(src, identifier)
+            identifiers[src] = identifier
+            liveIdentifiers[src] = identifier
+        end,
+        setLiveIdentifier = function(src, identifier) liveIdentifiers[src] = identifier end,
         timers = timers,
         saveCount = function() return saves end,
     }
@@ -310,7 +316,7 @@ local cases = {
             local src = 45
             fixture.setIdentifier(src, 'char1')
             local context = fixture.coordinator:Activate(src, 'char1')
-            fixture.setIdentifier(src, 'char2')
+            fixture.setLiveIdentifier(src, 'char2')
             local ack = fixture.coordinator:Handle(src, snapshotPayload(context, 1))
             Assert.equal(false, ack.ok)
             Assert.equal('wrong_session', ack.code)

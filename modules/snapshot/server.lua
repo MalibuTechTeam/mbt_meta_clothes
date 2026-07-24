@@ -11,9 +11,11 @@ local function copyAck(ack, code)
     return copied
 end
 
-local function boundedPayload(value)
+local function boundedPayload(value, maxStringBytes)
     local seen = {}
     local nodes = 0
+    local stringBytes = 0
+    local failure = 'malformed'
     local function walk(current, depth)
         nodes = nodes + 1
         if nodes > 256 or depth > 6 then return false end
@@ -24,15 +26,28 @@ local function boundedPayload(value)
             for key, nested in pairs(current) do
                 local keyType = type(key)
                 if keyType ~= 'string' and keyType ~= 'number' then return false end
+                if keyType == 'string' then
+                    stringBytes = stringBytes + #key
+                    if stringBytes > maxStringBytes then
+                        failure = 'oversized'
+                        return false
+                    end
+                end
                 if not walk(nested, depth + 1) then return false end
             end
             seen[current] = nil
             return true
         end
-        return currentType == 'string' or currentType == 'number'
-            or currentType == 'boolean' or currentType == 'nil'
+        if currentType == 'string' then
+            stringBytes = stringBytes + #current
+            if stringBytes > maxStringBytes then failure = 'oversized' end
+            return stringBytes <= maxStringBytes
+        end
+        return currentType == 'number' or currentType == 'boolean' or currentType == 'nil'
     end
-    return walk(value, 1)
+    local valid = walk(value, 1)
+    if valid then return true end
+    return false, failure
 end
 
 function SnapshotServer.New(deps)
@@ -123,13 +138,18 @@ function SnapshotServer.New(deps)
         if type(payload) ~= 'table' then return reject(src, state, payload, 'malformed') end
 
         local identifier = playerState.GetIdentifier(src)
+        local liveIdentifier = deps.getIdentifier and deps.getIdentifier(src) or nil
         local loaded = not playerState.IsLoaded or playerState.IsLoaded(src)
-        if not loaded or not identifier or identifier ~= state.identifier then
+        if not loaded or not identifier or identifier ~= state.identifier
+            or not liveIdentifier or liveIdentifier ~= state.identifier then
             state.saveGeneration = state.saveGeneration + 1
             sessions[src] = nil
             return reject(src, state, payload, 'wrong_session')
         end
-        if not boundedPayload(payload) then return reject(src, state, payload, 'malformed') end
+        local payloadBounded, payloadReason = boundedPayload(payload, MBT.SnapshotMaxPayload or 16384)
+        if not payloadBounded then
+            return reject(src, state, payload, payloadReason)
+        end
 
         local encodedOk, encoded = pcall(encode, payload)
         if not encodedOk or type(encoded) ~= 'string' then
@@ -235,6 +255,9 @@ local production = SnapshotServer.New({
     saveDelay = MBT.SnapshotWriteBehind,
     newSession = function(currentGeneration)
         return ('%d:%d:%d'):format(os.time(), GetGameTimer(), currentGeneration)
+    end,
+    getIdentifier = function(src)
+        return getPlayerIdentifier and getPlayerIdentifier(src) or nil
     end,
 })
 
