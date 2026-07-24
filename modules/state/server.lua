@@ -10,6 +10,7 @@ MBT.PlayerState = {}
 local PlayerWearing = {}
 local DirtyPlayers = {}
 local PlayerIdentifiers = {}
+local PlayerRevisions = {}
 local PlayerHasDbEntry = {}
 local PlayerDripXp = {}
 local PlayerJustSwitched = {} -- true quando CheckCharacterSwitch ha rilevato uno switch
@@ -88,7 +89,25 @@ end
 function MBT.PlayerState.InitPlayer(src)
     PlayerWearing[src] = { Drawables = {}, Props = {} }
     PlayerDripXp[src] = PlayerDripXp[src] or 0
+    PlayerRevisions[src] = PlayerRevisions[src] or 0
     DirtyPlayers[src] = false
+end
+
+local function touchRevision(src)
+    PlayerRevisions[src] = (PlayerRevisions[src] or 0) + 1
+    local revision = PlayerRevisions[src]
+    if MBT.SnapshotServer and MBT.SnapshotServer.OnRevisionChanged then
+        MBT.SnapshotServer.OnRevisionChanged(src, revision)
+    end
+    return revision
+end
+
+function MBT.PlayerState.GetRevision(src)
+    return PlayerRevisions[src] or 0
+end
+
+function MBT.PlayerState.GetIdentifier(src)
+    return PlayerIdentifiers[src]
 end
 
 function MBT.PlayerState.SetSlot(src, slotType, slotIndex, metadata)
@@ -103,6 +122,7 @@ function MBT.PlayerState.SetSlot(src, slotType, slotIndex, metadata)
     if not PlayerWearing[src] then MBT.PlayerState.InitPlayer(src) end
     PlayerWearing[src][slotType][slotIndex] = metadata
     DirtyPlayers[src] = true
+    touchRevision(src)
     -- Broadcast for consumers (e.g. mbt_wearable_props capacity).
     -- Server-side event so listeners can recompute without polling.
     TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, slotIndex, metadata)
@@ -126,6 +146,7 @@ function MBT.PlayerState.ClearSlot(src, slotType, slotIndex)
     PlayerWearing[src][slotType][slotIndex] = nil
     if metadata then
         DirtyPlayers[src] = true
+        touchRevision(src)
         TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, slotIndex, nil)
     end
     return metadata
@@ -142,6 +163,7 @@ function MBT.PlayerState.ClearAllSlots(src, slotType)
     PlayerWearing[src][slotType] = {}
     if next(allMetadata) then
         DirtyPlayers[src] = true
+        touchRevision(src)
         TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, nil, nil)
     end
     return allMetadata
@@ -153,6 +175,79 @@ end
 
 function MBT.PlayerState.IsLoaded(src)
     return PlayerWearing[src] ~= nil
+end
+
+--- Atomically replace the wearing state produced by snapshot reconciliation.
+--- @return integer revision
+function MBT.PlayerState.CommitSnapshot(src, nextState, changes)
+    if type(nextState) ~= 'table' or type(changes) ~= 'table' then
+        return MBT.PlayerState.GetRevision(src)
+    end
+    if #changes == 0 then return MBT.PlayerState.GetRevision(src) end
+
+    PlayerWearing[src] = nextState
+    DirtyPlayers[src] = true
+    local revision = touchRevision(src)
+    for _, change in ipairs(changes) do
+        TriggerEvent(
+            'mbt_meta_clothes:onClothingChanged',
+            src,
+            change.slotType,
+            change.slotIndex,
+            change.metadata
+        )
+    end
+    return revision
+end
+
+local function validVisual(slotType, slotIndex, visual)
+    local valid, normalizedIndex = MBT.ServerUtils.ValidateSlot(slotType, slotIndex)
+    if not valid or type(visual) ~= 'table' then return nil, 'invalid_slot' end
+    local drawableBounds = slotType == 'Drawables'
+        and MBT.SnapshotBounds.componentDrawable
+        or MBT.SnapshotBounds.propDrawable
+    local palette = visual.palette == nil and 0 or visual.palette
+    local function boundedInteger(value, bounds)
+        return type(value) == 'number' and value == value and value % 1 == 0
+            and value >= bounds.min and value <= bounds.max
+    end
+    if not boundedInteger(visual.drawable, drawableBounds)
+        or not boundedInteger(visual.texture, MBT.SnapshotBounds.texture)
+        or not boundedInteger(palette, MBT.SnapshotBounds.palette) then
+        return nil, 'invalid_visual'
+    end
+    return {
+        index = normalizedIndex,
+        drawable = visual.drawable,
+        texture = visual.texture,
+        palette = palette,
+    }
+end
+
+--- Persist an MBT-owned visual variant while preserving trusted rich metadata.
+function MBT.PlayerState.UpdateSlotVisual(src, slotType, slotIndex, visual)
+    local normalized, reason = validVisual(slotType, slotIndex, visual)
+    if not normalized then return false, reason end
+    if MBT.PlayerState.CheckCharacterSwitch(src) then MBT.PlayerState.Load(src) end
+    local current = MBT.PlayerState.GetSlot(src, slotType, normalized.index)
+    if not current then return false, 'missing_metadata' end
+    if current.drawable == normalized.drawable
+        and current.texture == normalized.texture
+        and (current.palette or 0) == normalized.palette then
+        return false, MBT.PlayerState.GetRevision(src)
+    end
+
+    local updated = {}
+    for key, value in pairs(current) do updated[key] = value end
+    updated.index = normalized.index
+    updated.drawable = normalized.drawable
+    updated.texture = normalized.texture
+    updated.palette = normalized.palette
+    PlayerWearing[src][slotType][normalized.index] = updated
+    DirtyPlayers[src] = true
+    local revision = touchRevision(src)
+    TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, normalized.index, updated)
+    return true, revision
 end
 
 -----------------------------------------------------------
@@ -279,6 +374,9 @@ function MBT.PlayerState.Load(src, identifier)
         return
     end
 
+    if PlayerIdentifiers[src] ~= identifier then
+        PlayerRevisions[src] = 0
+    end
     PlayerIdentifiers[src] = identifier
 
     local result = MySQL.query.await(
@@ -367,13 +465,14 @@ function MBT.PlayerState.HasDbEntry(src)
     return PlayerHasDbEntry[src] == true
 end
 
-function MBT.PlayerState.Cleanup(src)
-    if DirtyPlayers[src] then
+function MBT.PlayerState.Cleanup(src, discard)
+    if DirtyPlayers[src] and not discard then
         MBT.PlayerState.Save(src)
     end
     PlayerWearing[src] = nil
     DirtyPlayers[src] = nil
     PlayerIdentifiers[src] = nil
+    PlayerRevisions[src] = nil
     PlayerHasDbEntry[src] = nil
     PlayerDripXp[src] = nil
     PlayerJustSwitched[src] = nil

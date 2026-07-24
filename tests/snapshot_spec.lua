@@ -119,6 +119,54 @@ local cases = {
             Assert.equal(nil, nextState.Drawables[11].item_name)
         end,
     },
+    {
+        name = 'tracks authoritative revisions and preserves rich metadata',
+        run = function()
+            local src = -41001
+            MBT.PlayerState.Cleanup(src, true)
+            MBT.PlayerState.InitPlayer(src)
+            Assert.equal(0, MBT.PlayerState.GetRevision(src))
+            local rich = {
+                index = 11,
+                drawable = 100,
+                texture = 2,
+                palette = 0,
+                item_name = 'jacket',
+                dna = { sample = 'trusted' },
+            }
+            MBT.PlayerState.SetSlot(src, 'Drawables', 11, rich)
+            Assert.equal(1, MBT.PlayerState.GetRevision(src))
+            local changed, revision = MBT.PlayerState.UpdateSlotVisual(src, 'Drawables', 11, {
+                drawable = 101,
+                texture = 0,
+                palette = 0,
+            })
+            Assert.equal(true, changed)
+            Assert.equal(2, revision)
+            local updated = MBT.PlayerState.GetSlot(src, 'Drawables', 11)
+            Assert.equal('jacket', updated.item_name)
+            Assert.same(rich.dna, updated.dna)
+            MBT.PlayerState.Cleanup(src, true)
+        end,
+    },
+    {
+        name = 'commits a multi-slot snapshot with one revision',
+        run = function()
+            local src = -41002
+            MBT.PlayerState.Cleanup(src, true)
+            MBT.PlayerState.InitPlayer(src)
+            local visual = fullVisual('male')
+            visual.Drawables[11] = { drawable = 101, texture = 0, palette = 0 }
+            visual.Props[0] = { drawable = 5, texture = 1, palette = 0 }
+            local nextState, changes = MBT.Snapshot.Reconcile(MBT.PlayerState.GetAll(src), visual, 'male')
+            Assert.equal(2, #changes)
+            Assert.equal(1, MBT.PlayerState.CommitSnapshot(src, nextState, changes))
+            Assert.equal(1, MBT.PlayerState.GetRevision(src))
+            Assert.equal(1, MBT.PlayerState.CommitSnapshot(src, nextState, {}))
+            Assert.equal(1, MBT.PlayerState.GetRevision(src))
+            MBT.PlayerState.Cleanup(src, true)
+        end,
+    },
 }
 
 RegisterCommand('mbt_snapshot_selftest', function(source)
