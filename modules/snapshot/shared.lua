@@ -217,6 +217,7 @@ function MBT.Snapshot.IsAllowedToggle(current, slotType, slotIndex, visual)
     states = states and states[tonumber(slotIndex) or slotIndex]
     if not sex or type(states) ~= 'table' then return false end
     if visual.texture ~= (current.texture or 0) then return false end
+    if (visual.palette or 0) ~= (current.palette or 0) then return false end
     for _, pair in ipairs(states) do
         if pair.sex == sex and ((current.drawable == pair.from and visual.drawable == pair.to)
             or (current.drawable == pair.to and visual.drawable == pair.from)) then

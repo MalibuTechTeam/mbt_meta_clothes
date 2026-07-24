@@ -894,6 +894,8 @@ function MBT.Utils.ToggleClothingState(slotType, slotIndex)
                 -- Play toggle-specific animation: prefer ToggleAnimation, fallback to Animation
                 local slotConfig = slotType == "Drawables" and MBT.Drawables[slotIndex] or MBT.Props[slotIndex]
                 local toggleAnim = slotConfig and (slotConfig["ToggleAnimation"] or slotConfig["Animation"])
+                local snapshotContext = MBT.SnapshotClient and MBT.SnapshotClient.GetContext()
+                if not snapshotContext then return false end
                 local token = MBT.SnapshotClient and MBT.SnapshotClient.BeginInternal('toggle', 5000)
                 local function applyToggle()
                     if not token then MBT.Utils.ExpectChange(slotType, slotIndex) end
@@ -916,7 +918,14 @@ function MBT.Utils.ToggleClothingState(slotType, slotIndex)
                             palette = 0,
                         }
                     end
-                    TriggerServerEvent('mbt_meta_clothes:updateInternalVisual', slotType, slotIndex, visual, token)
+                    TriggerServerEvent(
+                        'mbt_meta_clothes:updateInternalVisual',
+                        slotType,
+                        slotIndex,
+                        visual,
+                        token,
+                        snapshotContext
+                    )
                 end
                 if toggleAnim then
                     MBT.Utils.PlayEmote({

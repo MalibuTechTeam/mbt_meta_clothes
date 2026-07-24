@@ -216,30 +216,76 @@ RegisterNetEvent('mbt_meta_clothes:externalUndress', function(slotType, slotInde
     end
 end)
 
-RegisterNetEvent('mbt_meta_clothes:updateInternalVisual', function(slotType, slotIndex, visual, requestToken)
+RegisterNetEvent('mbt_meta_clothes:updateInternalVisual', function(slotType, slotIndex, visual, requestToken, requestContext)
     local src = source
-    if not MBT.ServerUtils.CheckRateLimit(src, 'internalVisual') then return end
+    -- A framework/multichar resource may rotate the identifier without firing
+    -- its lifecycle event. Never validate against A and then let PlayerState
+    -- reload and mutate B inside UpdateSlotVisual.
+    if MBT.PlayerState.CheckCharacterSwitch(src) then
+        MBT.PlayerState.PushStateToClient(src, 1, true)
+        return
+    end
     local valid, index = MBT.ServerUtils.ValidateSlot(slotType, slotIndex)
-    if not valid or type(visual) ~= 'table' then return end
-    local current = MBT.PlayerState.GetSlot(src, slotType, index)
-    if not MBT.Snapshot.IsAllowedToggle(current, slotType, index, visual) then return end
-    local changed, revision = MBT.PlayerState.UpdateSlotVisual(src, slotType, index, visual)
-    if not changed then return end
+    local current = valid and MBT.PlayerState.GetSlot(src, slotType, index) or nil
     local context = MBT.SnapshotServer.GetContext(src)
-    if context then
+
+    local function reply(ok, code, authoritativeVisual, revision)
+        if not context or not valid or not authoritativeVisual then return end
         TriggerClientEvent('mbt_meta_clothes:authoritativeVisual', src, {
+            ok = ok,
+            code = code,
             session = context.session,
-            revision = revision,
+            revision = revision or MBT.PlayerState.GetRevision(src),
             slotType = slotType,
             slotIndex = index,
             visual = {
-                drawable = visual.drawable,
-                texture = visual.texture,
-                palette = visual.palette or 0,
+                drawable = authoritativeVisual.drawable,
+                texture = authoritativeVisual.texture or 0,
+                palette = authoritativeVisual.palette or 0,
             },
             token = type(requestToken) == 'number' and requestToken or nil,
         })
     end
+
+    if not valid or type(visual) ~= 'table' then return end
+    if not context or type(requestContext) ~= 'table'
+        or requestContext.session ~= context.session then return end
+    if not MBT.ServerUtils.CheckRateLimit(src, 'internalVisual') then
+        return reply(false, 'rate_limited', current)
+    end
+    if requestContext.revision ~= MBT.PlayerState.GetRevision(src) then
+        return reply(false, 'stale_revision', current)
+    end
+    if not current then
+        local ped = GetPlayerPed(src)
+        local model = ped and ped ~= 0 and GetEntityModel(ped) or nil
+        local sex = model and MBT.GenderModels[model] or nil
+        local authoritative = sex and MBT.Snapshot.VisualFromWearing(MBT.PlayerState.GetAll(src), sex)
+        return reply(false, 'missing_metadata', authoritative and authoritative[slotType][index])
+    end
+    if not MBT.Snapshot.IsAllowedToggle(current, slotType, index, visual) then
+        return reply(false, 'invalid_transition', current)
+    end
+    local changed, revision = MBT.PlayerState.UpdateSlotVisual(src, slotType, index, visual)
+    if not changed then
+        local code = type(revision) == 'string' and revision or 'no_change'
+        local authoritativeRevision = type(revision) == 'number' and revision or nil
+        return reply(false, code, current, authoritativeRevision)
+    end
+    reply(true, nil, visual, revision)
+end)
+
+-- Ordinary PlayerState mutations (dress, undress, steal) advance the same
+-- revision used by snapshots and toggles. Keep the active client context in
+-- sync; snapshot commits and visual toggles already carry their own ACK.
+AddEventHandler('mbt_meta_clothes:onClothingChanged', function(src, _, _, _, origin)
+    if origin == 'snapshot' or origin == 'internal_visual' then return end
+    local context = MBT.SnapshotServer.GetContext(src)
+    if not context then return end
+    TriggerClientEvent('mbt_meta_clothes:authoritativeRevision', src, {
+        session = context.session,
+        revision = MBT.PlayerState.GetRevision(src),
+    })
 end)
 
 -----------------------------------------------------------

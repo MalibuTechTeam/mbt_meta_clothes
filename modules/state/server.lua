@@ -127,7 +127,7 @@ function MBT.PlayerState.SetSlot(src, slotType, slotIndex, metadata)
     touchRevision(src)
     -- Broadcast for consumers (e.g. mbt_wearable_props capacity).
     -- Server-side event so listeners can recompute without polling.
-    TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, slotIndex, metadata)
+    TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, slotIndex, metadata, 'state')
 end
 
 function MBT.PlayerState.GetSlot(src, slotType, slotIndex)
@@ -149,7 +149,7 @@ function MBT.PlayerState.ClearSlot(src, slotType, slotIndex)
     if metadata then
         DirtyPlayers[src] = true
         touchRevision(src)
-        TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, slotIndex, nil)
+        TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, slotIndex, nil, 'state')
     end
     return metadata
 end
@@ -166,7 +166,7 @@ function MBT.PlayerState.ClearAllSlots(src, slotType)
     if next(allMetadata) then
         DirtyPlayers[src] = true
         touchRevision(src)
-        TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, nil, nil)
+        TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, nil, nil, 'state')
     end
     return allMetadata
 end
@@ -196,7 +196,8 @@ function MBT.PlayerState.CommitSnapshot(src, nextState, changes)
             src,
             change.slotType,
             change.slotIndex,
-            change.metadata
+            change.metadata,
+            'snapshot'
         )
     end
     return revision
@@ -248,7 +249,14 @@ function MBT.PlayerState.UpdateSlotVisual(src, slotType, slotIndex, visual)
     PlayerWearing[src][slotType][normalized.index] = updated
     DirtyPlayers[src] = true
     local revision = touchRevision(src)
-    TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, normalized.index, updated)
+    TriggerEvent(
+        'mbt_meta_clothes:onClothingChanged',
+        src,
+        slotType,
+        normalized.index,
+        updated,
+        'internal_visual'
+    )
     return true, revision
 end
 
@@ -530,7 +538,8 @@ local lastPushAt = {} -- [src] = GetGameTimer()
 --- il client event corrispondente. Idempotente con debounce 500ms.
 --- @param src number Player source
 --- @param attempt number Internal: counter retry (default 1)
-function MBT.PlayerState.PushStateToClient(src, attempt)
+--- @param force boolean Internal: bypass duplicate-readiness debounce after a detected switch
+function MBT.PlayerState.PushStateToClient(src, attempt, force)
     if not src or src <= 0 then return end
     attempt = attempt or 1
 
@@ -555,14 +564,14 @@ function MBT.PlayerState.PushStateToClient(src, attempt)
         Citizen.SetTimeout(200, function()
             -- Verifica che il player non si sia disconnesso nel frattempo
             if GetPlayerName(src) then
-                MBT.PlayerState.PushStateToClient(src, attempt + 1)
+                MBT.PlayerState.PushStateToClient(src, attempt + 1, force)
             end
         end)
         return
     end
 
     local now = GetGameTimer()
-    if lastPushAt[src] and (now - lastPushAt[src]) < 500 then
+    if not force and lastPushAt[src] and (now - lastPushAt[src]) < 500 then
         -- Debounce: skip silenziosamente. Già pushato di recente.
         return
     end

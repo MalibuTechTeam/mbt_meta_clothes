@@ -87,15 +87,18 @@ local function snapshotClientFixture()
     local current = fullVisual('male')
     local currentModel = maleModel
     local sent = {}
+    local enforced = {}
     local client = MBT.SnapshotClient.New({
         now = function() return fakeNow end,
         capture = function() return current end,
         model = function() return currentModel end,
         send = function(payload) sent[#sent + 1] = payload end,
+        enforce = function(target) enforced[#enforced + 1] = target end,
     })
     return {
         client = client,
         sent = sent,
+        enforced = enforced,
         visual = function() return current end,
         setVisual = function(visual) current = visual end,
         setModel = function(model) currentModel = model end,
@@ -642,6 +645,11 @@ local cases = {
                 texture = 9,
                 palette = 0,
             }))
+            Assert.equal(false, MBT.Snapshot.IsAllowedToggle(current, 'Drawables', 11, {
+                drawable = 30,
+                texture = 2,
+                palette = 1,
+            }))
         end,
     },
     {
@@ -666,6 +674,50 @@ local cases = {
             }))
             Assert.equal(5, client:GetContext().revision)
             Assert.equal(30, wearing.Drawables[11].drawable)
+        end,
+    },
+    {
+        name = 'client rolls a rejected toggle back to authoritative visual',
+        run = function()
+            local fixture = snapshotClientFixture()
+            local client = fixture.client
+            local wearing = {
+                Drawables = {
+                    [11] = { drawable = 29, texture = 2, palette = 0, sex = 'male', item_name = 'jacket' },
+                },
+                Props = {},
+            }
+            client:SetContext({ session = 18, revision = 4 }, wearing)
+            client:Resume('startup')
+            local token = client:BeginInternal('toggle', 5000)
+            Assert.equal(true, client:ApplyAuthoritativeVisual({
+                ok = false,
+                code = 'invalid_transition',
+                session = 18,
+                revision = 4,
+                slotType = 'Drawables',
+                slotIndex = 11,
+                visual = { drawable = 29, texture = 2, palette = 0 },
+                token = token,
+            }))
+            Assert.equal(1, #fixture.enforced)
+            Assert.equal(29, fixture.enforced[1].Drawables[11].drawable)
+        end,
+    },
+    {
+        name = 'ordinary state mutation rebases client before immediate toggle',
+        run = function()
+            local fixture = snapshotClientFixture()
+            local client = fixture.client
+            client:SetContext({ session = 19, revision = 4 }, { Drawables = {}, Props = {} })
+            client:Resume('startup')
+            Assert.equal(true, client:ApplyAuthoritativeRevision({
+                session = 19,
+                revision = 5,
+            }))
+            local context = client:GetContext()
+            Assert.equal(19, context.session)
+            Assert.equal(5, context.revision)
         end,
     },
 }

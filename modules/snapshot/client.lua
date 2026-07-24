@@ -162,6 +162,16 @@ function SnapshotClient.New(deps)
         return { session = context.session, revision = context.revision }
     end
 
+    function coordinator:ApplyAuthoritativeRevision(update)
+        if type(update) ~= 'table' or not context or update.session ~= context.session
+            or type(update.revision) ~= 'number' or update.revision < context.revision then return false end
+        context.revision = update.revision
+        if pending and pending.payload.baseRevision < update.revision then pending = nil end
+        candidateFingerprint = nil
+        candidateSince = nil
+        return true
+    end
+
     function coordinator:Pause(reason)
         pauses[reason or 'manual'] = true
         pending = nil
@@ -305,6 +315,10 @@ function SnapshotClient.New(deps)
         end
         candidateFingerprint = nil
         candidateSince = nil
+        if update.ok == false and deps.enforce and acknowledgedVisual then
+            deps.enforce(acknowledgedVisual, guardReason)
+            acknowledgedFingerprint = MBT.Snapshot.Fingerprint(acknowledgedVisual)
+        end
         return true
     end
 
@@ -489,6 +503,9 @@ local running = false
 
 function SnapshotClient.SetContext(context, wearingState) return production:SetContext(context, wearingState) end
 function SnapshotClient.GetContext() return production:GetContext() end
+function SnapshotClient.ApplyAuthoritativeRevision(update)
+    return production:ApplyAuthoritativeRevision(update)
+end
 function SnapshotClient.Pause(reason) return production:Pause(reason) end
 function SnapshotClient.Resume(reason, wearingState) return production:Resume(reason, wearingState) end
 function SnapshotClient.BeginInternal(reason, timeoutMs) return production:BeginInternal(reason, timeoutMs) end
@@ -535,6 +552,10 @@ end)
 
 RegisterNetEvent('mbt_meta_clothes:authoritativeVisual', function(update)
     production:ApplyAuthoritativeVisual(update)
+end)
+
+RegisterNetEvent('mbt_meta_clothes:authoritativeRevision', function(update)
+    production:ApplyAuthoritativeRevision(update)
 end)
 
 AddEventHandler('onResourceStop', function(resourceName)
