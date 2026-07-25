@@ -148,6 +148,52 @@ local cases = {
             Assert.equal(true, nested.ok)
         end,
     },
+    {
+        name = 'normalizes inventory add results',
+        run = function()
+            local ok, reason = MBT.GiveItems.NormalizeAddResult(false, 'invalid_item')
+            Assert.equal(false, ok)
+            Assert.equal('invalid_item', reason)
+
+            ok, reason = MBT.GiveItems.NormalizeAddResult(nil, nil)
+            Assert.equal(false, ok)
+            Assert.equal('add_failed', reason)
+
+            ok, reason = MBT.GiveItems.NormalizeAddResult(true, { slot = 4 })
+            Assert.equal(true, ok)
+            Assert.equal(nil, reason)
+        end,
+    },
+    {
+        name = 'custom inventory callback fails closed',
+        run = function()
+            local ok, reason = MBT.GiveItems.CallCustom(nil, 12, 'hat', 1, {})
+            Assert.equal(false, ok)
+            Assert.equal('unsupported_inventory', reason)
+
+            ok, reason = MBT.GiveItems.CallCustom(function()
+                error('custom exploded')
+            end, 12, 'hat', 1, {})
+            Assert.equal(false, ok)
+            Assert.equal('custom_error', reason)
+
+            ok, reason = MBT.GiveItems.CallCustom(function()
+                return nil
+            end, 12, 'hat', 1, {})
+            Assert.equal(false, ok)
+            Assert.equal('add_failed', reason)
+
+            ok, reason = MBT.GiveItems.CallCustom(function(src, name, count, metadata)
+                Assert.equal(12, src)
+                Assert.equal('hat', name)
+                Assert.equal(1, count)
+                Assert.equal('male', metadata.sex)
+                return true
+            end, 12, 'hat', 1, { sex = 'male' })
+            Assert.equal(true, ok)
+            Assert.equal(nil, reason)
+        end,
+    },
 }
 
 RegisterCommand('mbt_inventory_return_selftest', function(source)

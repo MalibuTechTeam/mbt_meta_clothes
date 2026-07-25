@@ -11,7 +11,8 @@ MBT.GiveItems.Setup({
     getPlayerName = function(player) return player.name end,
     getPlayerSource = function(player) return player.source end,
     addItem = function(src, itemName, count, metadata)
-        exports.ox_inventory:AddItem(src, itemName, count, metadata)
+        local success, response = exports.ox_inventory:AddItem(src, itemName, count, metadata)
+        return MBT.GiveItems.NormalizeAddResult(success, response)
     end
 })
 

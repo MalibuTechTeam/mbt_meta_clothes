@@ -5,6 +5,36 @@
 
 MBT.GiveItems = {}
 
+---@param success any
+---@param reason any
+---@return boolean success
+---@return string|nil reason
+function MBT.GiveItems.NormalizeAddResult(success, reason)
+    if success == true then
+        return true, nil
+    end
+    return false, type(reason) == "string" and reason or "add_failed"
+end
+
+---@param callback function|nil
+---@param src number
+---@param itemName string
+---@param count number
+---@param metadata table
+---@return boolean success
+---@return string|nil reason
+function MBT.GiveItems.CallCustom(callback, src, itemName, count, metadata)
+    if type(callback) ~= "function" then
+        return false, "unsupported_inventory"
+    end
+
+    local called, success, reason = pcall(callback, src, itemName, count, metadata)
+    if not called then
+        return false, "custom_error"
+    end
+    return MBT.GiveItems.NormalizeAddResult(success, reason)
+end
+
 --- Create a small add-before-commit coordinator.
 --- The caller owns payload construction and the authoritative state commit;
 --- this helper only guarantees ordering and per-logical-slot exclusion.

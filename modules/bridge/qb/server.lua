@@ -8,18 +8,23 @@ local isOXInventory = GetResourceState('ox_inventory'):find('start')
 -- Inventory-agnostic addItem: tries OX → QB → Custom fallback
 local function addItem(src, itemName, count, metadata)
     if isOXInventory then
-        exports.ox_inventory:AddItem(src, itemName, count, metadata)
+        local success, response = exports.ox_inventory:AddItem(src, itemName, count, metadata)
+        return MBT.GiveItems.NormalizeAddResult(success, response)
     elseif isQBInventory then
         local player = QBCore.Functions.GetPlayer(src)
-        if player then
-            player.Functions.AddItem(itemName, count, false, metadata)
+        if not player then return false, 'invalid_player' end
+
+        local success = player.Functions.AddItem(itemName, count, false, metadata)
+        if success then
             TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[itemName], "add")
         end
+        return MBT.GiveItems.NormalizeAddResult(success, success and nil or 'inventory_full')
     else
         if type(MBT.CustomInventory) == 'function' then
-            MBT.CustomInventory(itemName, metadata)
+            return MBT.GiveItems.CallCustom(MBT.CustomInventory, src, itemName, count, metadata)
         else
             MBT.ServerUtils.PrintWarning()
+            return false, 'unsupported_inventory'
         end
     end
 end
