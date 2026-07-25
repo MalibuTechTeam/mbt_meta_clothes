@@ -5,6 +5,92 @@
 
 MBT.GiveItems = {}
 
+--- Create a small add-before-commit coordinator.
+--- The caller owns payload construction and the authoritative state commit;
+--- this helper only guarantees ordering and per-logical-slot exclusion.
+---@param config table
+---@return table coordinator
+function MBT.GiveItems.New(config)
+    assert(type(config) == "table", "MBT.GiveItems.New: config must be a table")
+    assert(type(config.addItem) == "function", "MBT.GiveItems.New: addItem must be a function")
+
+    local locks = {}
+    local coordinator = {}
+
+    ---@param lockKey string
+    ---@param buildPayload function
+    ---@param commitState function
+    ---@return table result
+    function coordinator:Transfer(lockKey, buildPayload, commitState)
+        if locks[lockKey] then
+            return { ok = false, reason = "busy" }
+        end
+
+        locks[lockKey] = true
+        local protected, result = xpcall(function()
+            local payload, buildReason = buildPayload()
+            if not payload then
+                return { ok = false, reason = buildReason or "no_item" }
+            end
+
+            local added, addReason = config.addItem(
+                payload.receiver,
+                payload.itemName,
+                payload.count or 1,
+                payload.metadata
+            )
+            if added ~= true then
+                return {
+                    ok = false,
+                    reason = addReason or "add_failed",
+                    itemName = payload.itemName,
+                }
+            end
+
+            local committed, committedData = commitState(payload)
+            if committed ~= true then
+                if config.log then
+                    config.log("commit_failed", lockKey, payload.itemName)
+                end
+                return {
+                    ok = false,
+                    reason = "commit_failed",
+                    itemName = payload.itemName,
+                }
+            end
+
+            return {
+                ok = true,
+                itemName = payload.itemName,
+                committed = committedData,
+            }
+        end, debug.traceback)
+
+        locks[lockKey] = nil
+
+        if protected then
+            return result
+        end
+
+        if config.log then
+            config.log("exception", lockKey, result)
+        end
+        return { ok = false, reason = "internal_error" }
+    end
+
+    ---@param src number|string
+    function coordinator:CleanupSource(src)
+        local prefix = tostring(src) .. ":"
+        for key in pairs(locks) do
+            if key:sub(1, #prefix) == prefix then
+                locks[key] = nil
+            end
+        end
+    end
+
+    return coordinator
+end
+
 
 --- Build item description with optional clothing ID for admin reference
 --- @param baseDesc string The base description (e.g. "Piece of clothing belonging to John")

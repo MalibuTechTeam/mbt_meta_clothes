@@ -44,6 +44,7 @@ server_scripts {
     'core/**/server.lua',
     -- 8. Deterministic server-console self-tests (debug only)
     'tests/snapshot_spec.lua',
+    'tests/inventory_return_spec.lua',
 }
 
 client_scripts {
