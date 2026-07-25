@@ -17,7 +17,7 @@ This change must fix that failure mode without introducing an inventory resolver
 - Preserve the current ESX, QB and OX bridge structure.
 - Preserve the current OX and QB item-registration paths.
 - Make returning a worn drawable, prop, or torso kit to inventory all-or-nothing from the resource's point of view.
-- Make single-item and steal-all operations use the same safe ordering.
+- Make single-item, selected-multiple, and steal-all operations use the same safe ordering.
 - Preserve complete server-owned metadata, including DNA and resolved `item_name` information.
 - Prevent duplicate requests against the same player slot while an operation is in progress.
 - Report inventory failures to the requesting client without changing the PED or `PlayerState`.
@@ -99,7 +99,7 @@ Single drawable, prop, and torso stealing follow the same order:
 
 The server never clears the victim first. A failed steal therefore cannot destroy clothing.
 
-Steal-all reuses this primitive for every logical item in deterministic slot order. It is not presented as one inventory-wide atomic transaction because the supported inventories do not share a reliable batch-add and rollback API. Instead:
+Selected-multiple and steal-all reuse this primitive for every requested logical item in deterministic slot order. The client submits one bounded batch rather than several rapid `stealSingleItem` events, so the existing steal rate limit applies to the user action instead of rejecting later selected slots. A batch is not presented as one inventory-wide atomic transaction because the supported inventories do not share a reliable batch-add and rollback API. Instead:
 
 - every successfully added logical item clears only its corresponding victim slot or torso group;
 - every rejected item remains worn and present in the victim's `PlayerState`;
@@ -148,11 +148,12 @@ No inventory polling, periodic task, or additional database write is introduced.
 5. Steal one drawable successfully; create one thief item, then clear and visually reset the victim slot.
 6. Attempt a steal while the thief inventory is full; preserve the victim state and PED.
 7. Attempt two simultaneous steals against the same victim slot; at most one succeeds.
-8. Use steal-all with enough capacity; transfer every logical item and reset exactly the committed victim slots.
-9. Use steal-all with capacity for only part of the outfit; retain every rejected item on the victim and clear only successful slots.
-10. Use rich metadata containing DNA, description, texture, palette, and resolved item name; preserve it in the returned item.
-11. Make the custom inventory callback fail or return no value; retain state and report a controlled failure.
-12. Relog after a successful, partial, or failed operation; restore the last authoritative result without duplication.
+8. Submit a selected-multiple batch; apply the steal rate limit once and process every valid selected slot in deterministic order.
+9. Use steal-all with enough capacity; transfer every logical item and reset exactly the committed victim slots.
+10. Use steal-all with capacity for only part of the outfit; retain every rejected item on the victim and clear only successful slots.
+11. Use rich metadata containing DNA, description, texture, palette, and resolved item name; preserve it in the returned item.
+12. Make the custom inventory callback fail or return no value; retain state and report a controlled failure.
+13. Relog after a successful, partial, or failed operation; restore the last authoritative result without duplication.
 
 ## Implementation Boundaries
 
