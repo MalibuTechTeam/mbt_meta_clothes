@@ -35,6 +35,90 @@ function MBT.GiveItems.CallCustom(callback, src, itemName, count, metadata)
     return MBT.GiveItems.NormalizeAddResult(success, reason)
 end
 
+---@param selections table
+---@param transfer function
+---@return table summary
+function MBT.GiveItems.ProcessBatch(selections, transfer)
+    local summary = {
+        requested = #selections,
+        succeeded = 0,
+        failed = 0,
+        committed = {},
+    }
+
+    for _, selection in ipairs(selections) do
+        local result = transfer(selection)
+        if result and result.ok == true then
+            summary.succeeded = summary.succeeded + 1
+            summary.committed[#summary.committed + 1] = result.committed or selection
+        else
+            summary.failed = summary.failed + 1
+            summary.lastReason = result and result.reason or "internal_error"
+        end
+    end
+
+    return summary
+end
+
+---@param selections table
+---@param config table
+---@return table|nil normalized
+function MBT.GiveItems.NormalizeStealSelections(selections, config)
+    if type(selections) ~= "table" or type(config) ~= "table" then return nil end
+    local length = #selections
+    if length < 1 or length > config.maxSelections then return nil end
+
+    local pairCount = 0
+    for key in pairs(selections) do
+        if type(key) ~= "number" or key ~= math.floor(key) or key < 1 or key > length then
+            return nil
+        end
+        pairCount = pairCount + 1
+    end
+    if pairCount ~= length then return nil end
+
+    local function isTorsoSlot(slotIndex)
+        for _, configuredIndex in ipairs(config.torsoSlots) do
+            if configuredIndex == slotIndex then return true end
+        end
+        return false
+    end
+
+    local normalized, seen = {}, {}
+    for _, selection in ipairs(selections) do
+        if type(selection) ~= "table" then return nil end
+        local stealType = selection.stealType
+        local slotIndex
+
+        if stealType == "torso" then
+            slotIndex = nil
+        elseif stealType == "drawable" or stealType == "prop" then
+            local slotType = stealType == "drawable" and "Drawables" or "Props"
+            local valid, index = config.validateSlot(slotType, selection.slotIndex)
+            if not valid then return nil end
+            if stealType == "drawable" and isTorsoSlot(index) then
+                stealType, index = "torso", nil
+            end
+            slotIndex = index
+        else
+            return nil
+        end
+
+        local logicalKey = stealType == "torso" and "torso" or (stealType .. ":" .. slotIndex)
+        if seen[logicalKey] then return nil end
+        seen[logicalKey] = true
+        normalized[#normalized + 1] = { stealType = stealType, slotIndex = slotIndex }
+    end
+
+    local typeOrder = { torso = 1, drawable = 2, prop = 3 }
+    table.sort(normalized, function(left, right)
+        local leftOrder, rightOrder = typeOrder[left.stealType], typeOrder[right.stealType]
+        if leftOrder ~= rightOrder then return leftOrder < rightOrder end
+        return (left.slotIndex or -1) < (right.slotIndex or -1)
+    end)
+    return normalized
+end
+
 --- Create a small add-before-commit coordinator.
 --- The caller owns payload construction and the authoritative state commit;
 --- this helper only guarantees ordering and per-logical-slot exclusion.
@@ -157,6 +241,7 @@ function MBT.GiveItems.NewRuntime(config)
     local torsoSlots = config.TorsoKitSlots or MBT.TorsoKitSlots
     local torsoNames = config.TorsoSlotNames or MBT.TorsoSlotNames
     local resolveItemName = config.resolveItemName or MBT.ResolveItemName
+    local normalizeSex = config.normalizeSex or MBT.NormalizeSex
     local cleanExpiredDNA = config.cleanExpiredDNA or MBT.ServerUtils.CleanExpiredDNA
     local clothesDescription = config.clothesDescription or MBT.Locale["clothes_desc"]
     local propsDescription = config.propsDescription or MBT.Locale["props_desc"]
@@ -176,8 +261,10 @@ function MBT.GiveItems.NewRuntime(config)
     ---@param receiverSrc number
     ---@param slotType string
     ---@param slotIndex number
+    ---@param options? table
     ---@return table result
-    function runtime:TransferSlot(ownerSrc, receiverSrc, slotType, slotIndex)
+    function runtime:TransferSlot(ownerSrc, receiverSrc, slotType, slotIndex, options)
+        options = options or {}
         local slotConfig = slotType == "Drawables" and drawables[slotIndex] or props[slotIndex]
         if not slotConfig then return { ok = false, reason = "invalid_slot" } end
 
@@ -192,8 +279,10 @@ function MBT.GiveItems.NewRuntime(config)
             if not original then return nil, "no_item" end
 
             local metadata = cloneTable(original)
-            local descriptionFormat = slotType == "Drawables" and clothesDescription or propsDescription
-            metadata.description = buildDescription(descriptionFormat:format(playerIdentity), metadata)
+            if not options.preserveDescription then
+                local descriptionFormat = slotType == "Drawables" and clothesDescription or propsDescription
+                metadata.description = buildDescription(descriptionFormat:format(playerIdentity), metadata)
+            end
             cleanExpiredDNA(metadata)
 
             local itemName = resolveItemName(slotConfig, metadata)
@@ -250,6 +339,28 @@ function MBT.GiveItems.NewRuntime(config)
             end
 
             if not found then return nil, "no_item" end
+
+            local sex = normalizeSex(metadata.sex)
+            if not sex then return nil, "invalid_metadata" end
+            metadata.sex = sex
+            for _, slotIndex in ipairs(torsoSlots) do
+                local slotName = torsoNames[slotIndex]
+                if not metadata[slotName] then
+                    local defaults = drawables[slotIndex]
+                        and drawables[slotIndex].Default
+                        and drawables[slotIndex].Default[sex]
+                    if not defaults or defaults[1] == nil then
+                        return nil, "invalid_config"
+                    end
+                    metadata[slotName] = {
+                        index = slotIndex,
+                        drawable = defaults[1],
+                        texture = 0,
+                        palette = 0,
+                        sex = sex,
+                    }
+                end
+            end
             cleanExpiredDNA(metadata)
             return {
                 receiver = receiverSrc,
@@ -297,9 +408,6 @@ function MBT.GiveItems.Setup(config)
     local runtime = MBT.GiveItems.NewRuntime(config)
     MBT.GiveItems.Runtime = runtime
 
-    -- Expose addItem globally for use by core/server.lua (e.g. externalUndress)
-    addItemToPlayer = config.addItem
-
     function giveDress(src, data)
         return runtime:ReturnSlot(src, "Drawables", data.Index)
     end
@@ -312,70 +420,4 @@ function MBT.GiveItems.Setup(config)
         return runtime:ReturnSlot(src, "Props", data.Index)
     end
 
-    function giveStolenItemDress(stealSource, targetWearing, playerSex)
-        local player = config.getPlayer(stealSource)
-        if not player then return end
-        local playerIdentity = config.getPlayerName(player)
-
-        -- Check if torso slots have non-default drawables → create topdress kit
-        local hasNonDefaultTorso = false
-        local kitMetadata = {
-            description = MBT.Locale["clothes_desc"]:format(playerIdentity),
-            sex = playerSex, type = "DressKit"
-        }
-
-        for _, slotIdx in ipairs(MBT.TorsoKitSlots) do
-            local v = targetWearing["Drawables"][slotIdx]
-            if v and MBT.Drawables[slotIdx] then
-                local isDefault = MBT.TableContains(MBT.Drawables[slotIdx]["Default"][playerSex], v.Drawable)
-                if not isDefault then
-                    hasNonDefaultTorso = true
-                end
-                kitMetadata[MBT.TorsoSlotNames[slotIdx]] = {
-                    index = slotIdx,
-                    drawable = v.Drawable,
-                    texture = v.Texture,
-                    palette = v.Palette
-                }
-            end
-        end
-
-        if hasNonDefaultTorso then
-            config.addItem(stealSource, "topdress", 1, kitMetadata)
-        end
-
-        -- Other drawable slots (not part of torso kit)
-        for k, v in pairs(targetWearing["Drawables"]) do
-            if not MBT.TableContains(MBT.TorsoKitSlots, k) then
-                local slotCfg = MBT.Drawables[k]
-                local itemName = MBT.ResolveItemName(slotCfg, v)
-                if slotCfg and itemName then
-                    if not MBT.TableContains(slotCfg["Default"][playerSex], v.Drawable) then
-                        config.addItem(stealSource, itemName, 1, {
-                            description = buildDescription(MBT.Locale["clothes_desc"]:format(playerIdentity), {index = k, drawable = v.Drawable, texture = v.Texture}),
-                            index = k, sex = playerSex,
-                            drawable = v.Drawable, texture = v.Texture, palette = v.Palette,
-                            type = "Drawable"
-                        })
-                    end
-                end
-            end
-        end
-
-        -- Props
-        for k, v in pairs(targetWearing["Props"]) do
-            local slotCfg = MBT.Props[k]
-            local itemName = MBT.ResolveItemName(slotCfg, v)
-            if slotCfg and itemName then
-                if not MBT.TableContains(slotCfg["Default"][playerSex], v.Drawable) then
-                    config.addItem(stealSource, itemName, 1, {
-                        description = buildDescription(MBT.Locale["props_desc"]:format(playerIdentity), {index = k, drawable = v.Drawable, texture = v.Texture}),
-                        index = k, sex = playerSex,
-                        drawable = v.Drawable, texture = v.Texture, palette = v.Palette,
-                        type = "Prop"
-                    })
-                end
-            end
-        end
-    end
 end

@@ -357,7 +357,7 @@ RegisterNetEvent('mbt_meta_clothes:giveDress', function(data)
         return sendUndressResult(src, data.RequestId, "drawable", data.Index, { ok = false, reason = "busy" })
     end
     local valid, index = MBT.ServerUtils.ValidateSlot("Drawables", data.Index)
-    if not valid then
+    if not valid or MBT.TableContains(MBT.TorsoKitSlots, index) then
         return sendUndressResult(src, data.RequestId, "drawable", data.Index, { ok = false, reason = "invalid_slot" })
     end
     if MBT.PlayerState.CheckCharacterSwitch(src) then
@@ -404,113 +404,134 @@ AddEventHandler('playerDropped', function()
 end)
 
 -- S4 FIX: Server-authoritative steal — server reads from PlayerState, not from client
-RegisterNetEvent('mbt_meta_clothes:syncStealDress', function(target)
-    local src = source
-    if not MBT.ServerUtils.CheckRateLimit(src, "steal") then return end
-    if not MBT.ServerUtils.IsValidPlayer(target) then return end
-    if not MBT.ServerUtils.CheckProximity(src, target, MBT.StealDistance or 5.0) then return end
+local function isTorsoSlot(slotIndex)
+    return MBT.TableContains(MBT.TorsoKitSlots, slotIndex)
+end
 
-    -- Server reads victim's state and gives items to thief
-    local targetWearing = MBT.PlayerState.GetAll(target)
-    if not targetWearing then return end
-
-    -- Verify target actually has worn items before proceeding
-    local hasItems = false
-    for _ in pairs(targetWearing.Drawables or {}) do hasItems = true break end
-    if not hasItems then
-        for _ in pairs(targetWearing.Props or {}) do hasItems = true break end
+local function maxStealSelections()
+    local count = 1
+    for slotIndex in pairs(MBT.Drawables) do
+        if not isTorsoSlot(slotIndex) then count = count + 1 end
     end
-    if not hasItems then return end
+    for _ in pairs(MBT.Props) do count = count + 1 end
+    return count
+end
 
-    -- Get target sex from metadata (normalize against legacy raw values like 0/"m")
-    local targetSex = "male"
-    for _, meta in pairs(targetWearing.Drawables or {}) do
-        if meta and meta.sex then targetSex = MBT.NormalizeSex(meta.sex) or "male" break end
+local function commitStealItem(thiefSource, targetServerId, selection)
+    local runtime = MBT.GiveItems.Runtime
+    if not runtime then return { ok = false, reason = "unsupported_inventory" } end
+
+    local result
+    if selection.stealType == "torso" then
+        result = runtime:TransferTorso(targetServerId, thiefSource)
+    else
+        local slotType = selection.stealType == "drawable" and "Drawables" or "Props"
+        result = runtime:TransferSlot(targetServerId, thiefSource, slotType, selection.slotIndex, {
+            preserveDescription = true,
+        })
     end
 
-    -- Give stolen items to thief using server-authoritative state
-    giveStolenItemDress(src, targetWearing, targetSex)
+    if result.ok then
+        result.committed = {
+            stealType = selection.stealType,
+            slotIndex = selection.slotIndex,
+        }
+        TriggerClientEvent(
+            'mbt_meta_clothes:stealApplyDefault',
+            targetServerId,
+            selection.stealType,
+            selection.slotIndex
+        )
+    end
+    return result
+end
 
-    -- Clear all slots for victim
-    MBT.PlayerState.ClearAllSlots(target, "Drawables")
-    MBT.PlayerState.ClearAllSlots(target, "Props")
+local function notifyStealSummary(thiefSource, summary)
+    if summary.succeeded == summary.requested then return end
+    local localeKey
+    if summary.succeeded > 0 then
+        localeKey = "partial_steal"
+    elseif summary.lastReason == "inventory_full" then
+        localeKey = "inventory_full"
+    elseif summary.lastReason == "busy" then
+        localeKey = "action_busy"
+    else
+        localeKey = "inventory_error"
+    end
+    TriggerClientEvent('mbt_meta_clothes:notify', thiefSource, MBT.Locale[localeKey])
+end
 
-    -- Tell victim client to strip PED
-    TriggerClientEvent('mbt_meta_clothes:setDefaultDressTarget', target, src)
-end)
+local function processStealSelections(thiefSource, targetServerId, selections)
+    local normalized = MBT.GiveItems.NormalizeStealSelections(selections, {
+        validateSlot = MBT.ServerUtils.ValidateSlot,
+        torsoSlots = MBT.TorsoKitSlots,
+        maxSelections = maxStealSelections(),
+    })
+    if not normalized then return nil end
+
+    local summary = MBT.GiveItems.ProcessBatch(normalized, function(selection)
+        return commitStealItem(thiefSource, targetServerId, selection)
+    end)
+    notifyStealSummary(thiefSource, summary)
+    return summary
+end
+
+local function validateStealAction(thiefSource, targetServerId)
+    if not MBT.ServerUtils.CheckRateLimit(thiefSource, "steal") then return false end
+    if not MBT.ServerUtils.IsValidPlayer(targetServerId) then return false end
+    if not MBT.ServerUtils.CheckProximity(thiefSource, targetServerId, MBT.StealDistance or 5.0) then return false end
+    if MBT.PlayerState.CheckCharacterSwitch(thiefSource) then return false end
+    return not MBT.PlayerState.CheckCharacterSwitch(targetServerId)
+end
 
 RegisterNetEvent('mbt_meta_clothes:stealSingleItem', function(targetServerId, stealType, slotIndex)
     local thiefSource = source
-    if not MBT.ServerUtils.CheckRateLimit(thiefSource, "steal") then return end
-    if not MBT.ServerUtils.IsValidPlayer(targetServerId) then return end
-    if not MBT.ServerUtils.CheckProximity(thiefSource, targetServerId, MBT.StealDistance or 5.0) then return end
+    if not validateStealAction(thiefSource, targetServerId) then return end
+    processStealSelections(thiefSource, targetServerId, {
+        { stealType = stealType, slotIndex = slotIndex },
+    })
+end)
 
-    -- Validate stealType
-    if stealType ~= "torso" and stealType ~= "drawable" and stealType ~= "prop" then return end
+RegisterNetEvent('mbt_meta_clothes:stealBatch', function(targetServerId, selections)
+    local thiefSource = source
+    if not validateStealAction(thiefSource, targetServerId) then return end
+    processStealSelections(thiefSource, targetServerId, selections)
+end)
 
-    -- Validate slotIndex for non-torso
-    if stealType ~= "torso" then
-        local slotTypeStr = stealType == "drawable" and "Drawables" or "Props"
-        local valid, idx = MBT.ServerUtils.ValidateSlot(slotTypeStr, slotIndex)
-        if not valid then return end
-        slotIndex = idx
-    end
+RegisterNetEvent('mbt_meta_clothes:syncStealDress', function(targetServerId)
+    local thiefSource = source
+    if not validateStealAction(thiefSource, targetServerId) then return end
 
-    -- Get target sex from wearing state (normalize against legacy raw values like 0/"m")
-    local targetSex = "male"
     local wearing = MBT.PlayerState.GetAll(targetServerId)
-    if wearing then
-        for _, meta in pairs(wearing.Drawables or {}) do
-            if meta and meta.sex then targetSex = MBT.NormalizeSex(meta.sex) or "male" break end
+    if not wearing then return end
+    local selections, hasTorso = {}, false
+
+    for _, slotIndex in ipairs(MBT.TorsoKitSlots) do
+        if wearing.Drawables and wearing.Drawables[slotIndex] then
+            hasTorso = true
+            break
         end
     end
+    if hasTorso then selections[#selections + 1] = { stealType = "torso" } end
 
-    if stealType == "torso" then
-        local kitMeta = {
-            description = MBT.Locale["stolen_clothing"] or "Stolen clothing",
-            sex = targetSex, type = "DressKit"
+    for slotIndex in pairs(wearing.Drawables or {}) do
+        slotIndex = tonumber(slotIndex) or slotIndex
+        if not isTorsoSlot(slotIndex) then
+            selections[#selections + 1] = { stealType = "drawable", slotIndex = slotIndex }
+        end
+    end
+    for slotIndex in pairs(wearing.Props or {}) do
+        selections[#selections + 1] = {
+            stealType = "prop",
+            slotIndex = tonumber(slotIndex) or slotIndex,
         }
-        for _, idx in ipairs(MBT.TorsoKitSlots) do
-            local meta = MBT.PlayerState.ClearSlot(targetServerId, "Drawables", idx)
-            if meta then
-                kitMeta[MBT.TorsoSlotNames[idx]] = meta
-            else
-                -- PlayerState had no entry (slot was at default): always include all three
-                -- torso slots so applyKitDress resets them together (prevents arms/shirt mismatch)
-                local defaultDrawable = MBT.Drawables[idx]
-                    and MBT.Drawables[idx]["Default"]
-                    and MBT.Drawables[idx]["Default"][targetSex]
-                    and MBT.Drawables[idx]["Default"][targetSex][1]
-                if defaultDrawable ~= nil then
-                    kitMeta[MBT.TorsoSlotNames[idx]] = {
-                        index = idx, drawable = defaultDrawable, texture = 0, palette = 0
-                    }
-                end
-            end
-        end
-        if addItemToPlayer then
-            addItemToPlayer(thiefSource, "topdress", 1, kitMeta)
-        end
-        TriggerClientEvent('mbt_meta_clothes:stealApplyDefault', targetServerId, "torso")
-
-    elseif stealType == "drawable" then
-        local meta = MBT.PlayerState.ClearSlot(targetServerId, "Drawables", slotIndex)
-        local slotCfg = MBT.Drawables[slotIndex]
-        local itemName = MBT.ResolveItemName(slotCfg, meta)
-        if meta and itemName and addItemToPlayer then
-            addItemToPlayer(thiefSource, itemName, 1, meta)
-        end
-        TriggerClientEvent('mbt_meta_clothes:stealApplyDefault', targetServerId, "drawable", slotIndex)
-
-    elseif stealType == "prop" then
-        local meta = MBT.PlayerState.ClearSlot(targetServerId, "Props", slotIndex)
-        local slotCfg = MBT.Props[slotIndex]
-        local itemName = MBT.ResolveItemName(slotCfg, meta)
-        if meta and itemName and addItemToPlayer then
-            addItemToPlayer(thiefSource, itemName, 1, meta)
-        end
-        TriggerClientEvent('mbt_meta_clothes:stealApplyDefault', targetServerId, "prop", slotIndex)
     end
+
+    if #selections == 0 then
+        TriggerClientEvent('mbt_meta_clothes:notify', thiefSource, MBT.Locale["nothing_to_steal"])
+        return
+    end
+    processStealSelections(thiefSource, targetServerId, selections)
 end)
 
 -- S3 FIX: Proximity + rate limit on victim anim relay

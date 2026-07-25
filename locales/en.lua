@@ -58,6 +58,12 @@ Locales['en'] = {
         ["type"] = "error",
         ["icon"] = "clock",
     },
+    ["partial_steal"] = {
+        ["title"] = "Clothes",
+        ["description"] = "Only part of the selected clothing could be taken.",
+        ["type"] = "warning",
+        ["icon"] = "triangle-exclamation",
+    },
 
     -----------------------------------------------------------
     -- Slot Labels (used in config Drawables/Props, steal menu, target)

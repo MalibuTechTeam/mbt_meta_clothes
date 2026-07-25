@@ -744,7 +744,7 @@ function MBT.Utils.StealAllItems(thiefPed, targetPed, targetServerId)
     TriggerServerEvent('mbt_meta_clothes:syncStealDress', targetServerId)
 end
 
--- Multi-select steal: una sola animazione (patdown) + un server event per ogni item selezionato.
+-- Multi-select steal: one animation and one bounded server batch.
 -- Usato da confirmSteal quando l'utente sceglie un sottoinsieme di item.
 function MBT.Utils.StealMultipleItems(thiefPed, targetPed, targetServerId, items)
     local targetDown = isTargetDown(targetPed)
@@ -766,10 +766,7 @@ function MBT.Utils.StealMultipleItems(thiefPed, targetPed, targetServerId, items
     requestVictimAnim(targetServerId, a.dur, targetDown)
     playStealAnimation(thiefPed, { dict = a.dict, clip = a.clip, flag = a.flag }, a.dur)
 
-    -- Manda tutti gli eventi server dopo UNA animazione
-    for _, item in ipairs(items) do
-        TriggerServerEvent("mbt_meta_clothes:stealSingleItem", targetServerId, item.stealType, item.slotIndex)
-    end
+    TriggerServerEvent("mbt_meta_clothes:stealBatch", targetServerId, items)
 end
 
 -----------------------------------------------------------

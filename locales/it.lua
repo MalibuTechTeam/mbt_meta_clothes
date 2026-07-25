@@ -58,6 +58,12 @@ Locales['it'] = {
         ["type"] = "error",
         ["icon"] = "clock",
     },
+    ["partial_steal"] = {
+        ["title"] = "Vestiti",
+        ["description"] = "È stato possibile prendere solo una parte dei capi selezionati.",
+        ["type"] = "warning",
+        ["icon"] = "triangle-exclamation",
+    },
 
     -----------------------------------------------------------
     -- Etichette Slot

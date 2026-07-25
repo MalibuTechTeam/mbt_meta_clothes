@@ -46,9 +46,9 @@ local function runtimeFixture(initial, add_item)
         getPlayerSource = function(player) return player.source end,
         PlayerState = playerState,
         Drawables = {
-            [3] = { Item = 'arms' },
-            [8] = { Item = 'tshirt' },
-            [11] = { Item = { 'jacket', 'designer_jacket' } },
+            [3] = { Item = 'arms', Default = { male = { 15 } } },
+            [8] = { Item = 'tshirt', Default = { male = { 15 } } },
+            [11] = { Item = { 'jacket', 'designer_jacket' }, Default = { male = { 15 } } },
         },
         Props = {
             [0] = { Item = 'hat' },
@@ -59,6 +59,7 @@ local function runtimeFixture(initial, add_item)
             if metadata.item_name then return metadata.item_name end
             return type(slot_config.Item) == 'table' and slot_config.Item[1] or slot_config.Item
         end,
+        normalizeSex = function(sex) return sex end,
         cleanExpiredDNA = function() end,
         clothesDescription = 'Piece of clothing belonging to %s',
         propsDescription = 'Accessory belonging to %s',
@@ -367,6 +368,131 @@ local cases = {
             Assert.equal(false, result.ok)
             Assert.equal(0, #clears)
             Assert.equal(29, state.Drawables[11].drawable)
+        end,
+    },
+    {
+        name = 'torso item fills absent slots with configured defaults',
+        run = function()
+            local addedMetadata
+            local runtime = runtimeFixture({
+                Drawables = {
+                    [11] = { index = 11, drawable = 29, texture = 2, sex = 'male' },
+                },
+                Props = {},
+            }, function(_, _, _, metadata)
+                addedMetadata = metadata
+                return true
+            end)
+
+            local result = runtime:ReturnTorso(14)
+
+            Assert.equal(true, result.ok)
+            Assert.equal(15, addedMetadata.Arms.drawable)
+            Assert.equal(15, addedMetadata.Tshirt.drawable)
+            Assert.equal(29, addedMetadata.Jacket.drawable)
+        end,
+    },
+    {
+        name = 'steal transfers victim metadata to thief before clearing',
+        run = function()
+            local receiver
+            local runtime, state = runtimeFixture({
+                Drawables = {
+                    [11] = {
+                        index = 11,
+                        drawable = 29,
+                        texture = 2,
+                        sex = 'male',
+                        item_name = 'designer_jacket',
+                        description = 'Original victim description',
+                        last_worn_by = { { identifier = 'victim:1' } },
+                    },
+                },
+                Props = {},
+            }, function(src, _, _, metadata)
+                receiver = src
+                Assert.equal('victim:1', metadata.last_worn_by[1].identifier)
+                Assert.equal('Original victim description', metadata.description)
+                return true
+            end)
+
+            local result = runtime:TransferSlot(20, 21, 'Drawables', 11, {
+                preserveDescription = true,
+            })
+
+            Assert.equal(true, result.ok)
+            Assert.equal(21, receiver)
+            Assert.equal(nil, state.Drawables[11])
+        end,
+    },
+    {
+        name = 'partial batch reports only committed selections',
+        run = function()
+            local calls = 0
+            local selections = {
+                { stealType = 'drawable', slotIndex = 4 },
+                { stealType = 'prop', slotIndex = 0 },
+                { stealType = 'drawable', slotIndex = 6 },
+            }
+
+            local summary = MBT.GiveItems.ProcessBatch(selections, function(selection)
+                calls = calls + 1
+                if calls == 3 then
+                    return { ok = false, reason = 'inventory_full' }
+                end
+                return {
+                    ok = true,
+                    committed = {
+                        stealType = selection.stealType,
+                        slotIndex = selection.slotIndex,
+                    },
+                }
+            end)
+
+            Assert.equal(3, summary.requested)
+            Assert.equal(2, summary.succeeded)
+            Assert.equal(1, summary.failed)
+            Assert.equal(2, #summary.committed)
+            Assert.equal(0, summary.committed[2].slotIndex)
+            Assert.equal('inventory_full', summary.lastReason)
+        end,
+    },
+    {
+        name = 'steal selections are validated deduplicated and sorted',
+        run = function()
+            local function validateSlot(slot_type, index)
+                index = tonumber(index)
+                if slot_type == 'Drawables' and (index == 4 or index == 11) then return true, index end
+                if slot_type == 'Props' and index == 0 then return true, index end
+                return false
+            end
+            local config = {
+                validateSlot = validateSlot,
+                torsoSlots = { 3, 8, 11 },
+                maxSelections = 4,
+            }
+
+            local normalized = MBT.GiveItems.NormalizeStealSelections({
+                { stealType = 'prop', slotIndex = '0' },
+                { stealType = 'drawable', slotIndex = 4 },
+                { stealType = 'drawable', slotIndex = 11 },
+            }, config)
+            Assert.equal('torso', normalized[1].stealType)
+            Assert.equal('drawable', normalized[2].stealType)
+            Assert.equal(4, normalized[2].slotIndex)
+            Assert.equal('prop', normalized[3].stealType)
+
+            local duplicate = MBT.GiveItems.NormalizeStealSelections({
+                { stealType = 'torso' },
+                { stealType = 'drawable', slotIndex = 11 },
+            }, config)
+            Assert.equal(nil, duplicate)
+
+            local malformed = MBT.GiveItems.NormalizeStealSelections({
+                [1] = { stealType = 'prop', slotIndex = 0 },
+                extra = true,
+            }, config)
+            Assert.equal(nil, malformed)
         end,
     },
 }
