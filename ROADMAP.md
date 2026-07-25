@@ -36,16 +36,20 @@ matrix above passes.
 
 - [ ] Make dress and undress operations server-authoritative.
   - Never create inventory metadata from untrusted client payloads.
-  - Reject an undress request when the corresponding server wearing slot is empty.
+  - [x] Reject an undress request when the corresponding server wearing slot is empty.
+  - [x] Build returned-item metadata from the authoritative server wearing state.
   - Correlate item use with the server-side inventory operation.
-- [ ] Make inventory mutations transactional.
-  - Check inventory capacity before removing a worn slot.
+- [x] Make inventory returns transactional.
+  - Add the item before removing a worn slot, using the inventory adapter result
+    as the capacity/failure decision.
   - Clear the wearing state only after `AddItem` succeeds.
-  - Preserve or restore the previous state when an inventory adapter fails.
+  - Preserve the previous state when an inventory adapter fails.
   - Return a localized error notification to the player.
-- [ ] Repair steal-all metadata.
-  - Standardize on `drawable`, `texture`, and `palette` lowercase keys.
-  - Preserve DNA and all original metadata when an item changes owner.
+- [x] Repair steal single, multiple, and steal-all ownership transfer.
+  - Preserve authoritative lowercase visual metadata, DNA, and original metadata
+    when an item changes owner.
+  - Commit and visually clear only the victim slots whose `AddItem` succeeded.
+  - Use one validated, bounded server batch for multi-select and steal-all.
   - Remove the obsolete client `giveStolenItemDress` event path.
 - [ ] Harden steal and animation events.
   - Validate numeric duration and clamp both minimum and maximum values.
@@ -56,12 +60,19 @@ matrix above passes.
   - Validate the archive against every path referenced by `fxmanifest.lua`.
   - Update deprecated GitHub Actions and output syntax.
 
+The transactional return and steal implementations pass the local pure-Lua
+inventory self-test (`16/16` on 2026-07-25), syntax compilation, and static diff
+checks. They remain pending in-resource Cfx and end-to-end inventory-full testing.
+
 ## P1 - Required for a stable 2.0
 
-- [ ] Add a single framework and inventory resolver.
-  - Select exactly one framework: ESX, QBCore, or OX Core.
-  - Select exactly one inventory adapter and expose a common result contract.
-  - Fail early with a useful startup error for unsupported combinations.
+- [ ] Enforce the existing single-active-inventory invariant.
+  - [x] Preserve the current bridge/resource-detection architecture: MBT servers
+    run one inventory implementation at a time, independently of the framework.
+  - [x] Expose one explicit success/failure result contract from every inventory
+    adapter without changing item registration ownership.
+  - [ ] Fail early with a useful startup error when no supported inventory adapter
+    is active and no custom adapter is configured.
 - [ ] Align optional and required dependencies.
   - Decide whether `ox_lib` is required or provide notification/progress fallbacks.
   - Fix the `MBT.CustomInventory(source, itemName, count, metadata)` contract.
@@ -82,7 +93,8 @@ matrix above passes.
 
 ## P2 - Quality and maintainability
 
-- [ ] Add automated tests for pure Lua helpers and metadata normalization.
+- [x] Add automated tests for snapshot helpers, inventory-return transactions,
+      steal batch validation, partial failures, and metadata preservation.
 - [ ] Add integration scenarios for dress, undress, inventory-full, steal single,
       steal multiple, steal all, reconnect, and rapid multichar switching.
 - [ ] Add a release smoke test that starts from a clean checkout.
