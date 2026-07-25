@@ -1,6 +1,8 @@
 local playerSex
 MBT.playerWearing = { Drawables = {}, Props = {} }
 local lastActionTime = 0
+local nextUndressRequestId = 0
+local pendingUndress = {}
 
 MBT.Utils = {}
 
@@ -12,6 +14,24 @@ local function checkCooldown()
     end
     lastActionTime = now
     return true
+end
+
+local function queueUndress(kind, index, sex)
+    local now = GetGameTimer()
+    for requestId, pending in pairs(pendingUndress) do
+        if now - pending.createdAt > 10000 then
+            pendingUndress[requestId] = nil
+        end
+    end
+
+    nextUndressRequestId = nextUndressRequestId % 2147483647 + 1
+    pendingUndress[nextUndressRequestId] = {
+        kind = kind,
+        index = index,
+        sex = sex,
+        createdAt = now,
+    }
+    return nextUndressRequestId
 end
 
 function MBT.Utils.UpdatePlayerClothes()
@@ -55,24 +75,12 @@ function MBT.Utils.HandleProps(propIndex)
     if not checkCooldown() then return end
     local playerSex = MBT.Utils.GetPedSex(PlayerPedId())
     local currentProp = GetPedPropIndex(PlayerPedId(), propIndex)
-    local propData = {
-        Item = MBT.Props[propIndex] and MBT.GetSlotItemNames(MBT.Props[propIndex])[1] or nil,
-        Index = propIndex,
-        Sex = playerSex,
-        Drawable = currentProp,
-        Texture  = GetPedPropTextureIndex(PlayerPedId(), propIndex)
-    }
 
     if MBT.Utils.IsAbleToUndress({Type = "Props", Index = propIndex, Drawable = currentProp}) then
-        MBT.Utils.SetDefaultPropVariation({
-            Player = PlayerPedId(),
-            Sex = playerSex,
+        TriggerServerEvent("mbt_meta_clothes:giveProp", {
+            RequestId = queueUndress("prop", propIndex, playerSex),
             Index = propIndex,
-            isAnimated = true
         })
-        TriggerServerEvent("mbt_meta_clothes:giveProp", propData)
-        MBT.Utils.UpdatePlayerClothes()
-        if MBT.Utils.SendWearingToNUI then MBT.Utils.SendWearingToNUI() end
     else
         MBT.Notification(MBT.Locale["nothing_to_unwear"])
     end
@@ -81,56 +89,13 @@ end
 function MBT.Utils.HandleTorsoUndress()
     if not checkCooldown() then return end
     local playerSex = MBT.Utils.GetPedSex(PlayerPedId())
+    local tshirtIndex = 8
+    local tshirtDrawable = GetPedDrawableVariation(PlayerPedId(), tshirtIndex)
 
-    local topDressData = {
-        Item = "topdress",
-        Sex = playerSex,
-        Kit = {
-            Arms = {
-                Index = 3,
-                Drawable = GetPedDrawableVariation(PlayerPedId(), 3),
-                Texture  = GetPedTextureVariation(PlayerPedId(), 3),
-                Palette =  GetPedPaletteVariation(PlayerPedId(), 3)
-            },
-            Tshirt = {
-                Index = 8,
-                Drawable = GetPedDrawableVariation(PlayerPedId(), 8),
-                Texture  = GetPedTextureVariation(PlayerPedId(), 8),
-                Palette =  GetPedPaletteVariation(PlayerPedId(), 8),
-                isAnimated = true
-            },
-            Jacket = {
-                Index = 11,
-                Drawable = GetPedDrawableVariation(PlayerPedId(), 11),
-                Texture  = GetPedTextureVariation(PlayerPedId(), 11),
-                Palette =  GetPedPaletteVariation(PlayerPedId(), 11)
-            }
-        }
-    }
-
-    if MBT.Utils.IsAbleToUndress({Type = "Drawables", Index = topDressData["Kit"]["Tshirt"]["Index"], Drawable = topDressData["Kit"]["Tshirt"]["Drawable"]}) then
-
-        MBT.Utils.SetDefaultVariation({
-            isAnimated = true,
-            Player = PlayerPedId(),
-            Sex = playerSex,
-            Index = topDressData["Kit"]["Tshirt"]["Index"]
+    if MBT.Utils.IsAbleToUndress({Type = "Drawables", Index = tshirtIndex, Drawable = tshirtDrawable}) then
+        TriggerServerEvent("mbt_meta_clothes:giveDressKit", {
+            RequestId = queueUndress("torso", nil, playerSex),
         })
-        MBT.Utils.SetDefaultVariation({
-            isAnimated = false,
-            Player = PlayerPedId(),
-            Sex = playerSex,
-            Index = topDressData["Kit"]["Arms"]["Index"]
-        })
-        MBT.Utils.SetDefaultVariation({
-            isAnimated = false,
-            Player = PlayerPedId(),
-            Sex = playerSex,
-            Index = topDressData["Kit"]["Jacket"]["Index"]
-        })
-        TriggerServerEvent("mbt_meta_clothes:giveDressKit", topDressData)
-        MBT.Utils.UpdatePlayerClothes()
-        if MBT.Utils.SendWearingToNUI then MBT.Utils.SendWearingToNUI() end
     else
         MBT.Notification(MBT.Locale["nothing_to_unwear"])
     end
@@ -141,26 +106,12 @@ function MBT.Utils.HandleUndress(dressIndex)
     if not checkCooldown() then return end
     local playerSex = MBT.Utils.GetPedSex(PlayerPedId())
     local currentDrawable = GetPedDrawableVariation(PlayerPedId(), dressIndex)
-    local dressData = {
-        Item = MBT.Drawables[dressIndex] and MBT.GetSlotItemNames(MBT.Drawables[dressIndex])[1] or nil,
-        Index = dressIndex,
-        Sex = playerSex,
-        Drawable = currentDrawable,
-        Texture  = GetPedTextureVariation(PlayerPedId(), dressIndex),
-        Palette =  GetPedPaletteVariation(PlayerPedId(), dressIndex)
-    }
 
     if MBT.Utils.IsAbleToUndress({Type = "Drawables", Index = dressIndex, Drawable = currentDrawable}) then
-        MBT.Utils.SetDefaultVariation({
-            Player = PlayerPedId(),
-            Sex = playerSex,
+        TriggerServerEvent("mbt_meta_clothes:giveDress", {
+            RequestId = queueUndress("drawable", dressIndex, playerSex),
             Index = dressIndex,
-            isAnimated = true
         })
-        TriggerServerEvent("mbt_meta_clothes:giveDress", dressData)
-        -- Update NUI after animation finishes (SetDefaultVariation is blocking)
-        MBT.Utils.UpdatePlayerClothes()
-        if MBT.Utils.SendWearingToNUI then MBT.Utils.SendWearingToNUI() end
     else
         MBT.Notification(MBT.Locale["nothing_to_unwear"])
     end
@@ -250,6 +201,54 @@ function MBT.Utils.SetDefaultPropVariation(data)
         ClearPedProp(data.Player, data.Index)
     end
 end
+
+RegisterNetEvent('mbt_meta_clothes:undressResult', function(result)
+    if type(result) ~= "table" then return end
+    local pending = pendingUndress[result.requestId]
+    if not pending then return end
+    pendingUndress[result.requestId] = nil
+
+    if result.ok ~= true then
+        local localeKey = result.reason == "inventory_full" and "inventory_full"
+            or result.reason == "busy" and "action_busy"
+            or "inventory_error"
+        MBT.Notification(MBT.Locale[localeKey])
+        return
+    end
+
+    local ped = PlayerPedId()
+    if pending.kind == "prop" then
+        MBT.Utils.SetDefaultPropVariation({
+            Player = ped,
+            Sex = pending.sex,
+            Index = pending.index,
+            isAnimated = true,
+        })
+    elseif pending.kind == "drawable" then
+        MBT.Utils.SetDefaultVariation({
+            Player = ped,
+            Sex = pending.sex,
+            Index = pending.index,
+            isAnimated = true,
+        })
+    elseif pending.kind == "torso" then
+        for _, slotIndex in ipairs(MBT.TorsoKitSlots) do
+            MBT.Utils.SetDefaultVariation({
+                Player = ped,
+                Sex = pending.sex,
+                Index = slotIndex,
+                isAnimated = slotIndex == 8,
+            })
+        end
+    end
+
+    MBT.Utils.UpdatePlayerClothes()
+    if MBT.Utils.SendWearingToNUI then MBT.Utils.SendWearingToNUI() end
+end)
+
+RegisterNetEvent('mbt_meta_clothes:multichar:pauseDetection', function()
+    pendingUndress = {}
+end)
 
 ---@param data table
 ---@param cb function

@@ -21,6 +21,53 @@ local function payload(receiver, item_name, metadata)
     }
 end
 
+local function runtimeFixture(initial, add_item)
+    local state = initial
+    local clears = {}
+    local playerState = {}
+
+    function playerState.GetSlot(_, slot_type, slot_index)
+        return state[slot_type] and state[slot_type][slot_index]
+    end
+
+    function playerState.ClearSlot(_, slot_type, slot_index)
+        local metadata = state[slot_type] and state[slot_type][slot_index]
+        if metadata then
+            state[slot_type][slot_index] = nil
+            clears[#clears + 1] = { slotType = slot_type, slotIndex = slot_index }
+        end
+        return metadata
+    end
+
+    local runtime = MBT.GiveItems.NewRuntime({
+        addItem = add_item,
+        getPlayer = function(src) return { source = src, name = 'Test Player' } end,
+        getPlayerName = function(player) return player.name end,
+        getPlayerSource = function(player) return player.source end,
+        PlayerState = playerState,
+        Drawables = {
+            [3] = { Item = 'arms' },
+            [8] = { Item = 'tshirt' },
+            [11] = { Item = { 'jacket', 'designer_jacket' } },
+        },
+        Props = {
+            [0] = { Item = 'hat' },
+        },
+        TorsoKitSlots = { 3, 8, 11 },
+        TorsoSlotNames = { [3] = 'Arms', [8] = 'Tshirt', [11] = 'Jacket' },
+        resolveItemName = function(slot_config, metadata)
+            if metadata.item_name then return metadata.item_name end
+            return type(slot_config.Item) == 'table' and slot_config.Item[1] or slot_config.Item
+        end,
+        cleanExpiredDNA = function() end,
+        clothesDescription = 'Piece of clothing belonging to %s',
+        propsDescription = 'Accessory belonging to %s',
+        log = function() end,
+    })
+
+    return runtime, state, clears
+end
+
 local cases = {
     {
         name = 'add failure never commits authoritative state',
@@ -192,6 +239,134 @@ local cases = {
             end, 12, 'hat', 1, { sex = 'male' })
             Assert.equal(true, ok)
             Assert.equal(nil, reason)
+        end,
+    },
+    {
+        name = 'failed drawable return preserves live state and metadata',
+        run = function()
+            local stored = {
+                index = 11,
+                drawable = 29,
+                texture = 2,
+                palette = 0,
+                sex = 'male',
+                item_name = 'designer_jacket',
+                description = 'original',
+                last_worn_by = { { identifier = 'char:1' } },
+            }
+            local runtime, state, clears = runtimeFixture({
+                Drawables = { [11] = stored },
+                Props = {},
+            }, function(_, name, _, metadata)
+                Assert.equal('designer_jacket', name)
+                Assert.equal('char:1', metadata.last_worn_by[1].identifier)
+                return false, 'inventory_full'
+            end)
+
+            local result = runtime:ReturnSlot(14, 'Drawables', 11)
+
+            Assert.equal(false, result.ok)
+            Assert.equal('inventory_full', result.reason)
+            Assert.equal(stored, state.Drawables[11])
+            Assert.equal('original', stored.description)
+            Assert.equal(0, #clears)
+        end,
+    },
+    {
+        name = 'successful drawable return preserves rich metadata then clears',
+        run = function()
+            local addedMetadata
+            local runtime, state, clears = runtimeFixture({
+                Drawables = {
+                    [11] = {
+                        index = 11,
+                        drawable = 29,
+                        texture = 2,
+                        palette = 0,
+                        sex = 'male',
+                        item_name = 'designer_jacket',
+                        last_worn_by = { { identifier = 'char:1' } },
+                    },
+                },
+                Props = {},
+            }, function(_, name, _, metadata)
+                Assert.equal('designer_jacket', name)
+                addedMetadata = metadata
+                return true
+            end)
+
+            local result = runtime:ReturnSlot(14, 'Drawables', 11)
+
+            Assert.equal(true, result.ok)
+            Assert.equal(nil, state.Drawables[11])
+            Assert.equal(1, #clears)
+            Assert.equal('char:1', addedMetadata.last_worn_by[1].identifier)
+            Assert.equal(29, addedMetadata.drawable)
+        end,
+    },
+    {
+        name = 'empty authoritative slot never creates an item',
+        run = function()
+            local adds = 0
+            local runtime = runtimeFixture({ Drawables = {}, Props = {} }, function()
+                adds = adds + 1
+                return true
+            end)
+
+            local result = runtime:ReturnSlot(14, 'Props', 0)
+
+            Assert.equal(false, result.ok)
+            Assert.equal('no_item', result.reason)
+            Assert.equal(0, adds)
+        end,
+    },
+    {
+        name = 'torso return commits every slot only after one successful add',
+        run = function()
+            local addedMetadata
+            local runtime, state, clears = runtimeFixture({
+                Drawables = {
+                    [3] = { index = 3, drawable = 15, texture = 0, palette = 0, sex = 'male' },
+                    [8] = { index = 8, drawable = 20, texture = 1, palette = 0, sex = 'male' },
+                    [11] = { index = 11, drawable = 29, texture = 2, palette = 0, sex = 'male' },
+                },
+                Props = {},
+            }, function(_, name, count, metadata)
+                Assert.equal('topdress', name)
+                Assert.equal(1, count)
+                addedMetadata = metadata
+                return true
+            end)
+
+            local result = runtime:ReturnTorso(14)
+
+            Assert.equal(true, result.ok)
+            Assert.equal(3, #clears)
+            Assert.equal(nil, state.Drawables[3])
+            Assert.equal(nil, state.Drawables[8])
+            Assert.equal(nil, state.Drawables[11])
+            Assert.equal(29, addedMetadata.Jacket.drawable)
+        end,
+    },
+    {
+        name = 'failed torso add clears no slot',
+        run = function()
+            local runtime, state, clears = runtimeFixture({
+                Drawables = {
+                    [3] = { index = 3, drawable = 15, sex = 'male' },
+                    [8] = { index = 8, drawable = 20, sex = 'male' },
+                    [11] = { index = 11, drawable = 29, sex = 'male' },
+                },
+                Props = {},
+            }, function()
+                return false, 'inventory_full'
+            end)
+
+            local result = runtime:ReturnTorso(14)
+
+            Assert.equal(false, result.ok)
+            Assert.equal(0, #clears)
+            Assert.equal(29, state.Drawables[11].drawable)
         end,
     },
 }

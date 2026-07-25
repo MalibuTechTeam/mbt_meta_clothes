@@ -333,30 +333,74 @@ end)
 -- Give items (dress/undress/steal)
 -----------------------------------------------------------
 
+local function validUndressRequestId(value)
+    return type(value) == "number"
+        and value == math.floor(value)
+        and value > 0
+        and value <= 2147483647
+end
+
+local function sendUndressResult(src, requestId, kind, index, result)
+    TriggerClientEvent('mbt_meta_clothes:undressResult', src, {
+        requestId = requestId,
+        ok = result.ok == true,
+        reason = result.reason,
+        kind = kind,
+        index = index,
+    })
+end
+
 RegisterNetEvent('mbt_meta_clothes:giveDress', function(data)
     local src = source
-    if not MBT.ServerUtils.CheckRateLimit(src, "giveDress") then return end
-    if not data or not data.Index then return end
-    if not MBT.Drawables[data.Index] then return end
-    MBT.Debugger("<<< giveDress: undressing slot", data.Index)
-    giveDress(data)
+    if type(data) ~= "table" or not validUndressRequestId(data.RequestId) then return end
+    if not MBT.ServerUtils.CheckRateLimit(src, "giveDress") then
+        return sendUndressResult(src, data.RequestId, "drawable", data.Index, { ok = false, reason = "busy" })
+    end
+    local valid, index = MBT.ServerUtils.ValidateSlot("Drawables", data.Index)
+    if not valid then
+        return sendUndressResult(src, data.RequestId, "drawable", data.Index, { ok = false, reason = "invalid_slot" })
+    end
+    if MBT.PlayerState.CheckCharacterSwitch(src) then
+        return sendUndressResult(src, data.RequestId, "drawable", index, { ok = false, reason = "character_changed" })
+    end
+    MBT.Debugger("<<< giveDress: undressing slot", index)
+    sendUndressResult(src, data.RequestId, "drawable", index, giveDress(src, { Index = index }))
 end)
 
 RegisterNetEvent('mbt_meta_clothes:giveDressKit', function(data)
     local src = source
-    if not MBT.ServerUtils.CheckRateLimit(src, "giveDressKit") then return end
-    if type(data) ~= "table" then return end
+    if type(data) ~= "table" or not validUndressRequestId(data.RequestId) then return end
+    if not MBT.ServerUtils.CheckRateLimit(src, "giveDressKit") then
+        return sendUndressResult(src, data.RequestId, "torso", nil, { ok = false, reason = "busy" })
+    end
+    if MBT.PlayerState.CheckCharacterSwitch(src) then
+        return sendUndressResult(src, data.RequestId, "torso", nil, { ok = false, reason = "character_changed" })
+    end
     MBT.Debugger("<<< giveDressKit: undressing top")
-    giveDressKit(data)
+    sendUndressResult(src, data.RequestId, "torso", nil, giveDressKit(src))
 end)
 
 RegisterNetEvent('mbt_meta_clothes:giveProp', function(data)
     local src = source
-    if not MBT.ServerUtils.CheckRateLimit(src, "giveProp") then return end
-    if not data or not data.Index then return end
-    if not MBT.Props[data.Index] then return end
-    MBT.Debugger("<<< giveProp: undressing prop slot", data.Index)
-    giveProp(data)
+    if type(data) ~= "table" or not validUndressRequestId(data.RequestId) then return end
+    if not MBT.ServerUtils.CheckRateLimit(src, "giveProp") then
+        return sendUndressResult(src, data.RequestId, "prop", data.Index, { ok = false, reason = "busy" })
+    end
+    local valid, index = MBT.ServerUtils.ValidateSlot("Props", data.Index)
+    if not valid then
+        return sendUndressResult(src, data.RequestId, "prop", data.Index, { ok = false, reason = "invalid_slot" })
+    end
+    if MBT.PlayerState.CheckCharacterSwitch(src) then
+        return sendUndressResult(src, data.RequestId, "prop", index, { ok = false, reason = "character_changed" })
+    end
+    MBT.Debugger("<<< giveProp: undressing prop slot", index)
+    sendUndressResult(src, data.RequestId, "prop", index, giveProp(src, { Index = index }))
+end)
+
+AddEventHandler('playerDropped', function()
+    if MBT.GiveItems.Runtime then
+        MBT.GiveItems.Runtime:CleanupSource(source)
+    end
 end)
 
 -- S4 FIX: Server-authoritative steal — server reads from PlayerState, not from client

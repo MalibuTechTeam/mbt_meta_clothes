@@ -135,91 +135,181 @@ local function buildDescription(baseDesc, metadata)
     return baseDesc .. " | " .. id
 end
 
+local function cloneTable(value, seen)
+    if type(value) ~= "table" then return value end
+    seen = seen or {}
+    if seen[value] then return seen[value] end
+
+    local copy = {}
+    seen[value] = copy
+    for key, entry in pairs(value) do
+        copy[cloneTable(key, seen)] = cloneTable(entry, seen)
+    end
+    return copy
+end
+
+---@param config table
+---@return table runtime
+function MBT.GiveItems.NewRuntime(config)
+    local playerState = config.PlayerState or MBT.PlayerState
+    local drawables = config.Drawables or MBT.Drawables
+    local props = config.Props or MBT.Props
+    local torsoSlots = config.TorsoKitSlots or MBT.TorsoKitSlots
+    local torsoNames = config.TorsoSlotNames or MBT.TorsoSlotNames
+    local resolveItemName = config.resolveItemName or MBT.ResolveItemName
+    local cleanExpiredDNA = config.cleanExpiredDNA or MBT.ServerUtils.CleanExpiredDNA
+    local clothesDescription = config.clothesDescription or MBT.Locale["clothes_desc"]
+    local propsDescription = config.propsDescription or MBT.Locale["props_desc"]
+    local coordinator = MBT.GiveItems.New({
+        addItem = config.addItem,
+        log = config.log,
+    })
+    local runtime = {}
+
+    local function getIdentity(src)
+        local player = config.getPlayer(src)
+        if not player then return nil end
+        return player, config.getPlayerName(player), config.getPlayerSource(player)
+    end
+
+    ---@param ownerSrc number
+    ---@param receiverSrc number
+    ---@param slotType string
+    ---@param slotIndex number
+    ---@return table result
+    function runtime:TransferSlot(ownerSrc, receiverSrc, slotType, slotIndex)
+        local slotConfig = slotType == "Drawables" and drawables[slotIndex] or props[slotIndex]
+        if not slotConfig then return { ok = false, reason = "invalid_slot" } end
+
+        local _, playerIdentity, resolvedReceiver = getIdentity(receiverSrc)
+        if not playerIdentity then return { ok = false, reason = "invalid_player" } end
+        receiverSrc = resolvedReceiver
+
+        local lockKey = ("%s:%s:%s"):format(ownerSrc, slotType, slotIndex)
+        local original
+        return coordinator:Transfer(lockKey, function()
+            original = playerState.GetSlot(ownerSrc, slotType, slotIndex)
+            if not original then return nil, "no_item" end
+
+            local metadata = cloneTable(original)
+            local descriptionFormat = slotType == "Drawables" and clothesDescription or propsDescription
+            metadata.description = buildDescription(descriptionFormat:format(playerIdentity), metadata)
+            cleanExpiredDNA(metadata)
+
+            local itemName = resolveItemName(slotConfig, metadata)
+            if not itemName then return nil, "invalid_item" end
+            return {
+                receiver = receiverSrc,
+                itemName = itemName,
+                count = 1,
+                metadata = metadata,
+            }
+        end, function()
+            if playerState.GetSlot(ownerSrc, slotType, slotIndex) ~= original then
+                return false
+            end
+            local cleared = playerState.ClearSlot(ownerSrc, slotType, slotIndex)
+            return cleared ~= nil, { slotType = slotType, slotIndex = slotIndex }
+        end)
+    end
+
+    ---@param src number
+    ---@param slotType string
+    ---@param slotIndex number
+    ---@return table result
+    function runtime:ReturnSlot(src, slotType, slotIndex)
+        return self:TransferSlot(src, src, slotType, slotIndex)
+    end
+
+    ---@param ownerSrc number
+    ---@param receiverSrc number
+    ---@return table result
+    function runtime:TransferTorso(ownerSrc, receiverSrc)
+        local _, playerIdentity, resolvedReceiver = getIdentity(receiverSrc)
+        if not playerIdentity then return { ok = false, reason = "invalid_player" } end
+        receiverSrc = resolvedReceiver
+
+        local lockKey = ("%s:torso"):format(ownerSrc)
+        local originals = {}
+        return coordinator:Transfer(lockKey, function()
+            local metadata = {
+                description = clothesDescription:format(playerIdentity),
+                type = "DressKit",
+            }
+            local found = false
+
+            for _, slotIndex in ipairs(torsoSlots) do
+                local stored = playerState.GetSlot(ownerSrc, "Drawables", slotIndex)
+                originals[slotIndex] = stored
+                if stored then
+                    found = true
+                    local slotMetadata = cloneTable(stored)
+                    metadata[torsoNames[slotIndex]] = slotMetadata
+                    metadata.sex = metadata.sex or slotMetadata.sex
+                end
+            end
+
+            if not found then return nil, "no_item" end
+            cleanExpiredDNA(metadata)
+            return {
+                receiver = receiverSrc,
+                itemName = "topdress",
+                count = 1,
+                metadata = metadata,
+            }
+        end, function()
+            for _, slotIndex in ipairs(torsoSlots) do
+                if playerState.GetSlot(ownerSrc, "Drawables", slotIndex) ~= originals[slotIndex] then
+                    return false
+                end
+            end
+
+            local committed = {}
+            for _, slotIndex in ipairs(torsoSlots) do
+                if originals[slotIndex] then
+                    playerState.ClearSlot(ownerSrc, "Drawables", slotIndex)
+                    committed[#committed + 1] = {
+                        slotType = "Drawables",
+                        slotIndex = slotIndex,
+                    }
+                end
+            end
+            return true, committed
+        end)
+    end
+
+    ---@param src number
+    ---@return table result
+    function runtime:ReturnTorso(src)
+        return self:TransferTorso(src, src)
+    end
+
+    function runtime:CleanupSource(src)
+        coordinator:CleanupSource(src)
+    end
+
+    return runtime
+end
+
 --- Setup global give* functions used by core/server.lua event handlers
 function MBT.GiveItems.Setup(config)
+
+    local runtime = MBT.GiveItems.NewRuntime(config)
+    MBT.GiveItems.Runtime = runtime
 
     -- Expose addItem globally for use by core/server.lua (e.g. externalUndress)
     addItemToPlayer = config.addItem
 
-    function giveDress(data)
-        local player = config.getPlayer(source)
-        if not player then return end
-        local playerIdentity = config.getPlayerName(player)
-
-        local storedMetadata = MBT.PlayerState.ClearSlot(source, "Drawables", data.Index)
-
-        local metadata
-        if storedMetadata then
-            metadata = storedMetadata
-            metadata.description = buildDescription(MBT.Locale["clothes_desc"]:format(playerIdentity), metadata)
-        else
-            metadata = {
-                index = data.Index, sex = data.Sex,
-                drawable = data.Drawable, texture = data.Texture, palette = data.Palette,
-                type = "Drawable"
-            }
-            metadata.description = buildDescription(MBT.Locale["clothes_desc"]:format(playerIdentity), metadata)
-        end
-
-        -- Clean expired DNA before returning item to inventory
-        MBT.ServerUtils.CleanExpiredDNA(metadata)
-
-        local itemName = MBT.ResolveItemName(MBT.Drawables[data.Index], metadata) or data.Item
-        config.addItem(config.getPlayerSource(player), itemName, 1, metadata)
+    function giveDress(src, data)
+        return runtime:ReturnSlot(src, "Drawables", data.Index)
     end
 
-    function giveDressKit(data)
-        local player = config.getPlayer(source)
-        if not player then return end
-        local playerIdentity = config.getPlayerName(player)
-        local metadata = {
-            description = MBT.Locale["clothes_desc"]:format(playerIdentity),
-            sex = data.Sex, type = "DressKit"
-        }
-
-        for k, v in pairs(data.Kit) do
-            local storedSlot = MBT.PlayerState.ClearSlot(source, "Drawables", v.Index)
-            if storedSlot then
-                metadata[tostring(k)] = storedSlot
-            else
-                metadata[tostring(k)] = {
-                    index = v.Index,
-                    drawable = v.Drawable,
-                    texture = v.Texture,
-                    palette = v.Palette
-                }
-            end
-        end
-
-        Wait(100)
-        config.addItem(config.getPlayerSource(player), data.Item, 1, metadata)
+    function giveDressKit(src)
+        return runtime:ReturnTorso(src)
     end
 
-    function giveProp(data)
-        local player = config.getPlayer(source)
-        if not player then return end
-        local playerIdentity = config.getPlayerName(player)
-
-        local storedMetadata = MBT.PlayerState.ClearSlot(source, "Props", data.Index)
-
-        local metadata
-        if storedMetadata then
-            metadata = storedMetadata
-            metadata.description = buildDescription(MBT.Locale["props_desc"]:format(playerIdentity), metadata)
-        else
-            metadata = {
-                index = data.Index, sex = data.Sex,
-                drawable = data.Drawable, texture = data.Texture,
-                type = "Prop"
-            }
-            metadata.description = buildDescription(MBT.Locale["props_desc"]:format(playerIdentity), metadata)
-        end
-
-        -- Clean expired DNA before returning item to inventory
-        MBT.ServerUtils.CleanExpiredDNA(metadata)
-
-        local itemName = MBT.ResolveItemName(MBT.Props[data.Index], metadata) or data.Item
-        config.addItem(config.getPlayerSource(player), itemName, 1, metadata)
+    function giveProp(src, data)
+        return runtime:ReturnSlot(src, "Props", data.Index)
     end
 
     function giveStolenItemDress(stealSource, targetWearing, playerSex)

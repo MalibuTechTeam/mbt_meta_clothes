@@ -40,6 +40,24 @@ Locales['en'] = {
         ["type"] = "error",
         ["icon"] = "ban",
     },
+    ["inventory_full"] = {
+        ["title"] = "Clothes",
+        ["description"] = "Your inventory does not have enough space.",
+        ["type"] = "error",
+        ["icon"] = "box",
+    },
+    ["inventory_error"] = {
+        ["title"] = "Clothes",
+        ["description"] = "The clothing item could not be moved.",
+        ["type"] = "error",
+        ["icon"] = "triangle-exclamation",
+    },
+    ["action_busy"] = {
+        ["title"] = "Clothes",
+        ["description"] = "That clothing action is already in progress.",
+        ["type"] = "error",
+        ["icon"] = "clock",
+    },
 
     -----------------------------------------------------------
     -- Slot Labels (used in config Drawables/Props, steal menu, target)

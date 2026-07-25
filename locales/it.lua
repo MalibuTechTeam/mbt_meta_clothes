@@ -40,6 +40,24 @@ Locales['it'] = {
         ["type"] = "error",
         ["icon"] = "ban",
     },
+    ["inventory_full"] = {
+        ["title"] = "Vestiti",
+        ["description"] = "Non hai abbastanza spazio nell'inventario.",
+        ["type"] = "error",
+        ["icon"] = "box",
+    },
+    ["inventory_error"] = {
+        ["title"] = "Vestiti",
+        ["description"] = "Non è stato possibile spostare il capo.",
+        ["type"] = "error",
+        ["icon"] = "triangle-exclamation",
+    },
+    ["action_busy"] = {
+        ["title"] = "Vestiti",
+        ["description"] = "Questa operazione è già in corso.",
+        ["type"] = "error",
+        ["icon"] = "clock",
+    },
 
     -----------------------------------------------------------
     -- Etichette Slot
