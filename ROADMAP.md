@@ -60,9 +60,10 @@ matrix above passes.
   - Validate the archive against every path referenced by `fxmanifest.lua`.
   - Update deprecated GitHub Actions and output syntax.
 
-The transactional return and steal implementations pass the local pure-Lua
-inventory self-test (`16/16` on 2026-07-25), syntax compilation, and static diff
-checks. They remain pending in-resource Cfx and end-to-end inventory-full testing.
+The transactional return and steal implementations pass the pure-Lua inventory
+self-test locally and inside the running Cfx resource (`16/16` on 2026-07-25),
+alongside the snapshot suite (`28/28`), syntax compilation, and static diff checks.
+End-to-end inventory-full and partial-batch gameplay testing remains pending.
 
 ## P1 - Required for a stable 2.0
 
