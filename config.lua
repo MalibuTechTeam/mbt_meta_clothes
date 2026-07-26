@@ -39,7 +39,8 @@ MBT.RateLimitMax         = 5    -- Max calls per window per player
 -----------------------------------------------------------
 MBT.StateSaveInterval    = 300   -- Seconds between periodic dirty saves (5 min)
 MBT.RestoreProtection    = 15000 -- ms to protect restored state from external overwrites
-MBT.PedRevealDelay       = 2000  -- ms to keep PED hidden after restore (covers appearance script late apply + our re-apply, prevents visible blink). Keep <= 4500 (the bridge keepPedHidden loop caps at 5000ms before auto-recovery).
+MBT.PedRevealStableWindow = 500  -- ms the PED must continuously match authoritative wearing before reveal
+MBT.PedRevealTimeout      = 4500 -- bounded wait; the 5s visibility watchdog remains the final recovery
 
 -- Hybrid snapshot synchronization. The client polls locally but submits only
 -- stable full-state changes; the server remains authoritative for metadata.

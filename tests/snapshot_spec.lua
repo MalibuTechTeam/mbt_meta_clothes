@@ -88,17 +88,22 @@ local function snapshotClientFixture()
     local currentModel = maleModel
     local sent = {}
     local enforced = {}
+    local initialAcknowledgements = {}
     local client = MBT.SnapshotClient.New({
         now = function() return fakeNow end,
         capture = function() return current end,
         model = function() return currentModel end,
         send = function(payload) sent[#sent + 1] = payload end,
         enforce = function(target) enforced[#enforced + 1] = target end,
+        onInitialAcknowledged = function(ack)
+            initialAcknowledgements[#initialAcknowledgements + 1] = ack
+        end,
     })
     return {
         client = client,
         sent = sent,
         enforced = enforced,
+        initialAcknowledgements = initialAcknowledgements,
         visual = function() return current end,
         setVisual = function(visual) current = visual end,
         setModel = function(model) currentModel = model end,
@@ -136,6 +141,17 @@ local cases = {
             visual = fullVisual('male')
             visual.Drawables['11'] = visual.Drawables[11]
             Assert.equal('duplicate_slot', select(2, MBT.Snapshot.Canonicalize(visual, maleModel)))
+        end,
+    },
+    {
+        name = 'canonicalizes absent prop texture sentinel to zero',
+        run = function()
+            local visual = fullVisual('male')
+            visual.Props[1] = { drawable = -1, texture = -1, palette = 0 }
+            local normalized, reason = MBT.Snapshot.Canonicalize(visual, maleModel)
+            Assert.truthy(normalized, reason)
+            Assert.equal(-1, normalized.Props[1].drawable)
+            Assert.equal(0, normalized.Props[1].texture)
         end,
     },
     {
@@ -576,6 +592,111 @@ local cases = {
             fixture.advance(MBT.SnapshotDebounce or 400)
             client:Tick()
             Assert.equal(true, fixture.sent[1].initial)
+        end,
+    },
+    {
+        name = 'client reports readiness only after initial snapshot acknowledgement',
+        run = function()
+            local fixture = snapshotClientFixture()
+            local client = fixture.client
+            client:SetContext({ session = 131, revision = 0 })
+            client:Resume('startup')
+            client:ForceInitialScan(0)
+            client:Tick()
+            fixture.advance(MBT.SnapshotDebounce or 400)
+            client:Tick()
+
+            Assert.equal(0, #fixture.initialAcknowledgements)
+            Assert.equal(true, fixture.sent[1].initial)
+            Assert.equal(true, client:HandleAck({
+                ok = true,
+                code = 'accepted',
+                session = 131,
+                seq = 1,
+                revision = 1,
+                visual = fixture.visual(),
+            }))
+            Assert.equal(1, #fixture.initialAcknowledgements)
+            Assert.equal(131, fixture.initialAcknowledgements[1].session)
+        end,
+    },
+    {
+        name = 'client compares live PED visuals with authoritative wearing state',
+        run = function()
+            local fixture = snapshotClientFixture()
+            local client = fixture.client
+            local wearing = { Drawables = {}, Props = {} }
+
+            Assert.equal(true, client:MatchesWearing(wearing))
+            local changed = fullVisual('male')
+            changed.Drawables[11] = { drawable = 101, texture = 0, palette = 0 }
+            fixture.setVisual(changed)
+            local matches, reason = client:MatchesWearing(wearing)
+            Assert.equal(false, matches)
+            Assert.equal('Drawables:11', reason)
+
+            changed.Props[0] = { drawable = 4, texture = -1, palette = 0 }
+            fixture.setVisual(changed)
+            matches, reason = client:MatchesWearing(wearing)
+            Assert.equal(false, matches)
+            Assert.equal('invalid_texture', reason)
+        end,
+    },
+    {
+        name = 'new reveal wait invalidates an older visibility watchdog',
+        run = function()
+            local timers = {}
+            local reveals = {}
+            local visibility = MBT.PedVisibility.New({
+                schedule = function(_, callback) timers[#timers + 1] = callback end,
+                hide = function() end,
+                reveal = function(reason) reveals[#reveals + 1] = reason end,
+            })
+
+            visibility:Begin('framework', 5000)
+            visibility:Begin('snapshot', 5000)
+            timers[1]()
+            Assert.equal(0, #reveals)
+            timers[2]()
+            Assert.equal(1, #reveals)
+            Assert.equal('watchdog:snapshot', reveals[1])
+        end,
+    },
+    {
+        name = 'successful reveal cancels its pending watchdog',
+        run = function()
+            local timer
+            local reveals = {}
+            local visibility = MBT.PedVisibility.New({
+                schedule = function(_, callback) timer = callback end,
+                hide = function() end,
+                reveal = function(reason) reveals[#reveals + 1] = reason end,
+            })
+
+            visibility:Begin('restore', 5000)
+            Assert.equal(true, visibility:Complete('stable'))
+            timer()
+            Assert.equal(1, #reveals)
+            Assert.equal('stable', reveals[1])
+        end,
+    },
+    {
+        name = 'visibility pulse keeps only the current spawn generation hidden',
+        run = function()
+            local hides = 0
+            local visibility = MBT.PedVisibility.New({
+                schedule = function() end,
+                hide = function() hides = hides + 1 end,
+                reveal = function() end,
+            })
+
+            local oldGeneration = visibility:Begin('framework', 5000)
+            local currentGeneration = visibility:Begin('snapshot', 5000)
+            Assert.equal(false, visibility:Pulse(oldGeneration))
+            Assert.equal(true, visibility:Pulse(currentGeneration))
+            Assert.equal(3, hides)
+            visibility:Complete('ready')
+            Assert.equal(false, visibility:Pulse(currentGeneration))
         end,
     },
     {

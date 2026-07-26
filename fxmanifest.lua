@@ -17,6 +17,7 @@ dependencies {
 
 shared_scripts {
     'modules/shared.lua',
+    'modules/visibility/shared.lua',
     'locales/*.lua',
     'config.lua',
     'modules/snapshot/shared.lua',

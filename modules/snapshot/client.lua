@@ -24,6 +24,7 @@ function SnapshotClient.New(deps)
     local capture = assert(deps.capture, 'snapshot client capture is required')
     local send = assert(deps.send, 'snapshot client transport is required')
     local modelProvider = deps.model or firstConfiguredModel
+    local onInitialAcknowledged = deps.onInitialAcknowledged
     local coordinator = {}
     local context
     local nextSeq = 0
@@ -71,8 +72,8 @@ function SnapshotClient.New(deps)
             model = raw.model or model
             raw = raw.visual
         end
-        local visual = MBT.Snapshot.Canonicalize(raw, model)
-        if not visual then return nil end
+        local visual, reason = MBT.Snapshot.Canonicalize(raw, model)
+        if not visual then return nil, model, nil, reason or 'capture_unavailable' end
         visual = copyVisual(visual)
         for _, slotType in ipairs({ 'Drawables', 'Props' }) do
             for slotIndex, suppressed in pairs(suppressions[slotType]) do
@@ -328,9 +329,30 @@ function SnapshotClient.New(deps)
         candidateSince = nil
     end
 
+    function coordinator:MatchesWearing(wearingState)
+        local visual, model, fingerprint, captureReason = captureCanonical()
+        local sex = model and MBT.GenderModels[model] or nil
+        if not visual or not sex then return false, captureReason or 'unsupported_model' end
+        local expected = MBT.Snapshot.VisualFromWearing(wearingState, sex)
+        if not expected then return false, 'invalid_wearing' end
+        if fingerprint == MBT.Snapshot.Fingerprint(expected) then return true end
+        for _, slotType in ipairs({ 'Drawables', 'Props' }) do
+            for slotIndex, expectedSlot in pairs(expected[slotType]) do
+                local actual = visual[slotType] and visual[slotType][slotIndex]
+                if not actual or actual.drawable ~= expectedSlot.drawable
+                    or actual.texture ~= expectedSlot.texture
+                    or (actual.palette or 0) ~= (expectedSlot.palette or 0) then
+                    return false, ('%s:%s'):format(slotType, tostring(slotIndex))
+                end
+            end
+        end
+        return false, 'fingerprint_mismatch'
+    end
+
     function coordinator:HandleAck(ack)
         if type(ack) ~= 'table' or not context or ack.session ~= context.session then return false end
         if not pending or ack.seq ~= pending.payload.seq then return false end
+        local wasInitial = pending.payload.initial == true
         pending = nil
         candidateFingerprint = nil
         candidateSince = nil
@@ -345,6 +367,7 @@ function SnapshotClient.New(deps)
             end
             forceInitialAt = nil
             rejectionCount = 0
+            if wasInitial and onInitialAcknowledged then onInitialAcknowledged(ack) end
             return true
         end
 
@@ -497,6 +520,9 @@ local production = SnapshotClient.New({
         TriggerServerEvent('mbt_meta_clothes:submitSnapshot', payload)
     end,
     enforce = enforcePed,
+    onInitialAcknowledged = function(ack)
+        TriggerEvent('mbt_meta_clothes:initialSnapshotReady', ack)
+    end,
 })
 
 local running = false
@@ -524,6 +550,7 @@ function SnapshotClient.RestoreSuppressed(slotType, slotIndex)
     return production:RestoreSuppressed(slotType, slotIndex)
 end
 function SnapshotClient.ForceInitialScan(delayMs) return production:ForceInitialScan(delayMs) end
+function SnapshotClient.MatchesWearing(wearingState) return production:MatchesWearing(wearingState) end
 function SnapshotClient.ApplyAuthoritativeVisual(update)
     return production:ApplyAuthoritativeVisual(update)
 end

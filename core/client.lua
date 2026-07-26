@@ -51,6 +51,22 @@ end
 -- to avoid duplicate playerReady events
 
 local restoreGeneration = 0
+local pendingInitialReveal
+
+local function revealPed(reason)
+    if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
+    if MBT.Utils.CompletePedVisibilityWait then
+        MBT.Utils.CompletePedVisibilityWait(reason)
+        MBT.Debugger('ped reveal', reason)
+        return true
+    end
+    local ped = PlayerPedId()
+    if not DoesEntityExist(ped) then return false end
+    ResetEntityAlpha(ped)
+    SetEntityAlpha(ped, 255, false)
+    MBT.Debugger('ped reveal', reason)
+    return true
+end
 
 RegisterNetEvent('mbt_meta_clothes:multichar:pauseDetection', function()
     restoreGeneration = restoreGeneration + 1
@@ -62,6 +78,12 @@ AddEventHandler('mbt_meta_clothes:requestPedScan', function(context)
     if not context or not MBT.SnapshotClient.SetContext(context) then return end
     restoreGeneration = restoreGeneration + 1
     local myGen = restoreGeneration
+    pendingInitialReveal = { generation = myGen, session = context.session }
+    if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
+    SetEntityAlpha(PlayerPedId(), 0, false)
+    if MBT.Utils.SchedulePedVisibilityWatchdog then
+        MBT.Utils.SchedulePedVisibilityWatchdog('requestPedScan')
+    end
     -- New player: lascia che l'appearance script applichi il SUO skin,
     -- POI scansiona il PED per popolare il nostro state.
 
@@ -81,19 +103,15 @@ AddEventHandler('mbt_meta_clothes:requestPedScan', function(context)
     -- restoreWearing il player apparirebbe nudo per sempre.
     MBT.SnapshotClient.ForceInitialScan(2500)
 
-    -- Mostra il PED solo dopo PedRevealDelay (default 2s), così illenium ha
-    -- tempo di applicare il suo skin completo PRIMA che il player veda. Senza
-    -- questo delay il player vedrebbe il PED nudo (default model) per ~1s
-    -- finché illenium non finisce di applicare. La camera del selector copre
-    -- normalmente questi 2s.
-    Citizen.SetTimeout(MBT.PedRevealDelay or 2000, function()
-        if myGen ~= restoreGeneration then return end
-        if MBT.Utils.StopKeepPedHidden then
-            MBT.Utils.StopKeepPedHidden()
-        end
-        ResetEntityAlpha(PlayerPedId())
-        SetEntityAlpha(PlayerPedId(), 255, false)
-    end)
+    -- Il reveal avviene solo dopo l'ACK server dello snapshot iniziale.
+end)
+
+AddEventHandler('mbt_meta_clothes:initialSnapshotReady', function(ack)
+    local pending = pendingInitialReveal
+    if not pending or type(ack) ~= 'table' or ack.session ~= pending.session
+        or pending.generation ~= restoreGeneration then return end
+    pendingInitialReveal = nil
+    revealPed('initial_snapshot_ack')
 end)
 
 -----------------------------------------------------------
@@ -156,9 +174,7 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, contex
     -- restore and must never apply an empty state over the active character.
     if not context then
         if MBT.Utils.ResumeHybridDetection then MBT.Utils.ResumeHybridDetection() end
-        if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
-        ResetEntityAlpha(PlayerPedId())
-        SetEntityAlpha(PlayerPedId(), 255, false)
+        revealPed('legacy_unblock')
         return
     end
 
@@ -177,6 +193,12 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, contex
     -- Bump generation: invalida ogni re-apply pendente del restore precedente
     restoreGeneration = restoreGeneration + 1
     local myGen = restoreGeneration
+    pendingInitialReveal = nil
+    if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
+    SetEntityAlpha(PlayerPedId(), 0, false)
+    if MBT.Utils.SchedulePedVisibilityWatchdog then
+        MBT.Utils.SchedulePedVisibilityWatchdog('restoreWearing')
+    end
 
     -- Enable restore protection: for the next 15 seconds, Hybrid Detection
     -- will REVERT any external changes to our managed slots instead of tracking them.
@@ -185,24 +207,6 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, contex
 
     -- Apply immediately — restore guard (100ms polling, 15s) handles late appearance script changes
     applyWearingState(wearingState)
-
-    -- Re-apply finale 200ms prima del reveal: garantisce che lo state sia
-    -- esattamente quello giusto nel momento in cui il PED diventa visibile.
-    -- Coprire la race con illenium-appearance (che applica il SUO skin async
-    -- via NUI ~500-1500ms dopo il load) è già fatto dal loop hybrid detection
-    -- con restoreProtection 15s + poll 500ms — questo re-apply è solo un
-    -- "polish" deterministico al momento del reveal.
-    --
-    -- Generation guard: se un nuovo restoreWearing è arrivato dopo (es. fast-switch
-    -- ad altro char), non re-applicare lo stato vecchio sul char nuovo.
-    local reapplyDelay = (MBT.PedRevealDelay or 2000) - 300
-    if reapplyDelay > 0 then
-        Citizen.SetTimeout(reapplyDelay, function()
-            if myGen == restoreGeneration then
-                applyWearingState(wearingState)
-            end
-        end)
-    end
 
     -- Riprende la detection con il cache settato sullo stato ATTESO (wearingState).
     -- Questo è cruciale post-multichar: se l'appearance script ha applicato
@@ -213,30 +217,34 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, contex
         MBT.Utils.ResumeHybridDetection(wearingState)
     end
 
-    -- Mostra il PED solo DOPO che tutta la sequenza apply-then-revert è stable.
-    --
-    -- Sequenza tipica al login/switch:
-    --   T=0     applyWearingState (nostro state corretto)
-    --   T=~700  illenium-appearance applica il SUO skin (potrebbe overrideare)
-    --   T=700   re-apply nostro #1 (reverte illenium)
-    --   T=1500  re-apply nostro #2 (finale)
-    --   T=2000  PED mostrato (state ora stable)
-    --
-    -- Se mostrassimo il PED a T=0 (come prima), il player vedrebbe un BLINK
-    -- visibile tra T=700 (illenium override) e T=1500 (revert). Questi 2s
-    -- coincidono normalmente con la camera del selector multichar / loading
-    -- screen, quindi l'utente non percepisce il delay.
-    --
-    -- Generation guard: se un nuovo restoreWearing arriva (fast-switch ad altro
-    -- char), il timeout scaduto non mostra il vecchio PED — sarà il nuovo
-    -- restoreWearing a gestire la propria reveal.
-    Citizen.SetTimeout(MBT.PedRevealDelay or 2000, function()
-        if myGen ~= restoreGeneration then return end
-        if MBT.Utils.StopKeepPedHidden then
-            MBT.Utils.StopKeepPedHidden()
+    -- Reveal condition-based: il PED deve coincidere continuativamente con lo
+    -- stato autorevole. Un apply tardivo di qualunque skin script resetta la
+    -- finestra e viene corretto prima che il PED torni visibile.
+    Citizen.CreateThread(function()
+        local startedAt = GetGameTimer()
+        local stableSince
+        local lastMismatch
+        local stableWindow = MBT.PedRevealStableWindow or 500
+        local timeout = MBT.PedRevealTimeout or 4500
+
+        while myGen == restoreGeneration and GetGameTimer() - startedAt < timeout do
+            local matches, mismatch = MBT.SnapshotClient.MatchesWearing(wearingState)
+            if matches then
+                stableSince = stableSince or GetGameTimer()
+                if GetGameTimer() - stableSince >= stableWindow then
+                    revealPed('authoritative_wearing_stable')
+                    return
+                end
+            else
+                stableSince = nil
+                if mismatch ~= lastMismatch then
+                    lastMismatch = mismatch
+                    MBT.Debugger('ped reveal waiting', mismatch)
+                end
+                applyWearingState(wearingState)
+            end
+            Citizen.Wait(100)
         end
-        ResetEntityAlpha(PlayerPedId())
-        SetEntityAlpha(PlayerPedId(), 255, false)
     end)
 end)
 

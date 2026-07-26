@@ -106,13 +106,17 @@ function MBT.Snapshot.Canonicalize(visual, model)
                 and MBT.SnapshotBounds.componentDrawable
                 or MBT.SnapshotBounds.propDrawable
             local palette = slot.palette == nil and 0 or slot.palette
+            local texture = slot.texture
+            if slotType == 'Props' and slot.drawable == -1 and texture == -1 then
+                texture = 0
+            end
             if not inBounds(slot.drawable, drawableBounds) then return nil, 'invalid_drawable' end
-            if not inBounds(slot.texture, MBT.SnapshotBounds.texture) then return nil, 'invalid_texture' end
+            if not inBounds(texture, MBT.SnapshotBounds.texture) then return nil, 'invalid_texture' end
             if not inBounds(palette, MBT.SnapshotBounds.palette) then return nil, 'invalid_palette' end
 
             normalized[slotType][slotIndex] = {
                 drawable = slot.drawable,
-                texture = slot.texture,
+                texture = texture,
                 palette = palette,
             }
         end

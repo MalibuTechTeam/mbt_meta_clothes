@@ -329,41 +329,44 @@ function MBT.Utils.PauseHybridDetection()
     if MBT.SnapshotClient then MBT.SnapshotClient.Pause('legacy') end
 end
 
---- Insurance net per la visibilità del PED.
----
---- Tutti i path che settano alpha=0 sul ped (loadingScreenOff, esx:playerLoaded,
---- multichar:pauseDetection, QB/OX playerLoaded) si aspettano che ENTRO 5s
---- arrivi un evento dal server (restoreWearing o requestPedScan) che resetti
---- alpha=255. Se quell'evento non arriva (rete persa, multichar fast-switch
---- che non triggera correttamente, race condition non prevista, server crash),
---- il ped rimane invisibile per sempre.
----
---- Questo watchdog scatta dopo 5s: se il ped è ancora alpha=0, lo riporta
---- visibile + ferma eventuale loop keepPedHidden + riprende la detection.
---- Stampa un WARN sempre visibile (non gated da MBT.Debug) così l'edge case
---- è visibile in console e il bug a monte può essere investigato.
----
---- Idempotente: se il ped è già visibile (alpha > 0), no-op silenzioso.
---- Safe da chiamare in più handler concorrenti — solo il primo che trova
---- alpha=0 effettua il recovery, gli altri trovano alpha=255 e non fanno nulla.
----
---- @param reason string|nil Etichetta diagnostica per il log
-function MBT.Utils.SchedulePedVisibilityWatchdog(reason)
-    Citizen.CreateThread(function()
-        Citizen.Wait(5000)
+--- Coordinator generazionale della visibilità. Ogni nuova fase di spawn
+--- invalida il watchdog precedente; solo la fase corrente può fare recovery.
+local pedVisibility = MBT.PedVisibility.New({
+    schedule = function(timeoutMs, callback) Citizen.SetTimeout(timeoutMs, callback) end,
+    hide = function()
         local ped = PlayerPedId()
         if not DoesEntityExist(ped) then return end
-        if GetEntityAlpha(ped) > 0 then return end -- già visibile, tutto ok
-        print(("^3[mbt_meta_clothes] WARN: ped still alpha=0 after 5s (reason=%s) — auto-recovering visibility^0"):format(tostring(reason or "unknown")))
+        SetEntityAlpha(ped, 0, false)
+    end,
+    reveal = function(reason, watchdog)
+        local ped = PlayerPedId()
+        if watchdog then
+            print(("^3[mbt_meta_clothes] WARN: ped visibility wait expired (reason=%s) — auto-recovering visibility^0"):format(tostring(reason)))
+        end
+        if not DoesEntityExist(ped) then return false end
         ResetEntityAlpha(ped)
         SetEntityAlpha(ped, 255, false)
         if MBT.Utils.StopKeepPedHidden then
             MBT.Utils.StopKeepPedHidden()
         end
-        if MBT.Utils.ResumeHybridDetection then
+        if watchdog and MBT.Utils.ResumeHybridDetection then
             MBT.Utils.ResumeHybridDetection()
         end
+        return true
+    end,
+})
+
+--- @param reason string|nil Etichetta diagnostica per il log
+function MBT.Utils.SchedulePedVisibilityWatchdog(reason)
+    local generation = pedVisibility:Begin(reason, 5000)
+    Citizen.CreateThread(function()
+        while pedVisibility:Pulse(generation) do Citizen.Wait(50) end
     end)
+    return generation
+end
+
+function MBT.Utils.CompletePedVisibilityWait(reason)
+    return pedVisibility:Complete(reason)
 end
 
 --- Riprende la hybrid detection dopo una pausa (es. multichar switch).
