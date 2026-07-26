@@ -1,59 +1,11 @@
 MBT = MBT or {}
 Locales = Locales or {}
 
-local resName = GetCurrentResourceName()
-
------------------------------------------------------------
--- Logging
------------------------------------------------------------
-
---- Serialize a single value for log output.
---- Tables are json.encoded; everything else is tostring'd.
-local function serialize(v)
-    if type(v) == "table" then
-        local ok, s = pcall(json.encode, v)
-        return ok and s or tostring(v)
-    end
-    return tostring(v)
-end
-
---- Return "folder/file.lua:line" of the caller at the given stack level.
---- Strips the resource-name prefix so paths stay short.
-local function callerLoc(level)
-    local info = debug.getinfo(level, "Sl")
-    if not info then return "?" end
-    local src = info.short_src:gsub("^@@?[^/\\]+[/\\]", "")
-    return src .. ":" .. (info.currentline or "?")
-end
-
---- HH:MM:SS timestamp on the server side; empty string on the client.
---- Lets you correlate events in server logs without noise in F8 console.
-local function timestamp()
-    return IsDuplicityVersion() and (os.date("%H:%M:%S") .. " ") or ""
-end
-
---- Log a debug message. Only prints when MBT.Debug = true.
---- Tables are auto json-encoded. Shows caller location and server timestamp.
---- @param ... any
-function MBT.Debugger(...)
-    if not MBT.Debug then return end
-    local parts = {}
-    for i = 1, select("#", ...) do
-        parts[i] = serialize(select(i, ...))
-    end
-    print(("^7[%s] %s^3%s^7 %s^0"):format(resName, timestamp(), callerLoc(2), table.concat(parts, " ")))
-end
-
---- Log a warning. Always prints regardless of MBT.Debug.
---- Tables are auto json-encoded. Shows caller location and server timestamp.
---- @param ... any
-function MBT.Warn(...)
-    local parts = {}
-    for i = 1, select("#", ...) do
-        parts[i] = serialize(select(i, ...))
-    end
-    print(("^3[%s] [WARN] %s%s %s^0"):format(resName, timestamp(), callerLoc(2), table.concat(parts, " ")))
-end
+-- Canonical MalibuTech logger aliases. Direct references preserve caller depth.
+MBT.Debugger = MBTLog.Debug
+MBT.Info = MBTLog.Info
+MBT.Warn = MBTLog.Warn
+MBT.Error = MBTLog.Error
 
 
 -----------------------------------------------------------

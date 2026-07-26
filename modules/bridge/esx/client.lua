@@ -66,7 +66,7 @@ AddEventHandler('mbt_meta_clothes:multichar:pauseDetection', function()
             Wait(50)
         end
         if not stoppedNormally and keepPedHidden then
-            print("^3[mbt_meta_clothes] WARN: keepPedHidden 5s timer expired without restoreWearing/requestPedScan — auto-recovering ped visibility^0")
+            MBT.Warn('keepPedHidden timer expired without restore or PED scan; auto-recovering visibility')
             keepPedHidden = false
             local ped = PlayerPedId()
             if DoesEntityExist(ped) then

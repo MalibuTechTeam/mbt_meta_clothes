@@ -385,7 +385,7 @@ function MBT.PlayerState.Load(src, identifier)
         if not PlayerWearing[src] then
             MBT.PlayerState.InitPlayer(src)
         end
-        print(("^3[mbt_meta_clothes][PlayerState.Load] WARN: src=%s identifier nil — skipping load, preservando stato corrente^0"):format(src))
+        MBT.Warn('PlayerState.Load: identifier unavailable; preserving current state', { source = src })
         return
     end
 
@@ -447,7 +447,10 @@ function MBT.PlayerState.Load(src, identifier)
             end
 
             if totalSlots > 0 and not hasNonZero then
-                print(("^3[mbt_meta_clothes][PlayerState.Load] WARN: corrupted bare-data row detected for identifier=%s (%d slots all drawable=0). Deleting row and treating as DB MISS.^0"):format(tostring(identifier), totalSlots))
+                MBT.Warn('PlayerState.Load: corrupted bare-data row; deleting and treating as DB miss', {
+                    identifier = identifier,
+                    slots = totalSlots,
+                })
                 MySQL.query.await("DELETE FROM mbt_player_wearing WHERE identifier = ?", { identifier })
                 MBT.PlayerState.InitPlayer(src)
                 PlayerHasDbEntry[src] = false
@@ -463,13 +466,16 @@ function MBT.PlayerState.Load(src, identifier)
         end
         PlayerHasDbEntry[src] = true
         PlayerHasBaseline[src] = true
-        -- Branch trace SEMPRE stampato (no MBT.Debug gate) per debug visibilità
-        print(("^5[mbt_meta_clothes][PlayerState.Load] src=%s identifier=%s -> DB HIT (HasDbEntry=true)^0"):format(src, tostring(identifier)))
+        MBT.Debugger('PlayerState.Load: DB hit', { source = src, identifier = identifier })
     else
         MBT.PlayerState.InitPlayer(src)
         PlayerHasDbEntry[src] = false
         PlayerHasBaseline[src] = false
-        print(("^5[mbt_meta_clothes][PlayerState.Load] src=%s identifier=%s -> DB MISS (HasDbEntry=false, switch flag=%s)^0"):format(src, tostring(identifier), tostring(PlayerJustSwitched[src] == true)))
+        MBT.Debugger('PlayerState.Load: DB miss', {
+            source = src,
+            identifier = identifier,
+            switched = PlayerJustSwitched[src] == true,
+        })
     end
 
     DirtyPlayers[src] = false
@@ -558,7 +564,11 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force)
     -- che firerà più tardi) rilancerà PushStateToClient.
     if not getPlayerIdentifier or not getPlayerIdentifier(src) then
         if attempt >= 8 then
-            print(("^3[mbt_meta_clothes][PushStateToClient] WARN: src=%s identifier still nil after %d attempts (~%dms) — abbandono, attendo prossimo trigger^0"):format(src, attempt, attempt * 200))
+            MBT.Warn('PushStateToClient: identifier unavailable; waiting for next lifecycle trigger', {
+                source = src,
+                attempts = attempt,
+                elapsedMs = attempt * 200,
+            })
             return
         end
         Citizen.SetTimeout(200, function()
@@ -590,7 +600,7 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force)
 
     if MBT.PlayerState.HasBaseline(src) then
         local wearingState = MBT.PlayerState.GetAll(src)
-        print(("^5[mbt_meta_clothes][PushStateToClient] src=%s -> restoreWearing (existing DB row)^0"):format(src))
+        MBT.Debugger('PushStateToClient: restoring existing wearing state', { source = src })
         TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, wearingState, context)
     else
         -- Sia "truly new player" sia "switched-to new char" → requestPedScan.
@@ -606,7 +616,10 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force)
         -- "tutto a 0" così non corrompiamo il DB se illenium tarda. Funziona sia
         -- per primo login che per switch.
         local justSwitched = MBT.PlayerState.ConsumeSwitchFlag(src)
-        print(("^5[mbt_meta_clothes][PushStateToClient] src=%s -> requestPedScan (new char, switched=%s)^0"):format(src, tostring(justSwitched)))
+        MBT.Debugger('PushStateToClient: requesting initial PED scan', {
+            source = src,
+            switched = justSwitched,
+        })
         TriggerClientEvent('mbt_meta_clothes:requestPedScan', src, context)
     end
 

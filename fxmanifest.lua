@@ -16,6 +16,8 @@ dependencies {
 }
 
 shared_scripts {
+    -- Canonical MalibuTech logger must load before every shared/client/server module.
+    'modules/utils/logger.lua',
     'modules/shared.lua',
     'modules/visibility/shared.lua',
     'locales/*.lua',

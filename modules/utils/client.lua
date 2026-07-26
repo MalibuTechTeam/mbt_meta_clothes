@@ -341,7 +341,7 @@ local pedVisibility = MBT.PedVisibility.New({
     reveal = function(reason, watchdog)
         local ped = PlayerPedId()
         if watchdog then
-            print(("^3[mbt_meta_clothes] WARN: ped visibility wait expired (reason=%s) — auto-recovering visibility^0"):format(tostring(reason)))
+            MBT.Warn('ped visibility wait expired; auto-recovering visibility', { reason = reason })
         end
         if not DoesEntityExist(ped) then return false end
         ResetEntityAlpha(ped)

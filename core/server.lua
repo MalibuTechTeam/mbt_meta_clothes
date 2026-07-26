@@ -44,7 +44,7 @@ end)
 
 RegisterNetEvent('mbt_meta_clothes:playerReady', function()
     local src = source
-    print(("^5[mbt_meta_clothes][playerReady] src=%s (triggered by client)^0"):format(src))
+    MBT.Debugger('playerReady: client ready', { source = src })
     -- Logica condivisa con il server bridge esx:playerLoaded — entrambi i flow
     -- (client manda playerReady oppure server riceve esx:playerLoaded direttamente)
     -- chiamano la stessa funzione, debounced per evitare doppio push.
@@ -122,7 +122,10 @@ RegisterNetEvent('mbt_meta_clothes:syncInitialWearing', function(wearingData)
     end
 
     if rejected then
-        print(("^3[mbt_meta_clothes] WARN: syncInitialWearing REJECTED for src=%s — %s. DB row NOT created (avoid storing partial bare-PED state).^0"):format(src, reason))
+        MBT.Warn('syncInitialWearing rejected; DB row not created', {
+            source = src,
+            reason = reason,
+        })
         return
     end
 

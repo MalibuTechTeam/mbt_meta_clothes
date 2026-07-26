@@ -55,13 +55,13 @@ end
 -- è arrivato dal client per quel src nei N secondi successivi al logout).
 local pendingPauseSince = {} -- [src] = GetGameTimer() del logout
 
--- Diagnostic logs: stampati SEMPRE (no MBT.Debug gate) così quando il bug
--- si manifesta in produzione abbiamo subito la timeline completa degli event
--- per capire QUALE step della catena ESX→multichar non si chiude.
+-- Lifecycle traces use the shared MBT logger and remain debug-gated.
 local function logEsxEvent(name, src, extra)
-    print(("^6[mbt_meta_clothes][esx-bridge] %s src=%s%s^0"):format(
-        name, tostring(src), extra and (" " .. extra) or ""
-    ))
+    MBT.Debugger('esx bridge lifecycle', {
+        event = name,
+        source = src,
+        detail = extra,
+    })
 end
 
 -- Carica nuovo character — guida direttamente il push al client.
@@ -114,7 +114,10 @@ AddEventHandler('esx:playerLogout', function(src)
     -- auto-recoverare.
     Citizen.SetTimeout(4000, function()
         if pendingPauseSince[src] then
-            print(("^3[mbt_meta_clothes][esx-bridge] WARN: 4s after esx:playerLogout for src=%s no esx:playerLoaded/onPlayerJoined arrived — forcing client unblock^0"):format(src))
+            MBT.Warn('esx bridge: load event missing after logout; forcing client unblock', {
+                source = src,
+                timeoutMs = 4000,
+            })
             pendingPauseSince[src] = nil
             -- Trigger un restoreWearing vuoto sul client. Se il src non è più
             -- valido (player disconnesso), TriggerClientEvent è no-op.

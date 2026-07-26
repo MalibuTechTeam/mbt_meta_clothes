@@ -89,8 +89,11 @@ End-to-end inventory-full and partial-batch gameplay testing remains pending.
 - [ ] Add startup configuration validation.
   - Validate slot defaults, item names, torso-kit mappings, locales, and drip levels.
   - Detect duplicate item names and conflicting clothing-state mappings.
-- [ ] Reduce production-only diagnostics.
-  - Keep actionable warnings, but route verbose multichar traces through `MBT.Debug`.
+- [x] Reduce production-only diagnostics.
+  - Adopt the canonical vendored MalibuTech logger used by `mbt_character` and
+    `mbt_malisling`, preserving the historical `MBT.*` aliases.
+  - Keep actionable warnings visible, but route verbose lifecycle and multichar
+    traces through `MBT.Debug`.
 
 ## P2 - Quality and maintainability
 
