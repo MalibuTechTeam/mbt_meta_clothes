@@ -242,19 +242,35 @@ function MBT.GiveItems.NewRuntime(config)
     local torsoNames = config.TorsoSlotNames or MBT.TorsoSlotNames
     local resolveItemName = config.resolveItemName or MBT.ResolveItemName
     local normalizeSex = config.normalizeSex or MBT.NormalizeSex
+    local getPlayerSex = config.getPlayerSex
+        or (MBT.ServerUtils and MBT.ServerUtils.GetPlayerSex)
     local cleanExpiredDNA = config.cleanExpiredDNA or MBT.ServerUtils.CleanExpiredDNA
-    local clothesDescription = config.clothesDescription or MBT.Locale["clothes_desc"]
-    local propsDescription = config.propsDescription or MBT.Locale["props_desc"]
+    local configuredClothesDescription = config.clothesDescription
+    local configuredPropsDescription = config.propsDescription
     local coordinator = MBT.GiveItems.New({
         addItem = config.addItem,
-        log = config.log,
+        log = config.log or function(...)
+            MBT.Debugger("inventory transfer", ...)
+        end,
     })
     local runtime = {}
+
+    local function resolveDescription(configuredDescription, localeKey)
+        if type(configuredDescription) == "string" then return configuredDescription end
+        local localized = MBT.Locale and MBT.Locale[localeKey]
+        if type(localized) == "string" then return localized end
+        return nil
+    end
 
     local function getIdentity(src)
         local player = config.getPlayer(src)
         if not player then return nil end
         return player, config.getPlayerName(player), config.getPlayerSource(player)
+    end
+
+    local function resolveMetadataSex(src, metadataSex)
+        local trustedSex = getPlayerSex and normalizeSex(getPlayerSex(src)) or nil
+        return trustedSex or normalizeSex(metadataSex)
     end
 
     ---@param ownerSrc number
@@ -279,8 +295,14 @@ function MBT.GiveItems.NewRuntime(config)
             if not original then return nil, "no_item" end
 
             local metadata = cloneTable(original)
+            local sex = resolveMetadataSex(ownerSrc, metadata.sex)
+            if not sex then return nil, "invalid_metadata" end
+            metadata.sex = sex
             if not options.preserveDescription then
-                local descriptionFormat = slotType == "Drawables" and clothesDescription or propsDescription
+                local descriptionFormat = slotType == "Drawables"
+                    and resolveDescription(configuredClothesDescription, "clothes_desc")
+                    or resolveDescription(configuredPropsDescription, "props_desc")
+                if not descriptionFormat then return nil, "invalid_locale" end
                 metadata.description = buildDescription(descriptionFormat:format(playerIdentity), metadata)
             end
             cleanExpiredDNA(metadata)
@@ -321,8 +343,10 @@ function MBT.GiveItems.NewRuntime(config)
         local lockKey = ("%s:torso"):format(ownerSrc)
         local originals = {}
         return coordinator:Transfer(lockKey, function()
+            local descriptionFormat = resolveDescription(configuredClothesDescription, "clothes_desc")
+            if not descriptionFormat then return nil, "invalid_locale" end
             local metadata = {
-                description = clothesDescription:format(playerIdentity),
+                description = descriptionFormat:format(playerIdentity),
                 type = "DressKit",
             }
             local found = false
@@ -340,12 +364,14 @@ function MBT.GiveItems.NewRuntime(config)
 
             if not found then return nil, "no_item" end
 
-            local sex = normalizeSex(metadata.sex)
+            local sex = resolveMetadataSex(ownerSrc, metadata.sex)
             if not sex then return nil, "invalid_metadata" end
             metadata.sex = sex
             for _, slotIndex in ipairs(torsoSlots) do
                 local slotName = torsoNames[slotIndex]
-                if not metadata[slotName] then
+                if metadata[slotName] then
+                    metadata[slotName].sex = sex
+                else
                     local defaults = drawables[slotIndex]
                         and drawables[slotIndex].Default
                         and drawables[slotIndex].Default[sex]

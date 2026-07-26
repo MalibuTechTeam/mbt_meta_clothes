@@ -21,10 +21,16 @@ local function payload(receiver, item_name, metadata)
     }
 end
 
-local function runtimeFixture(initial, add_item)
+local function runtimeFixture(initial, add_item, options)
+    options = options or {}
     local state = initial
     local clears = {}
     local playerState = {}
+    local clothesDescription, propsDescription
+    if not options.useRuntimeLocale then
+        clothesDescription = 'Piece of clothing belonging to %s'
+        propsDescription = 'Accessory belonging to %s'
+    end
 
     function playerState.GetSlot(_, slot_type, slot_index)
         return state[slot_type] and state[slot_type][slot_index]
@@ -47,6 +53,7 @@ local function runtimeFixture(initial, add_item)
         PlayerState = playerState,
         Drawables = {
             [3] = { Item = 'arms', Default = { male = { 15 } } },
+            [6] = { Item = 'shoes', Default = { male = { 34 } } },
             [8] = { Item = 'tshirt', Default = { male = { 15 } } },
             [11] = { Item = { 'jacket', 'designer_jacket' }, Default = { male = { 15 } } },
         },
@@ -60,10 +67,11 @@ local function runtimeFixture(initial, add_item)
             return type(slot_config.Item) == 'table' and slot_config.Item[1] or slot_config.Item
         end,
         normalizeSex = function(sex) return sex end,
+        getPlayerSex = options.getPlayerSex,
         cleanExpiredDNA = function() end,
-        clothesDescription = 'Piece of clothing belonging to %s',
-        propsDescription = 'Accessory belonging to %s',
-        log = function() end,
+        clothesDescription = clothesDescription,
+        propsDescription = propsDescription,
+        log = options.log or function() end,
     })
 
     return runtime, state, clears
@@ -350,6 +358,31 @@ local cases = {
         end,
     },
     {
+        name = 'runtime resolves locale descriptions after deferred locale initialization',
+        run = function()
+            local previousLocale = MBT.Locale
+            MBT.Locale = {}
+            local runtime = runtimeFixture({
+                Drawables = {
+                    [8] = { index = 8, drawable = 21, texture = 0, sex = 'male' },
+                },
+                Props = {},
+            }, function(_, _, _, metadata)
+                Assert.equal('Late locale for Test Player', metadata.description)
+                return true
+            end, { useRuntimeLocale = true })
+
+            MBT.Locale = {
+                clothes_desc = 'Late locale for %s',
+                props_desc = 'Late prop locale for %s',
+            }
+            local result = runtime:ReturnTorso(7)
+            MBT.Locale = previousLocale
+
+            Assert.equal(true, result.ok, result.reason)
+        end,
+    },
+    {
         name = 'failed torso add clears no slot',
         run = function()
             local runtime, state, clears = runtimeFixture({
@@ -390,6 +423,60 @@ local cases = {
             Assert.equal(15, addedMetadata.Arms.drawable)
             Assert.equal(15, addedMetadata.Tshirt.drawable)
             Assert.equal(29, addedMetadata.Jacket.drawable)
+        end,
+    },
+    {
+        name = 'legacy single-slot metadata receives trusted PED sex',
+        run = function()
+            local addedMetadata
+            local runtime = runtimeFixture({
+                Drawables = {
+                    [6] = { index = 6, drawable = 12, texture = 1, palette = 0 },
+                },
+                Props = {},
+            }, function(_, _, _, metadata)
+                addedMetadata = metadata
+                return true
+            end, {
+                getPlayerSex = function(src)
+                    Assert.equal(14, src)
+                    return 'male'
+                end,
+            })
+
+            local result = runtime:ReturnSlot(14, 'Drawables', 6)
+
+            Assert.equal(true, result.ok, result.reason)
+            Assert.equal('male', addedMetadata.sex)
+        end,
+    },
+    {
+        name = 'legacy torso metadata receives trusted PED sex',
+        run = function()
+            local addedMetadata
+            local runtime = runtimeFixture({
+                Drawables = {
+                    [8] = { index = 8, drawable = 20, texture = 1, palette = 0 },
+                    [11] = { index = 11, drawable = 29, texture = 2, palette = 0 },
+                },
+                Props = {},
+            }, function(_, _, _, metadata)
+                addedMetadata = metadata
+                return true
+            end, {
+                getPlayerSex = function(src)
+                    Assert.equal(14, src)
+                    return 'male'
+                end,
+            })
+
+            local result = runtime:ReturnTorso(14)
+
+            Assert.equal(true, result.ok, result.reason)
+            Assert.equal('male', addedMetadata.sex)
+            Assert.equal('male', addedMetadata.Arms.sex)
+            Assert.equal('male', addedMetadata.Tshirt.sex)
+            Assert.equal('male', addedMetadata.Jacket.sex)
         end,
     },
     {

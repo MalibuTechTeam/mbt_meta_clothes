@@ -31,6 +31,12 @@ local function queueUndress(kind, index, sex)
         sex = sex,
         createdAt = now,
     }
+    MBT.Debugger("undress request", {
+        requestId = nextUndressRequestId,
+        kind = kind,
+        index = index,
+        sex = sex,
+    })
     return nextUndressRequestId
 end
 
@@ -205,6 +211,12 @@ end
 RegisterNetEvent('mbt_meta_clothes:undressResult', function(result)
     if type(result) ~= "table" then return end
     local pending = pendingUndress[result.requestId]
+    MBT.Debugger("undress ACK", {
+        requestId = result.requestId,
+        ok = result.ok,
+        reason = result.reason,
+        pending = pending ~= nil,
+    })
     if not pending then return end
     pendingUndress[result.requestId] = nil
 

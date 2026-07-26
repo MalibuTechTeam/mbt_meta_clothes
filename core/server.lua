@@ -341,6 +341,14 @@ local function validUndressRequestId(value)
 end
 
 local function sendUndressResult(src, requestId, kind, index, result)
+    MBT.Debugger("undress result", {
+        source = src,
+        requestId = requestId,
+        kind = kind,
+        index = index,
+        ok = result.ok == true,
+        reason = result.reason,
+    })
     TriggerClientEvent('mbt_meta_clothes:undressResult', src, {
         requestId = requestId,
         ok = result.ok == true,

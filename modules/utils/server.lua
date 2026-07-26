@@ -103,6 +103,17 @@ function MBT.ServerUtils.IsValidPlayer(src)
     return src and GetPlayerPing(src) > 0
 end
 
+--- Resolve the active PED sex from the server-owned network entity.
+--- This keeps inventory metadata independent from client-provided sex values.
+---@param src number Player source
+---@return string|nil sex
+function MBT.ServerUtils.GetPlayerSex(src)
+    local ped = GetPlayerPed(src)
+    if not ped or ped == 0 then return nil end
+    local model = GetEntityModel(ped)
+    return MBT.NormalizeSex(MBT.GenderModels and MBT.GenderModels[model])
+end
+
 --- Check if wearable_props has gloves export available
 --- Cached at startup to avoid repeated pcall overhead
 local hasGlovesExport = false
