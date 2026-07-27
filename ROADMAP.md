@@ -60,11 +60,11 @@ matrix above passes.
     catalog; clients cannot relay arbitrary dictionaries, clips, or durations.
   - Serialize active thief/victim sessions and retain the old event names only as
     non-mutating compatibility tombstones for one release cycle.
-- [ ] Repair the GitHub release workflow.
+- [x] Repair the GitHub release workflow.
   - [x] Install dependencies with Bun and build `web/dist` during the release job.
   - [x] Include `core`, `data`, `locales`, runtime web assets, modules, and manifest files.
-  - Validate the archive against every path referenced by `fxmanifest.lua`.
-  - Update deprecated GitHub Actions and output syntax.
+  - [x] Validate the archive against every path referenced by `fxmanifest.lua`.
+  - [x] Update deprecated GitHub Actions and output syntax.
 
 The authoritative dress, transactional return, and steal implementations pass
 both their pure-Lua checks and the running Cfx self-tests: snapshot `34/34`,
