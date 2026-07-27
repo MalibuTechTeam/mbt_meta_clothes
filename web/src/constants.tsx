@@ -97,9 +97,10 @@ export const HOTSPOT_META: Record<
 
 // Clothing layer overlay metadata — one entry per slot that has a PNG layer.
 // path: base filename without sex suffix and extension (e.g. "hat" → "hat_male.png" / "hat_female.png")
-// If the sex-specific PNG doesn't exist, the layer is silently hidden (onError).
+// availableFor is authoritative; check:assets verifies every declared PNG.
 export interface LayerMeta {
   path: string;
+  availableFor: readonly ("male" | "female")[];
   top: string;
   left: string;
   width: string;
@@ -110,6 +111,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
   // Props
   "Props-0": {
     path: "hat",
+    availableFor: ["male"],
     top: "-1%",
     left: "50%",
     width: "19%",
@@ -117,6 +119,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
   },
   "Props-1": {
     path: "glasses",
+    availableFor: ["male"],
     top: "4.5%",
     left: "50%",
     width: "10%",
@@ -124,6 +127,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
   },
   "Props-2": {
     path: "earrings",
+    availableFor: ["male"],
     top: "6%",
     left: "50%",
     width: "13%",
@@ -132,6 +136,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
   "Props-6": {
     // sotto il jacket (zIndex 18) — la giacca copre i polsi
     path: "watch",
+    availableFor: ["male"],
     top: "4%",
     left: "51.5%",
     width: "90%",
@@ -140,6 +145,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
   "Props-7": {
     // sotto il jacket (zIndex 18) — la giacca copre i polsi
     path: "bracelet",
+    availableFor: ["male"],
     top: "39%",
     left: "40%",
     width: "17%",
@@ -148,6 +154,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
   // Drawables
   "Drawables-1": {
     path: "mask",
+    availableFor: ["male"],
     top: "0%",
     left: "50%",
     width: "25%",
@@ -155,6 +162,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
   },
   "Drawables-5": {
     path: "backpack",
+    availableFor: [],
     top: "32%",
     left: "62%",
     width: "36%",
@@ -162,6 +170,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
   },
   "Drawables-7": {
     path: "chain",
+    availableFor: ["male"],
     top: "14%",
     left: "50%",
     width: "10%",
@@ -169,6 +178,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
   },
   "Drawables-11": {
     path: "jacket",
+    availableFor: ["male", "female"],
     top: "0%",
     left: "50%",
     width: "99%",
@@ -176,6 +186,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
   },
   "Drawables-9": {
     path: "armor",
+    availableFor: ["male"],
     top: "13.5%",
     left: "50%",
     width: "39%",
@@ -183,6 +194,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
   },
   "Drawables-4": {
     path: "pants",
+    availableFor: ["male"],
     top: "31%",
     left: "50%",
     width: "65%",
@@ -190,6 +202,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
   },
   "Drawables-6": {
     path: "shoes",
+    availableFor: ["male"],
     top: "1%",
     left: "50%",
     width: "100%",

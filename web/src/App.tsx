@@ -148,8 +148,9 @@ export default function App() {
       "./mannequin_female.png",
     ]);
     Object.values(LAYER_META).forEach((meta) => {
-      paths.add(`./layers/${meta.path}_male.png`);
-      paths.add(`./layers/${meta.path}_female.png`);
+      meta.availableFor.forEach((gender) => {
+        paths.add(`./layers/${meta.path}_${gender}.png`);
+      });
     });
     paths.forEach((src) => {
       const img = new Image();

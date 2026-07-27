@@ -294,6 +294,7 @@ export default function Mannequin({
               : wearing[slotType as keyof typeof wearing]?.[slotIndexStr];
             if (!worn) return null;
             const gender = sex === 1 ? "female" : "male";
+            if (!meta.availableFor.includes(gender)) return null;
             // STEP 3: se lo slot hoverato è mappato a questo layer, applica glow ciano
             const isLayerHovered =
               hoveredSlot !== null &&
@@ -364,9 +365,6 @@ export default function Mannequin({
               >
                 <img
                   src={`./layers/${meta.path}_${gender}.png`}
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
                   style={{
                     filter: isLayerActive ? undefined : layerFilter,
                   }}

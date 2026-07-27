@@ -9,7 +9,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "check": "bun run lint && bun run typecheck && bun run build",
+    "check:assets": "bun run scripts/check-assets.ts",
+    "check": "bun run lint && bun run typecheck && bun run check:assets && bun run build",
     "preview": "vite preview"
   },
   "dependencies": {

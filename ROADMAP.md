@@ -104,9 +104,9 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
   - [x] Run lint, type-check, and production build in CI.
 - [ ] Complete runtime assets.
   - Add `item_image/bracelet.png`.
-  - Add the missing male backpack layer.
-  - Add or deliberately disable missing female mannequin layers.
-  - Add an automated check for layer paths declared by the frontend.
+  - Add the missing male backpack layer; it is explicitly disabled until supplied.
+  - [x] Explicitly disable missing female mannequin layers instead of requesting broken images.
+  - [x] Add an automated check for layer paths declared by the frontend.
 - [x] Add startup configuration validation.
   - [x] Validate slot defaults, item names, torso-kit mappings, locales, and drip levels.
   - [x] Detect duplicate item names and conflicting clothing-state mappings.
