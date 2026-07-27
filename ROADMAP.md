@@ -61,8 +61,8 @@ matrix above passes.
   - Serialize active thief/victim sessions and retain the old event names only as
     non-mutating compatibility tombstones for one release cycle.
 - [ ] Repair the GitHub release workflow.
-  - Install dependencies and build `web/dist` during the release job.
-  - Include `core`, `data`, `locales`, runtime web assets, modules, and manifest files.
+  - [x] Install dependencies with Bun and build `web/dist` during the release job.
+  - [x] Include `core`, `data`, `locales`, runtime web assets, modules, and manifest files.
   - Validate the archive against every path referenced by `fxmanifest.lua`.
   - Update deprecated GitHub Actions and output syntax.
 
@@ -98,10 +98,10 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
 - [ ] Align optional and required dependencies.
   - Decide whether `ox_lib` is required or provide notification/progress fallbacks.
   - Fix the `MBT.CustomInventory(source, itemName, count, metadata)` contract.
-- [ ] Fix and enforce the NUI type contract.
+- [x] Fix and enforce the NUI type contract.
   - [x] Add `extraStateUpdate` to the `NUIMessage` union.
   - [x] Add `typecheck` and `check` package scripts.
-  - Run lint, type-check, and production build in CI.
+  - [x] Run lint, type-check, and production build in CI.
 - [ ] Complete runtime assets.
   - Add `item_image/bracelet.png`.
   - Add the missing male backpack layer.
