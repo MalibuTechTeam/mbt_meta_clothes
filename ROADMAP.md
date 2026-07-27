@@ -20,7 +20,7 @@ the candidate section are not automatically part of the 2.0 release scope.
 - [x] Complete Lua parser checks, `git diff --check`, web lint, and independent
       protocol/lifecycle code review.
 - [x] Run `mbt_snapshot_selftest` in an actual Cfx server with `MBT.Debug = true`
-      (`28/28` passed on 2026-07-24).
+      (`33/33` passed on 2026-07-27).
 - [x] Verify the primary relog case: logout without jacket and reconnect without
       the jacket being duplicated on the PED and in inventory.
 - [ ] Complete the remaining end-to-end verification: six-or-more-slot external
@@ -34,11 +34,11 @@ matrix above passes.
 
 ## P0 - Release blockers
 
-- [ ] Make dress and undress operations server-authoritative.
-  - Never create inventory metadata from untrusted client payloads.
+- [x] Make dress and undress operations server-authoritative.
+  - [x] Never create inventory metadata from untrusted client payloads.
   - [x] Reject an undress request when the corresponding server wearing slot is empty.
   - [x] Build returned-item metadata from the authoritative server wearing state.
-  - Correlate item use with the server-side inventory operation.
+  - [x] Correlate item use with the server-side inventory operation.
 - [x] Make inventory returns transactional.
   - Add the item before removing a worn slot, using the inventory adapter result
     as the capacity/failure decision.
@@ -60,10 +60,12 @@ matrix above passes.
   - Validate the archive against every path referenced by `fxmanifest.lua`.
   - Update deprecated GitHub Actions and output syntax.
 
-The transactional return and steal implementations pass the pure-Lua inventory
-self-test locally and inside the running Cfx resource (`16/16` on 2026-07-25),
-alongside the snapshot suite (`28/28`), syntax compilation, and static diff checks.
-End-to-end inventory-full and partial-batch gameplay testing remains pending.
+The authoritative dress, transactional return, and steal implementations pass
+their pure-Lua checks and the running Cfx self-tests: snapshot `33/33`, inventory
+return `19/19`, dress authority `8/8`, and inventory adapters `5/5` on 2026-07-27.
+Equip, undress, relog, and connected resource-restart paths were also verified in
+game with both QB Inventory and OX Inventory against commit `d0a9f0e`. End-to-end
+inventory-full and partial-batch gameplay testing remains pending.
 
 ## P1 - Required for a stable 2.0
 
