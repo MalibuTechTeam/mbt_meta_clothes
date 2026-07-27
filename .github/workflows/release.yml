@@ -15,15 +15,21 @@ jobs:
         run: sudo apt install zip
 
       - name: Checkout source code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.repository.default_branch }}
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2.2.2
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          version: 8.1.1
+          bun-version: 1.3.13
+
+      - name: Install and verify web UI
+        working-directory: web
+        run: |
+          bun install --frozen-lockfile
+          bun run check
 
       - name: Get variables
         id: get_vars
@@ -52,9 +58,10 @@ jobs:
 
       - name: Bundle files
         run: |
-          mkdir -p ./temp/mbt_meta_clothes
+          mkdir -p ./temp/mbt_meta_clothes/web
           cp ./{README.md,config.lua,fxmanifest.lua} ./temp/mbt_meta_clothes
-          cp -r ./{web,modules,item_image} ./temp/mbt_meta_clothes
+          cp -r ./{core,data,item_image,locales,modules,tests} ./temp/mbt_meta_clothes
+          cp -r ./web/dist ./temp/mbt_meta_clothes/web
           cd ./temp && zip -r ../mbt_meta_clothes.zip ./mbt_meta_clothes
 
       - name: Create Release
