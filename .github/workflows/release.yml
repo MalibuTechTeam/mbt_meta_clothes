@@ -5,20 +5,22 @@ on:
     tags:
       - "v*.*.*"
 
+permissions:
+  contents: write
+
 jobs:
   create-release:
-    name: Build and Create Tagged release
+    name: Build and create tagged release
     runs-on: ubuntu-latest
 
     steps:
       - name: Install archive tools
-        run: sudo apt install zip
+        run: sudo apt-get update && sudo apt-get install -y zip unzip
 
-      - name: Checkout source code
-        uses: actions/checkout@v4
+      - name: Checkout tagged source
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: ${{ github.event.repository.default_branch }}
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
@@ -31,48 +33,46 @@ jobs:
           bun install --frozen-lockfile
           bun run check
 
-      - name: Get variables
-        id: get_vars
+      - name: Determine release type
+        id: release
+        shell: bash
         run: |
-          echo '::set-output name=SHORT_SHA::$(git rev-parse --short HEAD)'
-          echo '::set-output name=DATE::$(date +'%D')'
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Bump manifest version
-        run: node .github/actions/bump-manifest-version.js
+      - name: Set manifest version for artifact
+        run: bun .github/actions/bump-manifest-version.js
         env:
           TGT_RELEASE_VERSION: ${{ github.ref_name }}
 
-      - name: Push manifest change
-        uses: EndBug/add-and-commit@v8
-        with:
-          add: fxmanifest.lua
-          push: true
-          author_name: Manifest Bumper
-          author_email: 41898282+github-actions[bot]@users.noreply.github.com
-          message: "chore: bump manifest version to ${{ github.ref_name }}"
-
-      - name: Update tag ref
-        uses: EndBug/latest-tag@latest
-        with:
-          tag-name: ${{ github.ref_name }}
-
-      - name: Bundle files
+      - name: Build and validate release archive
+        shell: bash
         run: |
-          mkdir -p ./temp/mbt_meta_clothes/web
-          cp ./{README.md,config.lua,fxmanifest.lua} ./temp/mbt_meta_clothes
-          cp -r ./{core,data,item_image,locales,modules,tests} ./temp/mbt_meta_clothes
-          cp -r ./web/dist ./temp/mbt_meta_clothes/web
-          cd ./temp && zip -r ../mbt_meta_clothes.zip ./mbt_meta_clothes
+          set -euo pipefail
 
-      - name: Create Release
-        uses: "marvinpinto/action-automatic-releases@v1.2.1"
-        id: auto_release
+          release_root="./temp/mbt_meta_clothes"
+          rm -rf ./temp ./mbt_meta_clothes.zip
+          mkdir -p "${release_root}/web"
+
+          cp ./README.md ./config.lua ./fxmanifest.lua "${release_root}/"
+          cp -r ./core ./data ./item_image ./locales ./modules ./tests "${release_root}/"
+          cp -r ./web/dist "${release_root}/web/"
+
+          bun .github/actions/validate-release.mjs \
+            "${release_root}" "${GITHUB_REF_NAME#v}"
+
+          cd ./temp
+          zip -r -q ../mbt_meta_clothes.zip ./mbt_meta_clothes
+          cd ..
+          unzip -t ./mbt_meta_clothes.zip
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          title: "${{ env.RELEASE_VERSION }}"
-          prerelease: false
           files: mbt_meta_clothes.zip
-
-        env:
-          CI: false
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{ github.ref_name }}
+          prerelease: ${{ steps.release.outputs.prerelease }}
+          fail_on_unmatched_files: true
