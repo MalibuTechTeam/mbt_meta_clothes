@@ -26,13 +26,9 @@ import type {
   ActiveCategory,
   CategorySlots,
   NUIMessage,
-  NUIMessageUI,
   DripState,
   ToggleableSlots,
   StealItem,
-  NUIMessageStealMenu,
-  NUIMessageUpdateSlot,
-  NUIMessageUpdateWearing,
   UILabels,
 } from "./types";
 
@@ -174,7 +170,7 @@ export default function App() {
       const { action } = event.data;
 
       if (action === "ui") {
-        const d = event.data as NUIMessageUI;
+        const d = event.data;
         const isVisible =
           d.status === true || d.status === "true" || d.status === 1;
         setVisible(isVisible);
@@ -203,7 +199,7 @@ export default function App() {
       }
 
       if (action === "stealMenu") {
-        const d = event.data as NUIMessageStealMenu;
+        const d = event.data;
         const isVisible = d.status === true;
         setVisible(isVisible);
         if (isVisible) {
@@ -224,15 +220,7 @@ export default function App() {
       }
 
       if (action === "dripUpdate") {
-        const d = event.data as {
-          action: string;
-          xp: number;
-          rate: number;
-          level: string;
-          levelIndex: number;
-          progress: number;
-          breakdown?: any;
-        };
+        const d = event.data;
         setDrip((prev) => ({
           ...prev,
           xp: d.xp !== undefined ? d.xp : prev.xp,
@@ -246,22 +234,27 @@ export default function App() {
       }
 
       if (action === "hairToggleUpdate") {
-        const d = event.data as { action: string; hairToggled: boolean };
+        const d = event.data;
         setHairToggled(d.hairToggled);
       }
 
       if (action === "extraStateUpdate") {
-        const d = event.data as Partial<ExtraState>;
-        setExtraState((prev) => ({ ...prev, ...d }));
+        const d = event.data;
+        setExtraState((prev) => ({
+          mask: d.mask ?? prev.mask,
+          bag: d.bag ?? prev.bag,
+          armor: d.armor ?? prev.armor,
+          wearableProps: d.wearableProps ?? prev.wearableProps,
+        }));
       }
 
       if (action === "updateWearing") {
-        const d = event.data as { action: string; wearing: WearingState };
+        const d = event.data;
         if (d.wearing) setWearing(d.wearing);
       }
 
       if (action === "updateSlot") {
-        const d = event.data as NUIMessageUpdateSlot;
+        const d = event.data;
         const { slotType, slotIndex, isWearing, drawable, texture } = d;
         setWearing((prev) => {
           // Normalize slotType casing ('drawable' -> 'Drawables', 'prop' -> 'Props')

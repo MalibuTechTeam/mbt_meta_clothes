@@ -76,6 +76,16 @@ Equip, undress, relog, and connected resource-restart paths were also verified i
 game with both QB Inventory and OX Inventory against commit `d0a9f0e`. End-to-end
 inventory-full, partial-batch, and two-player tokenized stealing remain pending.
 
+### Pre-release gameplay backlog
+
+- [ ] Verify tokenized stealing with two connected players before release.
+  - Complete one single-item theft and confirm item metadata, victim state, and
+    thief inventory are updated exactly once.
+  - Cancel an active theft and confirm no item or wearing state changes owner.
+  - Exercise multi-select and steal-all with limited thief capacity, confirming
+    that only successful transfers commit and failed slots remain on the victim.
+  - Retry or replay a completed request and confirm no duplicate item is created.
+
 ## P1 - Required for a stable 2.0
 
 - [ ] Enforce the existing single-active-inventory invariant.
@@ -89,8 +99,8 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
   - Decide whether `ox_lib` is required or provide notification/progress fallbacks.
   - Fix the `MBT.CustomInventory(source, itemName, count, metadata)` contract.
 - [ ] Fix and enforce the NUI type contract.
-  - Add `extraStateUpdate` to the `NUIMessage` union.
-  - Add `typecheck` and `check` package scripts.
+  - [x] Add `extraStateUpdate` to the `NUIMessage` union.
+  - [x] Add `typecheck` and `check` package scripts.
   - Run lint, type-check, and production build in CI.
 - [ ] Complete runtime assets.
   - Add `item_image/bracelet.png`.

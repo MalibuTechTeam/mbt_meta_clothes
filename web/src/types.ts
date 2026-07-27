@@ -66,6 +66,14 @@ export interface NUIMessageHairToggleUpdate {
   hairToggled: boolean;
 }
 
+export interface NUIMessageExtraStateUpdate {
+  action: 'extraStateUpdate';
+  mask?: boolean;
+  bag?: boolean;
+  armor?: boolean;
+  wearableProps?: boolean;
+}
+
 export interface NUIMessageUpdateSlot {
   action: 'updateSlot';
   slotType: 'Drawables' | 'Props';
@@ -156,4 +164,5 @@ export type NUIMessage =
   | NUIMessageDripUpdate
   | NUIMessageStealMenu
   | NUIMessageHairToggleUpdate
+  | NUIMessageExtraStateUpdate
   | NUIMessageUpdateWearing;
