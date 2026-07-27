@@ -107,9 +107,9 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
   - Add the missing male backpack layer.
   - Add or deliberately disable missing female mannequin layers.
   - Add an automated check for layer paths declared by the frontend.
-- [ ] Add startup configuration validation.
-  - Validate slot defaults, item names, torso-kit mappings, locales, and drip levels.
-  - Detect duplicate item names and conflicting clothing-state mappings.
+- [x] Add startup configuration validation.
+  - [x] Validate slot defaults, item names, torso-kit mappings, locales, and drip levels.
+  - [x] Detect duplicate item names and conflicting clothing-state mappings.
 - [x] Reduce production-only diagnostics.
   - Adopt the canonical vendored MalibuTech logger used by `mbt_character` and
     `mbt_malisling`, preserving the historical `MBT.*` aliases.

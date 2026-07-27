@@ -30,6 +30,8 @@ shared_scripts {
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
+    -- Fail fast on invalid server-owner configuration before runtime modules initialize.
+    'modules/config_validation/server.lua',
     -- 1. Server utilities (MBT.ServerUtils)
     'modules/utils/server.lua',
     -- 2. Player wearing state manager (MBT.PlayerState)
