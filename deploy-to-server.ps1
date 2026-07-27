@@ -3,15 +3,15 @@
 #
 #  Syncs the resource from the dev folder to your FiveM server's resources
 #  folder using robocopy. Excludes dev-only artifacts (node_modules, .git,
-#  web/src, pnpm-lock, etc.) so only runtime files are copied.
+#  web/src, bun.lock, etc.) so only runtime files are copied.
 #
-#  Runs `pnpm build` by DEFAULT before the sync — deploying a stale NUI
+#  Runs `bun run build` by DEFAULT before the sync — deploying a stale NUI
 #  bundle is one of the top debugging time-sinks. Use -SkipBuild only when
 #  you KNOW the dist is current (e.g. back-to-back Lua-only edits).
 #
 #  Usage examples:
 #     .\deploy-to-server.ps1                  # build + deploy (default)
-#     .\deploy-to-server.ps1 -SkipBuild       # skip pnpm build (Lua-only edit)
+#     .\deploy-to-server.ps1 -SkipBuild       # skip Bun build (Lua-only edit)
 #     .\deploy-to-server.ps1 -DryRun          # list what would change, don't write
 #     .\deploy-to-server.ps1 -Dest 'C:\FXServer\server-data\resources\[mbt]\mbt_meta_clothes'
 #
@@ -23,7 +23,7 @@ param(
     [string]$Src  = 'D:\Projects\FiveM\MBT\mbt_meta_clothes',
     [string]$Dest = '',
     # Build is now ON by default — see header comment. Pass -SkipBuild to
-    # skip the pnpm build step for Lua-only iterations.
+    # skip the Bun build step for Lua-only iterations.
     [switch]$SkipBuild,
     # NOTE: named -DryRun (not -WhatIf) to avoid collision with PowerShell's
     # common ShouldProcess -WhatIf parameter, which on some hosts leaks into
@@ -60,15 +60,15 @@ if (-not (Test-Path -LiteralPath (Join-Path $Src 'fxmanifest.lua'))) {
 
 # --- Rebuild NUI (default: ON) ---------------------------------------------
 # Deploying a stale `web/dist` is the #1 source of "I fixed it but the server
-# still shows the old version" — so we run `pnpm build` by default. Pass
+# still shows the old version" — so we run `bun run build` by default. Pass
 # -SkipBuild only when you're iterating on Lua and KNOW the NUI is already
 # current.
 if (-not $SkipBuild) {
-    Write-Host "[build] pnpm build..." -ForegroundColor Cyan
+    Write-Host "[build] bun run build..." -ForegroundColor Cyan
     Push-Location (Join-Path $Src 'web')
     try {
-        & pnpm build
-        if ($LASTEXITCODE -ne 0) { throw "pnpm build failed (exit $LASTEXITCODE)" }
+        & bun run build
+        if ($LASTEXITCODE -ne 0) { throw "bun run build failed (exit $LASTEXITCODE)" }
     } finally {
         Pop-Location
     }
@@ -81,7 +81,7 @@ if (-not $SkipBuild) {
 # --- Sanity: dist exists ----------------------------------------------------
 $distPath = Join-Path $Src 'web\dist\index.html'
 if (-not (Test-Path -LiteralPath $distPath)) {
-    Write-Error "web/dist/index.html not found. Run without -SkipBuild or execute 'pnpm build' manually first."
+    Write-Error "web/dist/index.html not found. Run without -SkipBuild or execute 'bun run build' manually first."
     exit 1
 }
 
@@ -116,6 +116,8 @@ $excludeDirs = @(
 )
 
 $excludeFiles = @(
+    'bun.lock',
+    'bun.lockb',
     'pnpm-lock.yaml',
     'package.json',
     'package-lock.json',
