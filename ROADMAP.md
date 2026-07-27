@@ -20,7 +20,7 @@ the candidate section are not automatically part of the 2.0 release scope.
 - [x] Complete Lua parser checks, `git diff --check`, web lint, and independent
       protocol/lifecycle code review.
 - [x] Run `mbt_snapshot_selftest` in an actual Cfx server with `MBT.Debug = true`
-      (`33/33` passed on 2026-07-27).
+      (`34/34` passed on 2026-07-27).
 - [x] Verify the primary relog case: logout without jacket and reconnect without
       the jacket being duplicated on the PED and in inventory.
 - [ ] Complete the remaining end-to-end verification: six-or-more-slot external
@@ -67,11 +67,11 @@ matrix above passes.
   - Update deprecated GitHub Actions and output syntax.
 
 The authoritative dress, transactional return, and steal implementations pass
-their pure-Lua checks: snapshot `33/33`, inventory return `21/21`, dress authority
-`8/8`, inventory adapters `5/5`, client startup `1/1`, and steal authority `10/10`.
-The snapshot, inventory return (`19/19` before the item-name hardening cases),
-dress, and adapter suites also passed in the running Cfx server on 2026-07-27;
-the new `21/21` return and `10/10` steal suites still require a resource restart.
+both their pure-Lua checks and the running Cfx self-tests: snapshot `34/34`,
+inventory return `21/21`, dress authority `8/8`, inventory adapters `5/5`, client
+startup `1/1`, and steal authority `10/10` on 2026-07-27. The intentional
+`admin_item` rejection warning confirms that forged item metadata reaches neither
+the inventory add operation nor the authoritative state commit.
 Equip, undress, relog, and connected resource-restart paths were also verified in
 game with both QB Inventory and OX Inventory against commit `d0a9f0e`. End-to-end
 inventory-full, partial-batch, and two-player tokenized stealing remain pending.
