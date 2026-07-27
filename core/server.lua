@@ -85,9 +85,14 @@ for _, eventName in ipairs({
     'storeWearingKit',
     'externalDress',
     'externalUndress',
+    'stealSingleItem',
+    'stealBatch',
+    'syncStealDress',
+    'requestVictimAnim',
 }) do
+    local legacyName = eventName
     RegisterNetEvent(('mbt_meta_clothes:%s'):format(eventName), function()
-        ignoreLegacyMutation(source, eventName)
+        ignoreLegacyMutation(source, legacyName)
     end)
 end
 
@@ -360,75 +365,121 @@ local function processStealSelections(thiefSource, targetServerId, selections)
     return summary
 end
 
-local function validateStealAction(thiefSource, targetServerId)
-    if not MBT.ServerUtils.CheckRateLimit(thiefSource, "steal") then return false end
+local function validateStealContext(thiefSource, targetServerId)
+    if thiefSource == targetServerId then return false end
     if not MBT.ServerUtils.IsValidPlayer(targetServerId) then return false end
     if not MBT.ServerUtils.CheckProximity(thiefSource, targetServerId, MBT.StealDistance or 5.0) then return false end
     if MBT.PlayerState.CheckCharacterSwitch(thiefSource) then return false end
     return not MBT.PlayerState.CheckCharacterSwitch(targetServerId)
 end
 
-RegisterNetEvent('mbt_meta_clothes:stealSingleItem', function(targetServerId, stealType, slotIndex)
-    local thiefSource = source
-    if not validateStealAction(thiefSource, targetServerId) then return end
-    processStealSelections(thiefSource, targetServerId, {
-        { stealType = stealType, slotIndex = slotIndex },
-    })
-end)
+local function validateStealBegin(thiefSource, targetServerId)
+    if not MBT.ServerUtils.CheckRateLimit(thiefSource, 'stealBegin') then return false end
+    return validateStealContext(thiefSource, targetServerId)
+end
 
-RegisterNetEvent('mbt_meta_clothes:stealBatch', function(targetServerId, selections)
-    local thiefSource = source
-    if not validateStealAction(thiefSource, targetServerId) then return end
-    processStealSelections(thiefSource, targetServerId, selections)
-end)
-
-RegisterNetEvent('mbt_meta_clothes:syncStealDress', function(targetServerId)
-    local thiefSource = source
-    if not validateStealAction(thiefSource, targetServerId) then return end
-
+local function buildAllStealSelections(targetServerId)
     local wearing = MBT.PlayerState.GetAll(targetServerId)
-    if not wearing then return end
-    local selections, hasTorso = {}, false
+    if not wearing then return nil end
 
+    local selections, hasTorso = {}, false
     for _, slotIndex in ipairs(MBT.TorsoKitSlots) do
         if wearing.Drawables and wearing.Drawables[slotIndex] then
             hasTorso = true
             break
         end
     end
-    if hasTorso then selections[#selections + 1] = { stealType = "torso" } end
+    if hasTorso then selections[#selections + 1] = { stealType = 'torso' } end
 
     for slotIndex in pairs(wearing.Drawables or {}) do
         slotIndex = tonumber(slotIndex) or slotIndex
         if not isTorsoSlot(slotIndex) then
-            selections[#selections + 1] = { stealType = "drawable", slotIndex = slotIndex }
+            selections[#selections + 1] = { stealType = 'drawable', slotIndex = slotIndex }
         end
     end
     for slotIndex in pairs(wearing.Props or {}) do
         selections[#selections + 1] = {
-            stealType = "prop",
+            stealType = 'prop',
             slotIndex = tonumber(slotIndex) or slotIndex,
         }
     end
+    return selections
+end
 
-    if #selections == 0 then
-        TriggerClientEvent('mbt_meta_clothes:notify', thiefSource, MBT.Locale["nothing_to_steal"])
-        return
+local lowStealSlots = {
+    Drawables = { [4] = true, [6] = true },
+    Props = {},
+}
+
+local stealProfiles = {}
+for _, key in ipairs({
+    'target_down',
+    'standing_low',
+    'standing_high',
+    'steal_all',
+    'steal_all_down',
+}) do
+    local animation = MBT.StealAnimations and MBT.StealAnimations[key]
+    if animation then stealProfiles[key] = { duration = animation.dur } end
+end
+
+local stealAuthority = MBT.StealAuthority.New({
+    now = GetGameTimer,
+    validateBegin = validateStealBegin,
+    validateComplete = validateStealContext,
+    normalizeSelections = function(selections)
+        return MBT.GiveItems.NormalizeStealSelections(selections, {
+            validateSlot = MBT.ServerUtils.ValidateSlot,
+            torsoSlots = MBT.TorsoKitSlots,
+            maxSelections = maxStealSelections(),
+        })
+    end,
+    buildAllSelections = buildAllStealSelections,
+    processSelections = processStealSelections,
+    isLowSelection = function(selection)
+        local slotType = selection.stealType == 'drawable' and 'Drawables'
+            or selection.stealType == 'prop' and 'Props'
+            or nil
+        return slotType and lowStealSlots[slotType][selection.slotIndex] == true or false
+    end,
+    profiles = stealProfiles,
+    singleProgressDuration = MBT.StealDuration or 1500,
+    batchProgressDuration = MBT.StealAllDuration or 2500,
+    graceDuration = MBT.StealTokenGrace or 10000,
+    log = function(message, detail)
+        MBT.Error(message, { detail = detail })
+    end,
+})
+
+RegisterNetEvent('mbt_meta_clothes:beginSteal', function(payload)
+    local thiefSource = source
+    local result = stealAuthority:Begin(thiefSource, payload)
+    if result.ok then
+        TriggerClientEvent(
+            'mbt_meta_clothes:playVictimAnim',
+            result.targetServerId,
+            result.victimAnimKey,
+            result.victimDuration
+        )
     end
-    processStealSelections(thiefSource, targetServerId, selections)
+    TriggerClientEvent('mbt_meta_clothes:stealBeginResult', thiefSource, result)
 end)
 
--- S3 FIX: Proximity + rate limit on victim anim relay
-RegisterNetEvent('mbt_meta_clothes:requestVictimAnim', function(targetServerId, duration, targetDown, dict, clip)
-    local src = source
-    if not MBT.ServerUtils.CheckRateLimit(src, "victimAnim") then return end
-    if not MBT.ServerUtils.IsValidPlayer(targetServerId) then return end
-    if not MBT.ServerUtils.CheckProximity(src, targetServerId, MBT.StealDistance or 5.0) then return end
-    -- Validate dict/clip are strings (security: prevent arbitrary data injection)
-    if type(dict) ~= "string" or type(clip) ~= "string" then return end
-    -- Cap duration to prevent grief
-    duration = math.min(duration or 3000, MBT.VictimAnimCap or 10000)
-    TriggerClientEvent('mbt_meta_clothes:playVictimAnim', targetServerId, duration, targetDown, dict, clip)
+RegisterNetEvent('mbt_meta_clothes:completeSteal', function(token)
+    local thiefSource = source
+    local result = stealAuthority:Complete(thiefSource, token)
+    TriggerClientEvent('mbt_meta_clothes:stealCompleteResult', thiefSource, result)
+end)
+
+RegisterNetEvent('mbt_meta_clothes:cancelSteal', function(token)
+    local targetServerId = stealAuthority:Cancel(source, token)
+    if targetServerId then
+        TriggerClientEvent('mbt_meta_clothes:stopVictimAnim', targetServerId)
+    end
+end)
+
+AddEventHandler('playerDropped', function()
+    stealAuthority:CleanupSource(source)
 end)
 
 -----------------------------------------------------------

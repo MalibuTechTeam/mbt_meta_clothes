@@ -51,9 +51,15 @@ matrix above passes.
   - Commit and visually clear only the victim slots whose `AddItem` succeeded.
   - Use one validated, bounded server batch for multi-select and steal-all.
   - Remove the obsolete client `giveStolenItemDress` event path.
-- [ ] Harden steal and animation events.
-  - Validate numeric duration and clamp both minimum and maximum values.
-  - Validate target, slot, metadata shape, action state, and proximity server-side.
+- [x] Harden steal and animation events.
+  - Use a server-issued, source-bound, expiring, one-use token across begin and
+    complete; reject direct, replayed, early, and stale completion attempts.
+  - Revalidate target, character context, proximity, and normalized selections
+    before the authoritative inventory transfer.
+  - Select victim/thief animations and effective durations from a fixed server
+    catalog; clients cannot relay arbitrary dictionaries, clips, or durations.
+  - Serialize active thief/victim sessions and retain the old event names only as
+    non-mutating compatibility tombstones for one release cycle.
 - [ ] Repair the GitHub release workflow.
   - Install dependencies and build `web/dist` during the release job.
   - Include `core`, `data`, `locales`, runtime web assets, modules, and manifest files.
@@ -61,11 +67,14 @@ matrix above passes.
   - Update deprecated GitHub Actions and output syntax.
 
 The authoritative dress, transactional return, and steal implementations pass
-their pure-Lua checks and the running Cfx self-tests: snapshot `33/33`, inventory
-return `19/19`, dress authority `8/8`, and inventory adapters `5/5` on 2026-07-27.
+their pure-Lua checks: snapshot `33/33`, inventory return `21/21`, dress authority
+`8/8`, inventory adapters `5/5`, client startup `1/1`, and steal authority `10/10`.
+The snapshot, inventory return (`19/19` before the item-name hardening cases),
+dress, and adapter suites also passed in the running Cfx server on 2026-07-27;
+the new `21/21` return and `10/10` steal suites still require a resource restart.
 Equip, undress, relog, and connected resource-restart paths were also verified in
 game with both QB Inventory and OX Inventory against commit `d0a9f0e`. End-to-end
-inventory-full and partial-batch gameplay testing remains pending.
+inventory-full, partial-batch, and two-player tokenized stealing remain pending.
 
 ## P1 - Required for a stable 2.0
 

@@ -45,6 +45,8 @@ server_scripts {
     'modules/bridge/inventory/qb_useable.lua',
     -- 5. Drip reputation engine (MBT.Drip)
     'modules/drip/server.lua',
+    -- Server-owned begin/complete protocol for clothing theft.
+    'modules/steal/server.lua',
     -- 6. Framework bridges (one activates based on resource check)
     'modules/bridge/**/server.lua',
     -- 7. Core server logic
@@ -55,6 +57,7 @@ server_scripts {
     'tests/dress_authority_spec.lua',
     'tests/dress_adapter_spec.lua',
     'tests/client_start_spec.lua',
+    'tests/steal_authority_spec.lua',
 }
 
 client_scripts {

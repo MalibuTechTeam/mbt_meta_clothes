@@ -449,17 +449,13 @@ end)
 -- Victim animation relay (requested by thief via server)
 -----------------------------------------------------------
 RegisterNetEvent('mbt_meta_clothes:playVictimAnim')
-AddEventHandler('mbt_meta_clothes:playVictimAnim', function(duration, targetDown, dict, clip)
-    local ped = PlayerPedId()
-    -- dict/clip are passed from the thief's client so victim always mirrors the thief's animation set
-    while not HasAnimDictLoaded(dict) do
-        RequestAnimDict(dict)
-        Wait(50)
-    end
-    TaskPlayAnim(ped, dict, clip, 3.0, 3.0, duration, 49, 0, false, false, false)
-    Wait(duration)
-    ClearPedTasks(ped)
-    RemoveAnimDict(dict)
+AddEventHandler('mbt_meta_clothes:playVictimAnim', function(animKey, duration)
+    MBT.Utils.PlayVictimStealAnimation(animKey, duration)
+end)
+
+RegisterNetEvent('mbt_meta_clothes:stopVictimAnim')
+AddEventHandler('mbt_meta_clothes:stopVictimAnim', function()
+    MBT.Utils.StopVictimStealAnimation()
 end)
 
 RegisterCommand("toggleUndress", function()

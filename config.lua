@@ -17,6 +17,20 @@ MBT.TargetDistance       = 2.0   -- ox_target / qb-target interaction distance
 MBT.StealDuration        = 1500  -- ms progress bar for single item steal
 MBT.StealAllDuration     = 2500  -- ms progress bar for steal all
 MBT.VictimAnimCap        = 10000 -- ms max victim animation (anti-grief)
+MBT.StealTokenGrace      = 10000 -- ms allowed to complete after the authoritative minimum duration
+MBT.StealRequestTimeout  = 5000  -- ms before a missing begin ACK is discarded client-side
+
+-- Fixed animation catalog. Clients request only a bounded action/stance; the
+-- server selects one of these keys and owns every effective duration.
+MBT.StealAnimations      = {
+    target_down    = { dict = "missexile3",          clip = "ex03_dingy_search_case_base_michael", flag = 1,  dur = 2000 },
+    standing_low   = { dict = "random@domestic",     clip = "pickup_low",                          flag = 0,  dur = 2000 },
+    standing_high  = { dict = "random@shop_robbery", clip = "robbery_action_b",                    flag = 49, dur = 2500 },
+    steal_all      = { dict = "missfbi2",            clip = "handsup_search_cop",                   flag = 49, dur = 5000 },
+    steal_all_down = { dict = "missexile3",          clip = "ex03_dingy_search_case_base_michael", flag = 1,  dur = 3000 },
+    victim_stand   = { dict = "random@mugging3",      clip = "handsup_standing_base",                flag = 49 },
+    victim_down    = { dict = "missexile3",          clip = "ex03_dingy_search_case_base_michael", flag = 1  },
+}
 
 -- Animations that count as "hands up" — target option appears only when one of these is active.
 -- Add the dict/clip used by your server's hands-up script.

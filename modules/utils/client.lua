@@ -622,52 +622,13 @@ end)
 -- Steal functions
 -----------------------------------------------------------
 
--- Slots considered "low on body" — use a bend-down animation instead of the standard grab
-local STEAL_ZONE_LOW = {
-    Drawables = { [4] = true, [6] = true },
-    Props = {}
-}
-
--- Animations used during steal interactions.
--- target_down  : thief searches a body on the ground / dead ped
--- standing_low : thief grabs a low-body item (shoes, pants) from a standing victim
--- standing_high: thief grabs an upper-body item (jacket, hat, chain) from a standing victim
--- steal_all    : thief does a full patdown on a standing victim
--- steal_all_down: thief searches a body for everything
--- victim_stand : what the victim plays while being robbed standing
--- victim_down  : what the victim plays while being robbed on the ground
-local STEAL_ANIMS = {
-    target_down    = { dict = "missexile3",        clip = "ex03_dingy_search_case_base_michael", flag = 1,  dur = 2000 },
-    standing_low   = { dict = "random@domestic",   clip = "pickup_low",                          flag = 0,  dur = 2000 },
-    standing_high  = { dict = "random@shop_robbery", clip = "robbery_action_b",                  flag = 49, dur = 2500 },
-    steal_all      = { dict = "missfbi2",            clip = "handsup_search_cop",                 flag = 49, dur = 5000 },
-    steal_all_down = { dict = "missexile3",         clip = "ex03_dingy_search_case_base_michael", flag = 1,  dur = 3000 },
-    victim_stand   = { dict = "random@mugging3",    clip = "handsup_standing_base",               flag = 49 },
-    victim_down    = { dict = "missexile3",         clip = "ex03_dingy_search_case_base_michael", flag = 1  },
-}
+local STEAL_ANIMS = MBT.StealAnimations or {}
+local stealRequestId = 0
+local pendingStealRequests = {}
+local victimAnimGeneration = 0
 
 local function isTargetDown(targetPed)
     return IsPedDeadOrDying(targetPed, false) or IsPedRagdoll(targetPed)
-end
-
-local function getStealAnim(targetDown, stealType, slotIndex)
-    if targetDown then
-        local a = STEAL_ANIMS.target_down
-        return { dict = a.dict, clip = a.clip, flag = a.flag }, a.dur
-    end
-    local isLow = false
-    if stealType == "drawable" and slotIndex then
-        isLow = STEAL_ZONE_LOW.Drawables[slotIndex] == true
-    elseif stealType == "prop" and slotIndex then
-        isLow = STEAL_ZONE_LOW.Props[slotIndex] == true
-    end
-    if isLow then
-        local a = STEAL_ANIMS.standing_low
-        return { dict = a.dict, clip = a.clip, flag = a.flag }, a.dur
-    else
-        local a = STEAL_ANIMS.standing_high
-        return { dict = a.dict, clip = a.clip, flag = a.flag }, a.dur
-    end
 end
 
 local function faceTarget(thiefPed, targetPed)
@@ -675,113 +636,168 @@ local function faceTarget(thiefPed, targetPed)
     local targetCoords = GetEntityCoords(targetPed)
     local dx = targetCoords.x - thiefCoords.x
     local dy = targetCoords.y - thiefCoords.y
-    -- GetHeadingFromVector_2d è il native GTA corretto per questo calcolo
     local targetHeading = GetHeadingFromVector_2d(dx, dy)
     local currentHeading = GetEntityHeading(thiefPed)
     local diff = math.abs(targetHeading - currentHeading)
     if diff > 180 then diff = 360 - diff end
-    if diff > 30 then
-        SetEntityHeading(thiefPed, targetHeading)
+    if diff > 30 then SetEntityHeading(thiefPed, targetHeading) end
+end
+
+local function playStealAnimation(ped, animation, duration, shouldClear)
+    if type(animation) ~= 'table' or type(animation.dict) ~= 'string' or type(animation.clip) ~= 'string' then
+        return false
     end
-end
 
-local function requestVictimAnim(targetServerId, duration, targetDown)
-    local animKey = targetDown and "victim_down" or "victim_stand"
-    local a = STEAL_ANIMS[animKey]
-    TriggerServerEvent("mbt_meta_clothes:requestVictimAnim", targetServerId, duration, targetDown, a.dict, a.clip)
-end
-
-local function playStealAnimation(ped, anim, duration)
-    local dict = anim.dict
     local attempts = 0
-    while not HasAnimDictLoaded(dict) do
-        RequestAnimDict(dict)
+    while not HasAnimDictLoaded(animation.dict) do
+        RequestAnimDict(animation.dict)
         Wait(50)
         attempts = attempts + 1
-        if attempts > 100 then -- 5s timeout: dict inesistente, non bloccare il thread
-            MBT.Debugger("playStealAnimation: timeout caricamento dict", dict)
-            return
+        if attempts > 100 then
+            MBT.Warn('steal animation dictionary timeout', { dict = animation.dict })
+            return false
         end
     end
-    TaskPlayAnim(ped, dict, anim.clip, 3.0, 3.0, duration, anim.flag or 49, 0, false, false, false)
+
+    TaskPlayAnim(
+        ped,
+        animation.dict,
+        animation.clip,
+        3.0,
+        3.0,
+        duration,
+        animation.flag or 49,
+        0,
+        false,
+        false,
+        false
+    )
     Wait(duration)
-    ClearPedTasks(ped)
-    RemoveAnimDict(dict)
+    if not shouldClear or shouldClear() then ClearPedTasks(ped) end
+    RemoveAnimDict(animation.dict)
+    return true
+end
+
+local function notifyStealFailure(reason)
+    local localeKey = reason == 'nothing_to_steal' and 'nothing_to_steal'
+        or reason == 'not_allowed' and 'action_busy'
+        or 'inventory_error'
+    local notification = MBT.Locale[localeKey]
+    if notification then MBT.Notification(notification) end
+end
+
+RegisterNetEvent('mbt_meta_clothes:stealBeginResult', function(result)
+    if type(result) ~= 'table' then return end
+    local callback = pendingStealRequests[result.requestId]
+    if not callback then return end
+    pendingStealRequests[result.requestId] = nil
+    callback(result)
+end)
+
+RegisterNetEvent('mbt_meta_clothes:stealCompleteResult', function(result)
+    if type(result) ~= 'table' or result.ok then return end
+    MBT.Warn('authoritative steal completion rejected', { reason = result.reason })
+    notifyStealFailure(result.reason)
+end)
+
+local function requestStealAuthorization(payload, callback)
+    stealRequestId = stealRequestId >= 2147483647 and 1 or stealRequestId + 1
+    local requestId = stealRequestId
+    payload.requestId = requestId
+    pendingStealRequests[requestId] = callback
+    TriggerServerEvent('mbt_meta_clothes:beginSteal', payload)
+
+    SetTimeout(MBT.StealRequestTimeout or 5000, function()
+        local pending = pendingStealRequests[requestId]
+        if not pending then return end
+        pendingStealRequests[requestId] = nil
+        pending({ ok = false, reason = 'timeout' })
+    end)
+end
+
+local function runAuthorizedSteal(thiefPed, targetPed, payload, label)
+    requestStealAuthorization(payload, function(result)
+        if not result.ok then
+            notifyStealFailure(result.reason)
+            return
+        end
+
+        local animation = STEAL_ANIMS[result.thiefAnimKey]
+        local progressDuration = tonumber(result.progressDuration)
+        local animationDuration = tonumber(result.animationDuration)
+        if type(result.token) ~= 'string'
+            or not animation
+            or not progressDuration
+            or progressDuration < 1
+            or not animationDuration
+            or animationDuration < 1
+        then
+            TriggerServerEvent('mbt_meta_clothes:cancelSteal', result.token)
+            return
+        end
+
+        faceTarget(thiefPed, targetPed)
+        local completed = false
+        MBT.ProgressBar({
+            duration = progressDuration,
+            label = label,
+        }, function(progressResult)
+            completed = progressResult == true
+        end)
+
+        if not completed or not playStealAnimation(thiefPed, animation, animationDuration) then
+            TriggerServerEvent('mbt_meta_clothes:cancelSteal', result.token)
+            return
+        end
+        TriggerServerEvent('mbt_meta_clothes:completeSteal', result.token)
+    end)
 end
 
 function MBT.Utils.StealSingleItem(thiefPed, targetPed, targetServerId, stealType, slotIndex)
-    local targetDown = isTargetDown(targetPed)
-    local anim, animDuration = getStealAnim(targetDown, stealType, slotIndex)
-
-    faceTarget(thiefPed, targetPed)
-
-    local cancelled = false
-    MBT.ProgressBar({
-        duration = MBT.StealDuration or 1500,
-        label = MBT.Locale["stealing"] or "Stealing...",
-    }, function(result)
-        if not result then cancelled = true end
-    end)
-
-    if cancelled then return end
-
-    requestVictimAnim(targetServerId, animDuration, targetDown)
-    playStealAnimation(thiefPed, anim, animDuration)
-
-    TriggerServerEvent("mbt_meta_clothes:stealSingleItem", targetServerId, stealType, slotIndex)
+    runAuthorizedSteal(thiefPed, targetPed, {
+        targetServerId = targetServerId,
+        mode = 'single',
+        stance = isTargetDown(targetPed) and 'down' or 'standing',
+        selections = { { stealType = stealType, slotIndex = slotIndex } },
+    }, MBT.Locale['stealing'] or 'Stealing...')
 end
 
 function MBT.Utils.StealAllItems(thiefPed, targetPed, targetServerId)
-    local targetDown = isTargetDown(targetPed)
-
-    faceTarget(thiefPed, targetPed)
-
-    local cancelled = false
-    MBT.ProgressBar({
-        duration = MBT.StealAllDuration or 2500,
-        label = MBT.Locale["stealing_all"] or "Stripping clothes...",
-    }, function(result)
-        if not result then cancelled = true end
-    end)
-
-    if cancelled then return end
-
-    if targetDown then
-        local a = STEAL_ANIMS.steal_all_down
-        requestVictimAnim(targetServerId, a.dur, targetDown)
-        playStealAnimation(thiefPed, { dict = a.dict, clip = a.clip, flag = a.flag }, a.dur)
-    else
-        local a = STEAL_ANIMS.steal_all
-        requestVictimAnim(targetServerId, a.dur, targetDown)
-        playStealAnimation(thiefPed, { dict = a.dict, clip = a.clip, flag = a.flag }, a.dur)
-    end
-
-    TriggerServerEvent('mbt_meta_clothes:syncStealDress', targetServerId)
+    runAuthorizedSteal(thiefPed, targetPed, {
+        targetServerId = targetServerId,
+        mode = 'all',
+        stance = isTargetDown(targetPed) and 'down' or 'standing',
+    }, MBT.Locale['stealing_all'] or 'Stripping clothes...')
 end
 
--- Multi-select steal: one animation and one bounded server batch.
--- Usato da confirmSteal quando l'utente sceglie un sottoinsieme di item.
 function MBT.Utils.StealMultipleItems(thiefPed, targetPed, targetServerId, items)
-    local targetDown = isTargetDown(targetPed)
+    runAuthorizedSteal(thiefPed, targetPed, {
+        targetServerId = targetServerId,
+        mode = 'batch',
+        stance = isTargetDown(targetPed) and 'down' or 'standing',
+        selections = items,
+    }, MBT.Locale['stealing_all'] or 'Stripping clothes...')
+end
 
-    faceTarget(thiefPed, targetPed)
+function MBT.Utils.PlayVictimStealAnimation(animKey, duration)
+    if animKey ~= 'victim_stand' and animKey ~= 'victim_down' then return end
+    local animation = STEAL_ANIMS[animKey]
+    duration = tonumber(duration)
+    if not animation or not duration or duration < 1 then return end
+    duration = math.min(duration, MBT.VictimAnimCap or 10000)
 
-    local cancelled = false
-    MBT.ProgressBar({
-        duration = MBT.StealAllDuration or 2500,
-        label = MBT.Locale["stealing_all"] or "Stripping clothes...",
-    }, function(result)
-        if not result then cancelled = true end
+    victimAnimGeneration = victimAnimGeneration + 1
+    local generation = victimAnimGeneration
+    CreateThread(function()
+        playStealAnimation(PlayerPedId(), animation, duration, function()
+            return generation == victimAnimGeneration
+        end)
     end)
+end
 
-    if cancelled then return end
-
-    -- Usa sempre l'animazione steal_all (patdown completo) per multi-item
-    local a = targetDown and STEAL_ANIMS.steal_all_down or STEAL_ANIMS.steal_all
-    requestVictimAnim(targetServerId, a.dur, targetDown)
-    playStealAnimation(thiefPed, { dict = a.dict, clip = a.clip, flag = a.flag }, a.dur)
-
-    TriggerServerEvent("mbt_meta_clothes:stealBatch", targetServerId, items)
+function MBT.Utils.StopVictimStealAnimation()
+    victimAnimGeneration = victimAnimGeneration + 1
+    ClearPedTasks(PlayerPedId())
 end
 
 -----------------------------------------------------------
