@@ -31,6 +31,25 @@ interface Hotspot {
   left: string;
 }
 
+const HOTSPOT_TO_LAYERS: Record<string, string[]> = {
+  head: ["Props-0", "Props-1", "Props-2", "Drawables-1"],
+  torso: ["Drawables-3", "Drawables-8", "Drawables-11"],
+  armor: ["Drawables-9"],
+  bags: ["Drawables-5"],
+  legs: ["Drawables-4"],
+  feet: ["Drawables-6"],
+  accessories: ["Drawables-7", "Props-6", "Props-7"],
+};
+
+const BASE_LAYER_FILTER = [
+  "drop-shadow(0 -1px 3px rgba(255,255,255,0.3))",
+  "drop-shadow(0 8px 14px rgba(0,0,0,0.65))",
+];
+const HOVER_LAYER_FILTER = "drop-shadow(0 0 5px rgba(0,220,255,0.2))";
+const ACTIVE_LAYER_FILTER = "drop-shadow(0 0 7px rgba(0,220,255,0.45))";
+
+let pedestalWarmed = false;
+
 
 interface MannequinProps {
   activeCategory: string | null;
@@ -75,29 +94,24 @@ export default function Mannequin({
   // STEP 3: slot attualmente hoverato — illumina ciano il capo corrispondente
   const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
 
-  // Ritardo il mount del pedestal di 600ms così il primo render della UI
-  // (mannequin slide + layers) non compete col compositor per i continuous
-  // animations del pedestal (breath + scanner rings). Eliminando il lavoro
-  // GPU concorrente al primo open, il main thread non droppa frames.
-  // Dopo 600ms il mannequin è già a riposo, il pedestal appare con un fade
-  // naturale della sua stessa animazione breath.
-  const [pedestalReady, setPedestalReady] = useState(false);
+  // Warm the pedestal once during an idle period. Later menu openings reuse
+  // that readiness instead of starting another delayed compositor workload.
+  const [pedestalReady, setPedestalReady] = useState(pedestalWarmed);
   useEffect(() => {
-    const t = setTimeout(() => setPedestalReady(true), 600);
-    return () => clearTimeout(t);
-  }, []);
+    if (pedestalWarmed) return;
 
-  // Mappa hotspot → layer keys che devono illuminarsi quando quell'hotspot è hover
-  // Le keys corrispondono a quelle di LAYER_META (formato "slotType-slotIndex")
-  const HOTSPOT_TO_LAYERS: Record<string, string[]> = {
-    head: ["Props-0", "Props-1", "Props-2", "Drawables-1"],
-    torso: ["Drawables-3", "Drawables-8", "Drawables-11"],
-    armor: ["Drawables-9"],
-    bags: ["Drawables-5"],
-    legs: ["Drawables-4"],
-    feet: ["Drawables-6"],
-    accessories: ["Drawables-7", "Props-6", "Props-7"],
-  };
+    const reveal = () => {
+      pedestalWarmed = true;
+      setPedestalReady(true);
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      const handle = window.requestIdleCallback(reveal, { timeout: 900 });
+      return () => window.cancelIdleCallback(handle);
+    }
+
+    const handle = window.setTimeout(reveal, 700);
+    return () => window.clearTimeout(handle);
+  }, []);
 
   // Label dai locale ricevuti dal Lua — con fallback inglese inline se il
   // payload non è ancora arrivato (primo frame post-mount prima del setLabels).
@@ -299,8 +313,8 @@ export default function Mannequin({
             const isLayerHovered =
               hoveredSlot !== null &&
               (HOTSPOT_TO_LAYERS[hoveredSlot] || []).includes(key);
-            // STEP 4: se lo slot attivo/selezionato è mappato a questo layer,
-            // applichiamo la classe .mbt-layer-active (keyframe animation)
+            // STEP 4: an active slot gets a duplicate glow overlay whose
+            // opacity animates without recalculating the filter every frame.
             const isLayerActive =
               activeCategory !== null &&
               (HOTSPOT_TO_LAYERS[activeCategory] || []).includes(key);
@@ -308,19 +322,11 @@ export default function Mannequin({
             // STEP 2: rim light bianca sul top per staccare il capo dal fondo e
             //         dare feel HUD (luce ambientale che colpisce dall'alto).
             // STEP 3: glow ciano se lo slot corrispondente è hover.
-            const baseFilters = [
-              "drop-shadow(0 -1px 0 rgba(255,255,255,0.6))",     // rim light sharp
-              "drop-shadow(0 -2px 4px rgba(255,255,255,0.25))",  // rim light soft
-              "drop-shadow(0 6px 6px rgba(0,0,0,0.85))",         // ombra contact
-              "drop-shadow(0 12px 24px rgba(0,0,0,0.55))",       // ombra diffusa
-            ];
-            const hoverGlow = [
-              "drop-shadow(0 0 1.5px rgba(0,220,255,0.45))",  // filo sul bordo
-              "drop-shadow(0 0 5px rgba(0,220,255,0.18))",    // halo morbido
-            ];
-            const layerFilter = (
-              isLayerHovered ? [...baseFilters, ...hoverGlow] : baseFilters
-            ).join(" ");
+            const layerFilter = [
+              ...BASE_LAYER_FILTER,
+              ...(isLayerHovered ? [HOVER_LAYER_FILTER] : []),
+            ].join(" ");
+            const layerSrc = `./layers/${meta.path}_${gender}.png`;
             return (
               // STEP 9: bloom SOLO in exit (quando l'utente svesté con UI
               // aperta). Entry è solo fade/scale — con UI aperta il player
@@ -331,9 +337,6 @@ export default function Mannequin({
               // parentesi nested di rgba dentro drop-shadow, producendo
               // "Invalid keyframe value for property filter".
               //
-              // Initial/animate includono comunque un filter "trasparente"
-              // per dare a framer-motion una struttura coerente da
-              // interpolare verso l'exit (richiede same number di drop-shadow).
               <motion.div
                 key={`layer-${key}`}
                 // Niente filter in initial/animate: crearlo al primo paint
@@ -356,34 +359,32 @@ export default function Mannequin({
                   left: meta.left,
                   width: meta.width,
                   zIndex: meta.zIndex,
-                  // Hint al browser: prepara i compositing layer per
-                  // transform+opacity PRIMA del primo paint, così il layer
-                  // GPU è già pronto quando serve.
-                  willChange: "transform, opacity",
                 }}
                 className="absolute h-auto pointer-events-none"
               >
                 <img
-                  src={`./layers/${meta.path}_${gender}.png`}
-                  style={{
-                    filter: isLayerActive ? undefined : layerFilter,
-                  }}
-                  className={`w-full h-auto block transition-[filter] duration-200 ease-out ${
-                    isLayerActive ? "mbt-layer-active" : ""
-                  }`}
+                  src={layerSrc}
+                  style={{ filter: layerFilter }}
+                  className="w-full h-auto block transition-[filter] duration-200 ease-out"
                   alt={`${meta.path} layer`}
                 />
+                {isLayerActive && (
+                  <img
+                    src={layerSrc}
+                    style={{ filter: ACTIVE_LAYER_FILTER }}
+                    className="absolute inset-0 w-full h-auto block mbt-layer-glow pointer-events-none"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                )}
               </motion.div>
             );
           })}
         </AnimatePresence>
 
         {/* STEP 5: Pedestal sci-fi — ambient glow + scanner rings.
-            Mount ritardato di 600ms (pedestalReady) per evitare che le
-            animazioni continue (breath + scanner sweep) saturino il compositor
-            durante il primo render della UI. Al mount del pedestal il
-            mannequin è già stabile, i continuous animations partono senza
-            competere con lo slide-in. */}
+            The first mount waits for an idle period; later openings reuse the
+            warmed state and do not schedule another delayed initialization. */}
         {pedestalReady && (
           <>
             {/* Layer 1: ambient radial light — mood light ciano/bianca che respira. */}

@@ -109,6 +109,15 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
   - Add the missing male backpack layer; it is explicitly disabled until supplied.
   - [x] Explicitly disable missing female mannequin layers instead of requesting broken images.
   - [x] Add an automated check for layer paths declared by the frontend.
+- [ ] Verify first-open NUI smoothness in the FiveM CEF runtime.
+  - [x] Cap declared clothing layers at 1024px, reducing estimated decoded PNG
+    memory from 183.12 MB to 51.12 MB.
+  - [x] Decode layer assets sequentially during idle periods instead of starting
+    every decode concurrently at resource startup.
+  - [x] Replace animated multi-filter chains with a static glow filter and an
+    opacity-only overlay animation.
+  - [ ] Compare the first and subsequent openings in game and confirm layer
+    alignment, image quality, hover glow, active pulse, and pedestal timing.
 - [x] Add startup configuration validation.
   - [x] Validate slot defaults, item names, torso-kit mappings, locales, and drip levels.
   - [x] Detect duplicate item names and conflicting clothing-state mappings.

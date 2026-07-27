@@ -12,33 +12,15 @@ body {
   height: 100vh;
 }
 
-/* Pulse ciano per layer vestiti nello stato "selected/active".
-   Animazione su opacity di un overlay brightness — evita di lottare con la
-   chain di drop-shadow già complessa del filter, e garantisce una pulsazione
-   fluida 60fps gestita dalla GPU. */
-@keyframes mbt-layer-pulse {
-  0%, 100% {
-    filter:
-      drop-shadow(0 -1px 0 rgba(255,255,255,0.6))
-      drop-shadow(0 -2px 4px rgba(255,255,255,0.25))
-      drop-shadow(0 6px 6px rgba(0,0,0,0.85))
-      drop-shadow(0 12px 24px rgba(0,0,0,0.55))
-      drop-shadow(0 0 1px rgba(0,220,255,0.35))
-      drop-shadow(0 0 4px rgba(0,220,255,0.12));
-  }
-  50% {
-    filter:
-      drop-shadow(0 -1px 0 rgba(255,255,255,0.6))
-      drop-shadow(0 -2px 4px rgba(255,255,255,0.25))
-      drop-shadow(0 6px 6px rgba(0,0,0,0.85))
-      drop-shadow(0 12px 24px rgba(0,0,0,0.55))
-      drop-shadow(0 0 2px rgba(0,220,255,0.55))
-      drop-shadow(0 0 7px rgba(0,220,255,0.22));
-  }
+/* Keep the glow filter static and animate only overlay opacity. This avoids
+   recalculating a multi-filter chain on every frame. */
+@keyframes mbt-layer-glow-pulse {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.75; }
 }
 
-.mbt-layer-active {
-  animation: mbt-layer-pulse 2s ease-in-out infinite;
+.mbt-layer-glow {
+  animation: mbt-layer-glow-pulse 2s ease-in-out infinite;
 }
 
 /* Scanner ring che si espande dal centro e sfuma — effetto HUD sci-fi.

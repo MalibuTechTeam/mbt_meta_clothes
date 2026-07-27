@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Mannequin from "./components/Mannequin";
 import { fetchNui } from "./utils/fetchNui";
+import { preloadImage, preloadImagesWhenIdle } from "./utils/imagePreload";
 import {
   Shirt,
   Glasses,
@@ -135,35 +136,21 @@ export default function App() {
     fetchNui("exitUI").catch(() => {});
   }, []);
 
-  // Preload tutte le PNG pesanti subito al mount dell'app (ancor prima che
-  // la UI sia aperta dal server). Usiamo img.decode() invece di solo .src
-  // perché .src avvia il download ma il decoding/rasterization avviene solo
-  // al primo paint del tag <img> reale — causando micro-lag "a scatti"
-  // all'apertura UI. decode() forza il browser a decodificare in background
-  // e mettere il risultato nella GPU texture cache, così al primo render
-  // dell'<img> il paint è istantaneo (solo un lookup in cache).
+  // Decode the two small mannequin bases immediately, then warm clothing
+  // layers one at a time while CEF is idle. A concurrent decode burst can
+  // otherwise compete with the first menu animation after resource startup.
   useEffect(() => {
-    const paths = new Set<string>([
-      "./mannequin_male.png",
-      "./mannequin_female.png",
-    ]);
+    void preloadImage("./mannequin_male.png");
+    void preloadImage("./mannequin_female.png");
+
+    const paths = new Set<string>();
     Object.values(LAYER_META).forEach((meta) => {
       meta.availableFor.forEach((gender) => {
         paths.add(`./layers/${meta.path}_${gender}.png`);
       });
     });
-    paths.forEach((src) => {
-      const img = new Image();
-      img.src = src;
-      // decode() è una Promise: se il browser non la supporta, fallback
-      // silenzioso (il preload base via .src funziona comunque)
-      if (typeof img.decode === "function") {
-        img.decode().catch(() => {
-          /* asset mancante o errore decode: ignoriamo, onError sul tag
-             <img> reale nasconderà comunque l'immagine */
-        });
-      }
-    });
+
+    return preloadImagesWhenIdle(paths);
   }, []);
 
   useEffect(() => {
