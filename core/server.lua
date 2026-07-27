@@ -1,4 +1,5 @@
 local playerSkins = {}
+local legacyEventWarnings = {}
 
 -----------------------------------------------------------
 -- State Bags (drip level, wearing slots count)
@@ -59,166 +60,36 @@ RegisterNetEvent('mbt_meta_clothes:submitSnapshot', function(payload)
     TriggerClientEvent('mbt_meta_clothes:snapshotAck', src, ack)
 end)
 
------------------------------------------------------------
--- Sync Initial Wearing (PED scan for NEW players only)
------------------------------------------------------------
-
-RegisterNetEvent('mbt_meta_clothes:syncInitialWearing', function(wearingData)
-    local src = source
-    if type(wearingData) ~= "table" then return end
-    if not MBT.ServerUtils.CheckRateLimit(src, "syncInitialWearing") then return end
-
-    -- Only process for NEW players (no DB entry)
-    if MBT.PlayerState.HasBaseline(src) then
-        MBT.Debugger("syncInitialWearing: EXISTING player, skipping PED scan")
-        return
-    end
-
-    -- BARE-PED SANITY CHECK (strict — 2026-05-05 fix)
-    --
-    -- Se il scan cattura uno stato in cui >50% delle slot non-default hanno
-    -- drawable=0, significa che è stato eseguito su un PED parzialmente
-    -- vestito (illenium-appearance / fivem-appearance non ha ancora finito
-    -- di applicare l'outfit, ma ha già applicato qualche slot — tipico nei
-    -- char nuovi appena creati dove appearance async load > 2.5s).
-    --
-    -- Il check precedente accettava la row se almeno 1 slot non-default
-    -- aveva drawable > 0 — troppo permissivo. Risultato: row con (es.) solo
-    -- pantaloni starter al drawable 35 ma slot 1, 3, 8, 11 a 0 → al
-    -- restoreWearing il player è nudo dalla cintola in su.
-    --
-    -- Nuovo threshold: tipico outfit reale ha 4-8+ slot non-default con
-    -- drawable > 0. Bare freemode ha 0-2. Settiamo MIN a 2 con check
-    -- aggiuntivo che almeno 50% delle slot scansionate sono non-zero.
-    local meaningfulSlotCount = 0
-    local zeroSlotCount = 0
-    local totalSlotCount = 0
-    for _, slots in pairs(wearingData) do
-        if type(slots) == "table" then
-            for _, metadata in pairs(slots) do
-                if type(metadata) == "table" and metadata.drawable then
-                    totalSlotCount = totalSlotCount + 1
-                    if metadata.drawable > 0 then
-                        meaningfulSlotCount = meaningfulSlotCount + 1
-                    else
-                        zeroSlotCount = zeroSlotCount + 1
-                    end
-                end
-            end
-        end
-    end
-
-    -- Reject conditions (any one triggers):
-    --   1. Empty scan (totalSlotCount == 0) — nothing to save anyway
-    --   2. Less than 2 slots have drawable > 0 (canonical bare PED)
-    --   3. More than 50% of scanned slots are zero (likely partial apply)
-    local MIN_MEANINGFUL = 2
-    local rejected, reason = false, nil
-    if totalSlotCount == 0 then
-        rejected, reason = true, 'empty scan'
-    elseif meaningfulSlotCount < MIN_MEANINGFUL then
-        rejected, reason = true, ('only %d non-zero slot(s), need ≥%d'):format(meaningfulSlotCount, MIN_MEANINGFUL)
-    elseif zeroSlotCount > meaningfulSlotCount then
-        rejected, reason = true, ('%d zero vs %d non-zero — likely partial appearance apply'):format(zeroSlotCount, meaningfulSlotCount)
-    end
-
-    if rejected then
-        MBT.Warn('syncInitialWearing rejected; DB row not created', {
-            source = src,
-            reason = reason,
-        })
-        return
-    end
-
-    MBT.Debugger("syncInitialWearing: NEW player, filling from PED scan")
-
-    if wearingData.Drawables then
-        for slotType, slots in pairs(wearingData) do
-            if type(slots) == "table" then
-                for idx, metadata in pairs(slots) do
-                    if type(metadata) == "table" and metadata.drawable then
-                        MBT.PlayerState.SetSlot(src, slotType, tonumber(idx) or idx, metadata)
-                        MBT.Debugger("  syncInitialWearing: filled", slotType, "slot", idx, "from PED")
-                    end
-                end
-            end
-        end
-    end
-    MBT.PlayerState.MarkBaseline(src)
-end)
+-- Compatibility tombstones: retain the old network names for one release
+-- cycle so unknown integrations are visible in logs, but never accept their
+-- client-provided wearing metadata as authoritative state.
+local function ignoreLegacyMutation(src, eventName)
+    legacyEventWarnings[src] = legacyEventWarnings[src] or {}
+    if legacyEventWarnings[src][eventName] then return end
+    legacyEventWarnings[src][eventName] = true
+    MBT.Warn('deprecated client mutation event ignored', {
+        source = src,
+        event = eventName,
+    })
+end
 
 -----------------------------------------------------------
--- Store Wearing (when player uses item to dress)
+-- Deprecated client mutation events
 -----------------------------------------------------------
 
-RegisterNetEvent('mbt_meta_clothes:storeWearing', function(slotType, metadata)
-    local src = source
-    if not metadata or not metadata.index then return end
-    if not MBT.ServerUtils.CheckRateLimit(src, "storeWearing") then return end
-
-    -- Validate slot
-    local valid, idx = MBT.ServerUtils.ValidateSlot(slotType, metadata.index)
-    if not valid then return end
-    metadata.index = idx
-
-    -- Inject DNA
-    MBT.ServerUtils.InjectDNA(metadata, src)
-
-    MBT.PlayerState.SetSlot(src, slotType, idx, metadata)
-    MBT.Debugger(">>> storeWearing:", slotType, "slot", idx)
-end)
-
-RegisterNetEvent('mbt_meta_clothes:storeWearingKit', function(kitData)
-    local src = source
-    if not MBT.ServerUtils.CheckRateLimit(src, "storeWearingKit") then return end
-    if type(kitData) ~= "table" then return end
-    MBT.Debugger(">>> storeWearingKit received:", json.encode(kitData))
-
-    for slotIndex, slotMetadata in pairs(kitData) do
-        if type(slotMetadata) == "table" and slotMetadata.index then
-            -- Validate each slot belongs to Drawables
-            local valid, idx = MBT.ServerUtils.ValidateSlot("Drawables", slotMetadata.index)
-            if valid then
-                MBT.Debugger("  kit slot:", slotIndex, "type:", type(slotMetadata), "index:", idx)
-                slotMetadata.index = idx
-                MBT.ServerUtils.InjectDNA(slotMetadata, src)
-                MBT.PlayerState.SetSlot(src, "Drawables", idx, slotMetadata)
-            end
-        end
-    end
-end)
-
------------------------------------------------------------
--- External Dress/Undress (from appearance scripts via Hybrid Detection)
------------------------------------------------------------
-
-RegisterNetEvent('mbt_meta_clothes:externalDress', function(slotType, metadata)
-    local src = source
-    if not metadata or not metadata.index then return end
-    if not MBT.ServerUtils.CheckRateLimit(src, "externalDress") then return end
-
-    local valid, idx = MBT.ServerUtils.ValidateSlot(slotType, metadata.index)
-    if not valid then return end
-    metadata.index = idx
-
-    MBT.Debugger("External dress detected:", slotType, "slot", idx)
-    MBT.ServerUtils.InjectDNA(metadata, src)
-    MBT.PlayerState.SetSlot(src, slotType, idx, metadata)
-end)
-
-RegisterNetEvent('mbt_meta_clothes:externalUndress', function(slotType, slotIndex)
-    local src = source
-    if not MBT.ServerUtils.CheckRateLimit(src, "externalUndress") then return end
-
-    local valid, idx = MBT.ServerUtils.ValidateSlot(slotType, slotIndex)
-    if not valid then return end
-
-    local existingMeta = MBT.PlayerState.GetSlot(src, slotType, idx)
-    if existingMeta then
-        MBT.PlayerState.ClearSlot(src, slotType, idx)
-        MBT.Debugger("External undress:", slotType, "slot", idx)
-    end
-end)
+-- Keep these names registered for one compatibility cycle. They deliberately
+-- do not mutate PlayerState; the warning exposes unknown external callers.
+for _, eventName in ipairs({
+    'syncInitialWearing',
+    'storeWearing',
+    'storeWearingKit',
+    'externalDress',
+    'externalUndress',
+}) do
+    RegisterNetEvent(('mbt_meta_clothes:%s'):format(eventName), function()
+        ignoreLegacyMutation(source, eventName)
+    end)
+end
 
 RegisterNetEvent('mbt_meta_clothes:updateInternalVisual', function(slotType, slotIndex, visual, requestToken, requestContext)
     local src = source
@@ -298,6 +169,7 @@ end)
 
 AddEventHandler('playerDropped', function(reason)
     local src = source
+    legacyEventWarnings[src] = nil
 
     if playerSkins[src] then
         TriggerEvent('mbt_meta_clothes:saveSkin', src, playerSkins[src])

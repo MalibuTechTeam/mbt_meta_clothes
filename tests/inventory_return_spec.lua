@@ -62,7 +62,7 @@ local function runtimeFixture(initial, add_item, options)
         },
         TorsoKitSlots = { 3, 8, 11 },
         TorsoSlotNames = { [3] = 'Arms', [8] = 'Tshirt', [11] = 'Jacket' },
-        resolveItemName = function(slot_config, metadata)
+        resolveItemName = options.useSharedResolver and MBT.ResolveItemName or function(slot_config, metadata)
             if metadata.item_name then return metadata.item_name end
             return type(slot_config.Item) == 'table' and slot_config.Item[1] or slot_config.Item
         end,
@@ -248,6 +248,47 @@ local cases = {
             end, 12, 'hat', 1, { sex = 'male' })
             Assert.equal(true, ok)
             Assert.equal(nil, reason)
+        end,
+    },
+    {
+        name = 'item resolver accepts only names configured for the slot',
+        run = function()
+            local slot = { Item = { 'jacket', 'designer_jacket' } }
+            Assert.equal('designer_jacket', MBT.ResolveItemName(slot, {
+                item_name = 'designer_jacket',
+            }))
+            Assert.equal('jacket', MBT.ResolveItemName(slot, {}))
+            Assert.equal(nil, MBT.ResolveItemName(slot, { item_name = 'admin_item' }))
+            Assert.equal(nil, MBT.ResolveItemName(slot, { item_name = 42 }))
+        end,
+    },
+    {
+        name = 'forged item name never reaches inventory or clears wearing state',
+        run = function()
+            local stored = {
+                index = 11,
+                drawable = 29,
+                texture = 2,
+                palette = 0,
+                sex = 'male',
+                item_name = 'admin_item',
+            }
+            local adds = 0
+            local runtime, state, clears = runtimeFixture({
+                Drawables = { [11] = stored },
+                Props = {},
+            }, function()
+                adds = adds + 1
+                return true
+            end, { useSharedResolver = true })
+
+            local result = runtime:ReturnSlot(14, 'Drawables', 11)
+
+            Assert.equal(false, result.ok)
+            Assert.equal('invalid_item', result.reason)
+            Assert.equal(0, adds)
+            Assert.equal(0, #clears)
+            Assert.equal(stored, state.Drawables[11])
         end,
     },
     {

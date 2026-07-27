@@ -308,7 +308,16 @@ function MBT.GiveItems.NewRuntime(config)
             cleanExpiredDNA(metadata)
 
             local itemName = resolveItemName(slotConfig, metadata)
-            if not itemName then return nil, "invalid_item" end
+            if not itemName then
+                MBT.Warn('inventory return rejected invalid item metadata', {
+                    source = ownerSrc,
+                    receiver = receiverSrc,
+                    slotType = slotType,
+                    slotIndex = slotIndex,
+                    itemName = metadata.item_name,
+                })
+                return nil, "invalid_item"
+            end
             return {
                 receiver = receiverSrc,
                 itemName = itemName,

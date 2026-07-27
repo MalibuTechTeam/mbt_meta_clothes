@@ -13,22 +13,34 @@ MBT.Error = MBTLog.Error
 -----------------------------------------------------------
 
 --- Resolve the item name to give back for a slot.
---- Prefers the item_name stored in metadata (set when the item was first used),
---- then falls back to the config ["Item"] value.
+--- Stored metadata may select one of the item names configured for this exact
+--- slot, but it can never introduce an arbitrary inventory item.
 --- ["Item"] can be a string ("trousers") or a table ({"trousers","jeans"}).
 --- @param slotCfg table  The MBT.Drawables[k] or MBT.Props[k] config entry
 --- @param metadata table The stored wearing metadata (may have item_name)
 --- @return string|nil
 function MBT.ResolveItemName(slotCfg, metadata)
-    if metadata and metadata.item_name then
-        return metadata.item_name
-    end
     if not slotCfg then return nil end
     local item = slotCfg["Item"]
-    if type(item) == "table" then
-        return item[1]   -- first entry is the canonical / generic item name
+
+    if metadata and metadata.item_name ~= nil then
+        if type(metadata.item_name) ~= "string" or metadata.item_name == "" then
+            return nil
+        end
+
+        if type(item) == "string" then
+            return metadata.item_name == item and item or nil
+        end
+        if type(item) == "table" then
+            for _, configuredName in ipairs(item) do
+                if metadata.item_name == configuredName then return configuredName end
+            end
+        end
+        return nil
     end
-    return item
+
+    if type(item) == "table" then return item[1] end
+    return type(item) == "string" and item or nil
 end
 
 --- Collect ALL item names registered for a slot (handles string and array).
