@@ -11,6 +11,23 @@ The resource has been tested ONLY on Ox Core and ESX
 <br />
 Remember to check and change if needed the ```Default``` clothes in ```MBT.Drawables``` and ```MBT.Props ```
 
+## Resource start order
+
+Following the standard MBT resource lifecycle, start the selected framework and
+inventory before `mbt_meta_clothes`. Run exactly one supported framework and one
+inventory implementation at a time.
+
+Supported runtime combinations are:
+
+- ESX with `ox_inventory` or `MBT.CustomInventory`
+- QBCore with `qb-inventory`, `ox_inventory`, or `MBT.CustomInventory`
+- OX Core with `ox_inventory`
+
+If an inventory is restarted while the server is running, restart
+`mbt_meta_clothes` afterwards so its bridge and item handlers are registered
+against the new inventory instance. Invalid or ambiguous combinations stop at
+startup with an actionable configuration error.
+
 
 ## ox_inventory/data/items.lua
 

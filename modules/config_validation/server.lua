@@ -9,6 +9,8 @@ local SLOT_LIMITS = {
     Drawables = { min = 0, max = 11 },
     Props = { min = 0, max = 7 },
 }
+local FRAMEWORK_RESOURCES = { 'es_extended', 'qb-core', 'ox_core' }
+local INVENTORY_RESOURCES = { 'ox_inventory', 'qb-inventory' }
 
 local function isInteger(value)
     return type(value) == 'number' and value == math.floor(value)
@@ -16,6 +18,49 @@ end
 
 local function addIssue(target, path, message)
     target[#target + 1] = ('%s: %s'):format(path, message)
+end
+
+local function startedResources(resourceNames)
+    local started = {}
+    for _, resourceName in ipairs(resourceNames) do
+        if GetResourceState(resourceName) == 'started' then
+            started[#started + 1] = resourceName
+        end
+    end
+    return started
+end
+
+local function validateRuntimeBridge(config, errors, stats)
+    local frameworks = startedResources(FRAMEWORK_RESOURCES)
+    local inventories = startedResources(INVENTORY_RESOURCES)
+    local hasCustomInventory = type(config.CustomInventory) == 'function'
+
+    stats.framework = frameworks[1] or 'none'
+    stats.inventory = inventories[1] or (hasCustomInventory and 'custom' or 'none')
+
+    if #frameworks == 0 then
+        addIssue(errors, 'runtime.framework', 'start one supported framework before mbt_meta_clothes: es_extended, qb-core, or ox_core')
+    elseif #frameworks > 1 then
+        addIssue(errors, 'runtime.framework', ('multiple supported frameworks are active: %s'):format(table.concat(frameworks, ', ')))
+    end
+
+    if #inventories > 1 then
+        addIssue(errors, 'runtime.inventory', ('multiple supported inventories are active: %s'):format(table.concat(inventories, ', ')))
+        return
+    end
+
+    if #inventories == 0 then
+        if not hasCustomInventory then
+            addIssue(errors, 'runtime.inventory', 'start ox_inventory or qb-inventory before mbt_meta_clothes, or configure MBT.CustomInventory')
+        elseif frameworks[1] == 'ox_core' then
+            addIssue(errors, 'runtime.inventory', 'the ox_core bridge requires ox_inventory; MBT.CustomInventory is supported by the ESX and QBCore bridges')
+        end
+        return
+    end
+
+    if inventories[1] == 'qb-inventory' and frameworks[1] ~= 'qb-core' then
+        addIssue(errors, 'runtime.inventory', 'qb-inventory is supported only with the qb-core bridge')
+    end
 end
 
 local function arrayContains(values, expected)
@@ -353,6 +398,7 @@ function ConfigValidation.Validate(config, locales)
     validateDripLevels(config, report.errors, report.stats)
     validateLocales(config, locales, report.errors, report.stats)
     validateClothingStates(config, report.errors, report.stats)
+    validateRuntimeBridge(config, report.errors, report.stats)
 
     if type(config.ProgressBar) ~= 'function' then
         addIssue(report.errors, 'MBT.ProgressBar', 'must be a function')

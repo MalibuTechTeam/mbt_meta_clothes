@@ -88,12 +88,12 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
 
 ## P1 - Required for a stable 2.0
 
-- [ ] Enforce the existing single-active-inventory invariant.
+- [x] Enforce the existing single-active-inventory invariant.
   - [x] Preserve the current bridge/resource-detection architecture: MBT servers
     run one inventory implementation at a time, independently of the framework.
   - [x] Expose one explicit success/failure result contract from every inventory
     adapter without changing item registration ownership.
-  - [ ] Fail early with a useful startup error when no supported inventory adapter
+  - [x] Fail early with a useful startup error when no supported inventory adapter
     is active and no custom adapter is configured.
 - [x] Align optional and required dependencies.
   - [x] Keep `ox_lib` optional with native notification and timed progress fallbacks.
