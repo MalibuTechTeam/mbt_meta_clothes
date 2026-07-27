@@ -11,27 +11,6 @@ local function copyAck(ack, code)
     return copied
 end
 
-local function validInitialSnapshot(visual, sex)
-    local meaningful = 0
-    local zero = 0
-    local total = 0
-    for _, slotType in ipairs({ 'Drawables', 'Props' }) do
-        local configured = slotType == 'Drawables' and MBT.Drawables or MBT.Props
-        for slotIndex, config in pairs(configured) do
-            local slot = visual[slotType][slotIndex]
-            local defaults = config.Default and config.Default[sex]
-            if not MBT.TableContains(defaults or {}, slot.drawable) then
-                total = total + 1
-                if slot.drawable > 0 then meaningful = meaningful + 1 else zero = zero + 1 end
-            end
-        end
-    end
-    if total == 0 then return false, 'empty_initial' end
-    if meaningful < 2 then return false, 'bare_initial' end
-    if zero > meaningful then return false, 'partial_initial' end
-    return true
-end
-
 local function boundedPayload(value, maxStringBytes)
     local seen = {}
     local nodes = 0
@@ -227,11 +206,6 @@ function SnapshotServer.New(deps)
                 return remember(state, payload.seq, requestFingerprint,
                     reject(src, state, payload, 'initial_not_allowed'))
             end
-            local initialOk, initialReason = validInitialSnapshot(visual, sex)
-            if not initialOk then
-                return remember(state, payload.seq, requestFingerprint,
-                    reject(src, state, payload, initialReason))
-            end
         end
 
         local current = playerState.GetAll(src) or { Drawables = {}, Props = {} }
@@ -247,6 +221,12 @@ function SnapshotServer.New(deps)
 
         if changed then
             revision = playerState.CommitSnapshot(src, nextState, changes)
+        end
+        if changed or payload.initial then
+            -- An initial snapshot is also the durable baseline when it matches
+            -- an empty/default state. Persist it even when reconciliation is a
+            -- no-op, otherwise a legitimate bare character is a DB miss again
+            -- after every resource/server restart.
             scheduleSave(src, state)
         end
         if payload.initial and playerState.MarkBaseline then playerState.MarkBaseline(src) end

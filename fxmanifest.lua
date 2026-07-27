@@ -38,6 +38,10 @@ server_scripts {
     'modules/snapshot/server.lua',
     -- 4. Shared inventory give functions (MBT.GiveItems)
     'modules/bridge/inventory/give_items.lua',
+    -- Server-authoritative inventory item -> wearing-state coordinator.
+    'modules/bridge/inventory/dress_authority.lua',
+    'modules/bridge/inventory/dress_adapters.lua',
+    'modules/bridge/inventory/dress_runtime.lua',
     'modules/bridge/inventory/qb_useable.lua',
     -- 5. Drip reputation engine (MBT.Drip)
     'modules/drip/server.lua',
@@ -48,6 +52,9 @@ server_scripts {
     -- 8. Deterministic server-console self-tests (debug only)
     'tests/snapshot_spec.lua',
     'tests/inventory_return_spec.lua',
+    'tests/dress_authority_spec.lua',
+    'tests/dress_adapter_spec.lua',
+    'tests/client_start_spec.lua',
 }
 
 client_scripts {

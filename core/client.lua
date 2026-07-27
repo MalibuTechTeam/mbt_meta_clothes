@@ -322,19 +322,17 @@ function MBT.Utils.SendSlotUpdate(slotType, slotIndex, isWearing)
     SendNUIMessage(update)
 end
 
-RegisterNetEvent('mbt_meta_clothes:applyDress')
-AddEventHandler('mbt_meta_clothes:applyDress', function(data)
+local function applyDress(data, persist)
     local meta = normalizeMetadata(data)
     MBT.Debugger("applyDress: slot", meta.index, "drawable", meta.drawable, "texture", meta.texture, "type", meta.type)
     MBT.Utils.ExpectChange("Drawables", meta.index)
     SetPedComponentVariation(PlayerPedId(), meta.index, meta.drawable, meta.texture, meta.palette)
     MBT.Utils.UpdatePlayerClothes() -- keep cache in sync so next checkDress sees the new state
     MBT.Utils.SendSlotUpdate("Drawables", meta.index, true)
-    TriggerServerEvent("mbt_meta_clothes:storeWearing", "Drawables", meta)
-end)
+    if persist then TriggerServerEvent("mbt_meta_clothes:storeWearing", "Drawables", meta) end
+end
 
-RegisterNetEvent('mbt_meta_clothes:applyKitDress')
-AddEventHandler('mbt_meta_clothes:applyKitDress', function(data)
+local function applyKitDress(data, persist)
     local kitMetadata = {}
     for k, v in pairs(data) do
         if type(v) == "table" and v.index then
@@ -352,11 +350,10 @@ AddEventHandler('mbt_meta_clothes:applyKitDress', function(data)
     MBT.Utils.SendSlotUpdate("Drawables", 3, true)
     MBT.Utils.SendSlotUpdate("Drawables", 8, true)
     MBT.Utils.SendSlotUpdate("Drawables", 11, true)
-    TriggerServerEvent("mbt_meta_clothes:storeWearingKit", kitMetadata)
-end)
+    if persist then TriggerServerEvent("mbt_meta_clothes:storeWearingKit", kitMetadata) end
+end
 
-RegisterNetEvent('mbt_meta_clothes:applyProps')
-AddEventHandler('mbt_meta_clothes:applyProps', function(data)
+local function applyProps(data, persist)
     local meta = normalizeMetadata(data)
     MBT.Utils.ExpectChange("Props", meta.index)
     SetPedPropIndex(PlayerPedId(), meta.index, meta.drawable, meta.texture, true)
@@ -366,7 +363,28 @@ AddEventHandler('mbt_meta_clothes:applyProps', function(data)
     end
     MBT.Utils.UpdatePlayerClothes() -- keep cache in sync so next checkDress sees the new state
     MBT.Utils.SendSlotUpdate("Props", meta.index, true)
-    TriggerServerEvent("mbt_meta_clothes:storeWearing", "Props", meta)
+    if persist then TriggerServerEvent("mbt_meta_clothes:storeWearing", "Props", meta) end
+end
+
+RegisterNetEvent('mbt_meta_clothes:applyDress')
+AddEventHandler('mbt_meta_clothes:applyDress', function(data)
+    applyDress(data, true)
+end)
+
+RegisterNetEvent('mbt_meta_clothes:applyKitDress')
+AddEventHandler('mbt_meta_clothes:applyKitDress', function(data)
+    applyKitDress(data, true)
+end)
+
+RegisterNetEvent('mbt_meta_clothes:applyProps')
+AddEventHandler('mbt_meta_clothes:applyProps', function(data)
+    applyProps(data, true)
+end)
+
+RegisterNetEvent('mbt_meta_clothes:applyAuthoritativeDress', function(kind, payload)
+    if kind == 'Drawable' then return applyDress(payload, false) end
+    if kind == 'Prop' then return applyProps(payload, false) end
+    if kind == 'DressKit' then return applyKitDress(payload, false) end
 end)
 
 RegisterNetEvent('mbt_meta_clothes:stealPlayerDress')

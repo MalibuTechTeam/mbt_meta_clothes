@@ -386,25 +386,40 @@ local cases = {
         end,
     },
     {
-        name = 'initial snapshots reject bare PED and accept a stable outfit',
+        name = 'initial snapshots accept complete PED states and initialize only once',
         run = function()
-            local fixture = snapshotServerFixture()
-            local src = 47
-            fixture.setIdentifier(src, 'char1')
-            local context = fixture.coordinator:Activate(src, 'char1')
-            local barePayload = snapshotPayload(context, 1)
+            local bareFixture = snapshotServerFixture()
+            local bareSrc = 47
+            bareFixture.setIdentifier(bareSrc, 'char1')
+            local bareContext = bareFixture.coordinator:Activate(bareSrc, 'char1')
+            local barePayload = snapshotPayload(bareContext, 1)
             barePayload.initial = true
-            Assert.equal('empty_initial', fixture.coordinator:Handle(src, barePayload).code)
+            Assert.equal('no_change', bareFixture.coordinator:Handle(bareSrc, barePayload).code)
+            Assert.equal(1, #bareFixture.timers,
+                'an unchanged initial baseline must still be persisted')
+            bareFixture.timers[1]()
+            Assert.equal(1, bareFixture.saveCount())
 
-            local outfit = fullVisual('male')
-            outfit.Drawables[11] = { drawable = 101, texture = 0, palette = 0 }
-            outfit.Props[0] = { drawable = 5, texture = 0, palette = 0 }
-            local outfitPayload = snapshotPayload(context, 2, outfit)
-            outfitPayload.initial = true
-            Assert.equal('accepted', fixture.coordinator:Handle(src, outfitPayload).code)
-            local repeated = snapshotPayload(context, 3, outfit, 1)
+            local repeated = snapshotPayload(bareContext, 2)
             repeated.initial = true
-            Assert.equal('initial_not_allowed', fixture.coordinator:Handle(src, repeated).code)
+            Assert.equal('initial_not_allowed', bareFixture.coordinator:Handle(bareSrc, repeated).code)
+
+            -- Drawable 0 is a valid GTA component, not evidence that an
+            -- appearance script is only partially loaded. This complete PED
+            -- state used to be rejected as `partial_initial`.
+            local partialFixture = snapshotServerFixture()
+            local partialSrc = 48
+            partialFixture.setIdentifier(partialSrc, 'char2')
+            local partialContext = partialFixture.coordinator:Activate(partialSrc, 'char2')
+            local validZeroHeavy = fullVisual('male')
+            validZeroHeavy.Drawables[11] = { drawable = 101, texture = 0, palette = 0 }
+            validZeroHeavy.Drawables[4] = { drawable = 20, texture = 0, palette = 0 }
+            validZeroHeavy.Props[0] = { drawable = 0, texture = 0, palette = 0 }
+            validZeroHeavy.Props[1] = { drawable = 0, texture = 0, palette = 0 }
+            validZeroHeavy.Props[2] = { drawable = 0, texture = 0, palette = 0 }
+            local validPayload = snapshotPayload(partialContext, 1, validZeroHeavy)
+            validPayload.initial = true
+            Assert.equal('accepted', partialFixture.coordinator:Handle(partialSrc, validPayload).code)
         end,
     },
     {

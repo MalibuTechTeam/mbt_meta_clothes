@@ -420,45 +420,6 @@ function MBT.PlayerState.Load(src, identifier)
                 end
             end
 
-            -- BARE-DATA CORRUPTION DETECTION
-            -- Rileva la firma del bug bare-PED: una row con slot drawable presenti
-            -- ma TUTTI con drawable=0. È sempre il risultato di un syncInitialWearing
-            -- eseguito su PED nudo prima dell'apply dello skin script (vedi commento
-            -- su syncInitialWearing in core/server.lua). Una pulizia legittima fatta
-            -- da meta_clothes lascia gli slot rimossi (ClearSlot), non valori a 0.
-            --
-            -- Cancella la row corrotta dal DB e tratta come DB MISS → al prossimo
-            -- requestPedScan il player verrà ri-scansionato con le clothes corrette.
-            local hasNonZero = false
-            local totalSlots = 0
-            for _, slot in pairs(normalized.Drawables) do
-                if type(slot) == "table" and slot.drawable then
-                    totalSlots = totalSlots + 1
-                    if slot.drawable > 0 then hasNonZero = true; break end
-                end
-            end
-            if not hasNonZero then
-                for _, slot in pairs(normalized.Props) do
-                    if type(slot) == "table" and slot.drawable then
-                        totalSlots = totalSlots + 1
-                        if slot.drawable > 0 then hasNonZero = true; break end
-                    end
-                end
-            end
-
-            if totalSlots > 0 and not hasNonZero then
-                MBT.Warn('PlayerState.Load: corrupted bare-data row; deleting and treating as DB miss', {
-                    identifier = identifier,
-                    slots = totalSlots,
-                })
-                MySQL.query.await("DELETE FROM mbt_player_wearing WHERE identifier = ?", { identifier })
-                MBT.PlayerState.InitPlayer(src)
-                PlayerHasDbEntry[src] = false
-                PlayerHasBaseline[src] = false
-                DirtyPlayers[src] = false
-                return
-            end
-
             PlayerWearing[src] = normalized
         else
             MBT.Debugger("PlayerState: corrupted DB data for", identifier, "- resetting")
@@ -611,10 +572,10 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force)
         -- combatte contro illenium-appearance che sta applicando il vero skin del
         -- nuovo char e li sovrascrive con default vanilla.
         --
-        -- Soluzione: requestPedScan ha un delay 2.5s che lascia respirare illenium
-        -- prima di catturare lo stato. Il bare-PED guard server-side rifiuta scan
-        -- "tutto a 0" così non corrompiamo il DB se illenium tarda. Funziona sia
-        -- per primo login che per switch.
+        -- requestPedScan lascia applicare la skin esterna; il client invia una
+        -- visuale completa rimasta stabile per il debounce. Il server valida
+        -- struttura e limiti, senza trattare drawable 0/default come una skin
+        -- necessariamente incompleta: sono stati legittimi per molti script.
         local justSwitched = MBT.PlayerState.ConsumeSwitchFlag(src)
         MBT.Debugger('PushStateToClient: requesting initial PED scan', {
             source = src,

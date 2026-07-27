@@ -25,6 +25,7 @@ end
 -----------------------------------------------------------
 
 MBT.PlayerState.Init()
+MBT.DressRuntime.Initialize()
 
 -- Resource restart recovery for every supported framework. Identifier
 -- readiness remains guarded inside PushStateToClient.

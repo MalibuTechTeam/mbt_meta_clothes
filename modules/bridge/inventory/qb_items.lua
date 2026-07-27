@@ -36,7 +36,7 @@ function MBT.QbItems.RegisterItems()
         local dict     = animCfg.Dict     or DEFAULT_ANIM.Dict
         local anim     = animCfg.Anim     or DEFAULT_ANIM.Anim
         local flags    = animCfg.Flag     or DEFAULT_ANIM.Flag
-        local duration = animCfg.Duration or DEFAULT_ANIM.Duration
+        local duration = tonumber(data.duration) or animCfg.Duration or DEFAULT_ANIM.Duration
 
         -- Progress bar label: try "use_{itemName}" locale key, then item name
         local itemName = data.itemData and data.itemData.name or ""
@@ -55,16 +55,10 @@ function MBT.QbItems.RegisterItems()
             flags    = flags,
         }, {}, {}, function() -- Done
             StopAnimTask(ped, dict, anim, 1.0)
-            TriggerEvent("mbt_meta_clothes:checkDress", {
-                type     = data.slotType,
-                index    = data.slotIndex,
-                sex      = data.sex,
-                itemInfo = data.itemInfo,
-            })
-            TriggerServerEvent('mbt_meta_clothes:removeWear', itemName)
-            TriggerEvent('inventory:client:ItemBox', data.itemData, "remove")
+            TriggerServerEvent('mbt_meta_clothes:completeClothingUse', data.token)
         end, function() -- Cancel
             StopAnimTask(ped, dict, anim, 1.0)
+            TriggerServerEvent('mbt_meta_clothes:cancelClothingUse', data.token)
             QBCore.Functions.Notify(MBT.Locale['cancel'] or 'Cancelled', "error")
         end)
     end)

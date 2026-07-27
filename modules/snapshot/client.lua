@@ -446,6 +446,17 @@ end
 
 MBT.SnapshotClient = SnapshotClient
 
+function SnapshotClient.InstallRuntimeHooks(deps)
+    assert(type(deps) == 'table', 'snapshot runtime hook dependencies are required')
+    local addEventHandler = assert(deps.addEventHandler, 'snapshot event registrar is required')
+    local currentResourceName = assert(deps.currentResourceName, 'snapshot resource name provider is required')
+    local start = assert(deps.start, 'snapshot start callback is required')
+
+    addEventHandler('onClientResourceStart', function(resourceName)
+        if resourceName == currentResourceName() then start() end
+    end)
+end
+
 if IsDuplicityVersion() then return end
 
 local function capturePed()
@@ -516,9 +527,7 @@ local production = SnapshotClient.New({
         local ped = PlayerPedId()
         return DoesEntityExist(ped) and GetEntityModel(ped) or nil
     end,
-    send = function(payload)
-        TriggerServerEvent('mbt_meta_clothes:submitSnapshot', payload)
-    end,
+    send = function(payload) TriggerServerEvent('mbt_meta_clothes:submitSnapshot', payload) end,
     enforce = enforcePed,
     onInitialAcknowledged = function(ack)
         TriggerEvent('mbt_meta_clothes:initialSnapshotReady', ack)
@@ -589,6 +598,8 @@ AddEventHandler('onResourceStop', function(resourceName)
     if resourceName == GetCurrentResourceName() then running = false end
 end)
 
-AddEventHandler('onResourceStart', function(resourceName)
-    if resourceName == GetCurrentResourceName() then SnapshotClient.Start() end
-end)
+SnapshotClient.InstallRuntimeHooks({
+    addEventHandler = AddEventHandler,
+    currentResourceName = GetCurrentResourceName,
+    start = SnapshotClient.Start,
+})

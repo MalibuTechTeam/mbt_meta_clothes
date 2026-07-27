@@ -7,6 +7,21 @@
 
 MBT.QbUseable = {}
 
+local DEFAULT_DURATION = 1200
+
+local function getDuration(slotType, slotIndex, isTopDress)
+    local slotConfig
+    if isTopDress then
+        slotConfig = MBT.Drawables[8]
+    elseif slotType == 'Drawables' then
+        slotConfig = MBT.Drawables[slotIndex]
+    else
+        slotConfig = MBT.Props[slotIndex]
+    end
+    local animation = slotConfig and slotConfig.Animation
+    return animation and tonumber(animation.Duration) or DEFAULT_DURATION
+end
+
 function MBT.QbUseable.RegisterItems()
     local registered    = {}
     local itemsToAdd    = {}
@@ -33,11 +48,19 @@ function MBT.QbUseable.RegisterItems()
                 return
             end
 
+            local duration = getDuration(slotType, slotIndex, isTopDress)
+            local pending = MBT.DressRuntime.BeginQb(source, item, duration)
+            if not pending.ok then
+                TriggerClientEvent('mbt_meta_clothes:notify', source, MBT.Locale['inventory_error'])
+                return
+            end
+
             TriggerClientEvent('mbt_meta_clothes:useClothing', source, {
+                token      = pending.token,
+                duration   = duration,
                 slotType   = slotType,
                 slotIndex  = isTopDress and item.info or item.info.index,
                 sex        = gender,
-                itemInfo   = item.info,
                 itemData   = item,
                 isTopDress = isTopDress or false,
             })

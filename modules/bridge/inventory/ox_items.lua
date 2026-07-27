@@ -71,16 +71,9 @@ function MBT.OxItems.RegisterItems(getPlayerSex)
                 MBT.Notification(MBT.Locale["undress"])
                 return
             end
-            exports.ox_inventory:useItem(data, function(data)
-                if data then
-                    TriggerEvent("mbt_meta_clothes:checkDress", {
-                        type = "Drawables",
-                        index = data.metadata,
-                        sex = sex,
-                        itemInfo = data.metadata
-                    })
-                end
-            end)
+            -- OX consumes the item server-side; its authoritative usedItem event
+            -- commits wearing state and sends the visual payload back to us.
+            exports.ox_inventory:useItem(data)
         end)
     end
 
@@ -102,16 +95,7 @@ function MBT.OxItems.RegisterItems(getPlayerSex)
                         MBT.Notification(MBT.Locale["undress"])
                         return
                     end
-                    exports.ox_inventory:useItem(data, function(data)
-                        if data and data.metadata then
-                            TriggerEvent("mbt_meta_clothes:checkDress", {
-                                type = "Drawables",
-                                index = data.metadata.index,
-                                sex = sex,
-                                itemInfo = data
-                            })
-                        end
-                    end)
+                    exports.ox_inventory:useItem(data)
                 end)
             end
         end
@@ -135,16 +119,7 @@ function MBT.OxItems.RegisterItems(getPlayerSex)
                         MBT.Notification(MBT.Locale["undress"])
                         return
                     end
-                    exports.ox_inventory:useItem(data, function(data)
-                        if data and data.metadata then
-                            TriggerEvent("mbt_meta_clothes:checkDress", {
-                                type = "Props",
-                                index = data.metadata.index,
-                                sex = sex,
-                                itemInfo = data
-                            })
-                        end
-                    end)
+                    exports.ox_inventory:useItem(data)
                 end)
             end
         end
