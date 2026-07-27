@@ -124,14 +124,16 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
       steal batch validation, partial failures, and metadata preservation.
 - [ ] Add integration scenarios for dress, undress, inventory-full, steal single,
       steal multiple, steal all, reconnect, and rapid multichar switching.
-- [ ] Add a release smoke test that starts from a clean checkout.
+- [x] Add a release smoke path that starts from GitHub Actions' clean checkout,
+      installs with the frozen Bun lockfile, runs the complete web check, stages
+      the runtime resource, validates every manifest path, and verifies the ZIP.
+  - [ ] Confirm the workflow on the first 2.0 prerelease tag before release.
 - [x] Document installation, dependency order, supported compatibility matrix,
       inventory item definitions, database behavior, build, deploy, and upgrades.
 - [ ] Remove obsolete event paths and reduce global functions shared between modules.
   - [x] Move inventory-return, wearable-state, and steal-menu helpers into their
     existing MBT module namespaces instead of resource-wide Lua globals.
   - [ ] Remove the one-release compatibility tombstones after the 2.0 transition.
-- [ ] Add a migration/version field to persisted wearing data.
 
 ## Feature candidates after stabilization
 
@@ -144,6 +146,8 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
 - [ ] Configuration tooling for addon clothing toggle pairs and custom drawables.
 - [ ] Explicit custom-ped support policy, with adapters where drawable metadata is
       available and a clear unsupported response otherwise.
+- [ ] Introduce persisted schema versioning only when a planned incompatible data
+      change requires a concrete migration; keep it outside the 2.0 scope for now.
 - [ ] Accessibility pass for keyboard navigation, focus handling, contrast, reduced
       motion, and screen-size scaling in the NUI.
 
