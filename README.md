@@ -1,156 +1,54 @@
 <div id="header" align="center">
-  <img src="https://dunb17ur4ymx4.cloudfront.net/wysiwyg/1131066/1fe58a9651a48982397fb7d9ec82bfd4aa26d036.png" width="500"/>
+  <img src="https://dunb17ur4ymx4.cloudfront.net/wysiwyg/1131066/1fe58a9651a48982397fb7d9ec82bfd4aa26d036.png" width="500" alt="MalibuTech" />
 </div>
 
-MBT Meta Clothes take advantage of inventory metadata feature giving you the possibility to turn your clothes into unique items. Undress yourself using a clean and simple NUI and have fun swapping your outfits with your friends!
+# MBT Meta Clothes
 
-### ⚠️Important:
-Add to your items the following ones (customize the settings to fit your needs) DO NOT CHANGE THE ITEMS NAME!
-<br/>
-The resource has been tested ONLY on Ox Core and ESX
-<br />
-Remember to check and change if needed the ```Default``` clothes in ```MBT.Drawables``` and ```MBT.Props ```
+MBT Meta Clothes turns equipped GTA clothing components into metadata-backed
+inventory items. Players can undress through the NUI, equip compatible items,
+swap clothing, and steal clothing through an optional target interaction.
 
-## Resource start order
+## Compatibility
 
-Following the standard MBT resource lifecycle, start the selected framework and
-inventory before `mbt_meta_clothes`. Run exactly one supported framework and one
-inventory implementation at a time.
+| Framework | Inventory | Status |
+| --- | --- | --- |
+| ESX | ox_inventory | Supported |
+| ESX | Custom adapter | Supported with integration work |
+| QBCore | qb-inventory | Supported |
+| QBCore | ox_inventory | Supported |
+| QBCore | Custom adapter | Supported with integration work |
+| OX Core | ox_inventory | Supported |
 
-Supported runtime combinations are:
+The resource follows the MBT startup convention: start the selected framework
+and inventory first, then start `mbt_meta_clothes`. Exactly one supported
+framework and one inventory implementation must be active. Startup validation
+rejects missing, ambiguous, or incompatible combinations with an actionable
+error.
 
-- ESX with `ox_inventory` or `MBT.CustomInventory`
-- QBCore with `qb-inventory`, `ox_inventory`, or `MBT.CustomInventory`
-- OX Core with `ox_inventory`
+See [Installation and operations](docs/installation.md) for dependencies, item
+definitions, database behavior, build, deployment, and upgrade instructions.
 
-If an inventory is restarted while the server is running, restart
-`mbt_meta_clothes` afterwards so its bridge and item handlers are registered
-against the new inventory instance. Invalid or ambiguous combinations stop at
-startup with an actionable configuration error.
+## Main features
 
+- Server-authoritative dress, undress, and clothing theft
+- Transactional inventory returns with metadata preservation
+- Persistent wearing state across reconnects and character switches
+- ESX, QBCore, and OX Core bridges
+- ox_inventory and qb-inventory item handlers
+- Optional DNA history and drip progression
+- Optional ox_target, qb-target, or qtarget interaction
+- English and Italian locales
 
-## ox_inventory/data/items.lua
+## Configuration
 
-```
-	['topdress'] = {
-		label 		= 'Top Dress',
-		description = 'YOUR_DESCRIPTION',
-		weight 		= 100,
-		stack 		= true,
-		close 		= true,
-		client = {
-			anim = { dict = 'clothingshirt', clip = 'try_shirt_positive_d', flag = 51 },
-			usetime = 1200,
-			export = 'mbt_meta_clothes.topdress'
-		},
-	},
+Edit `config.lua` before starting the resource. In particular, verify the
+freemode defaults in `MBT.Drawables` and `MBT.Props` against the clothing pack
+used by the server. Keep `MBT.Debug = false` in production after completing the
+runtime verification.
 
-  	['trousers'] = {
-		label 		= 'Trousers',
-		description = 'YOUR_DESCRIPTION',
-		weight 		= 100,
-		stack 		= true,
-		close 		= true,
-		client = {
-			anim = { dict = 're@construction', clip = 'out_of_breath', flag = 51 },
-			usetime = 1200,
-			export = 'mbt_meta_clothes.trousers'
-		}
-	},
+## Media
 
-  	['shoes'] = {
-		label 		= 'Shoes',
-		description = 'YOUR_DESCRIPTION',
-		weight 		= 100,
-		stack 		= true,
-		close 		= true,
-		client = {
-			anim = { dict = 'random@domestic', clip = 'pickup_low', flag = 0 },
-			usetime = 1200,
-			export = 'mbt_meta_clothes.shoes'
-		}
-	},
+- [Showcase](https://www.youtube.com/watch?v=TSCrxiJaWdg)
+- [Cfx.re release](https://forum.cfx.re/t/free-esx-qb-ox-mbt-meta-clothes/4961827)
 
-  	['hat'] = {
-		label 		= 'Hat',
-		description = 'YOUR_DESCRIPTION',
-		weight 		= 100,
-		stack 		= true,
-		close 		= true,
-		client = {
-			anim = { dict = 'missheist_agency2ahelmet', clip = 'take_off_helmet_stand', flag = 51 },
-			usetime = 1200,
-			export = 'mbt_meta_clothes.hat'
-		}
-	},
-
-  	['glasses'] = {
-		label 		= 'Glasses',
-		description = 'YOUR_DESCRIPTION',
-		weight 		= 100,
-		stack 		= true,
-		close 		= true,
-		client = {
-			anim = { dict = 'clothingspecs', clip = 'take_off', flag = 51 },
-			usetime = 1200,
-			export = 'mbt_meta_clothes.glasses'
-		}
-	},
-
-  	['earaccess'] = {
-		label 		= 'Ear Accessories',
-		description = 'YOUR_DESCRIPTION',
-		weight 		= 100,
-		stack 		= true,
-		close 		= true,
-		client = {
-			anim = { dict = 'mp_cp_stolen_tut', clip = 'b_think', flag = 51 },
-			usetime = 1200,
-			export = 'mbt_meta_clothes.earaccess'
-		}
-	},
-
-  	['chain'] = {
-		label 		= 'Torso Accessories',
-		description = 'YOUR_DESCRIPTION',
-		weight 		= 100,
-		stack 		= true,
-		close 		= true,
-		client = {
-			anim = { dict = 'clothingtie', clip = 'try_tie_positive_a', flag = 51 },
-			usetime = 2500,
-			export = 'mbt_meta_clothes.chain'
-		}
-	},
-
-  	['watch'] = {
-		label 		= 'Watch',
-		description = 'YOUR_DESCRIPTION',
-		weight 		= 100,
-		stack 		= true,
-		close 		= true,
-		client = {
-			anim = { dict = 'nmt_3_rcm-10', clip = 'cs_nigel_dual-10', flag = 51 },
-			usetime = 900,
-			export = 'mbt_meta_clothes.watch'
-		}
-	},
-  
-```
-
-## Features
-
-- Turn clothes into items and swap them with your friends
-- ESX,OX, QB compatible
-- Optimized for low CPU usage
-- Customizable labels
-- Customizable notify system
-
-### Media:
-- Showcase:  [Click Here](https://www.youtube.com/watch?v=TSCrxiJaWdg)
-- Cfx : [Click Here](https://forum.cfx.re/t/free-esx-qb-ox-mbt-meta-clothes/4961827)
-
-## DMCA Protection Certificate
-![image](https://media.discordapp.net/attachments/1045063739738705940/1049386591359074354/image.png)
-
-##### Copyright © 2022 Malibú Tech. All rights reserved.
+Copyright 2022-2026 MalibuTech. All rights reserved.

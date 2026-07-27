@@ -104,6 +104,8 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
   - [x] Run lint, type-check, and production build in CI.
 - [ ] Complete runtime assets.
   - Add `item_image/bracelet.png`.
+  - Add `item_image/jacket.png`, which is referenced by the configured drawable
+    slot and the generated QB item definition.
   - Add the missing male backpack layer; it is explicitly disabled until supplied.
   - [x] Explicitly disable missing female mannequin layers instead of requesting broken images.
   - [x] Add an automated check for layer paths declared by the frontend.
@@ -123,7 +125,7 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
 - [ ] Add integration scenarios for dress, undress, inventory-full, steal single,
       steal multiple, steal all, reconnect, and rapid multichar switching.
 - [ ] Add a release smoke test that starts from a clean checkout.
-- [ ] Document installation, dependency order, supported compatibility matrix,
+- [x] Document installation, dependency order, supported compatibility matrix,
       inventory item definitions, database behavior, build, deploy, and upgrades.
 - [ ] Remove obsolete event paths and reduce global functions shared between modules.
 - [ ] Add a migration/version field to persisted wearing data.
