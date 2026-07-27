@@ -95,9 +95,9 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
     adapter without changing item registration ownership.
   - [ ] Fail early with a useful startup error when no supported inventory adapter
     is active and no custom adapter is configured.
-- [ ] Align optional and required dependencies.
-  - Decide whether `ox_lib` is required or provide notification/progress fallbacks.
-  - Fix the `MBT.CustomInventory(source, itemName, count, metadata)` contract.
+- [x] Align optional and required dependencies.
+  - [x] Keep `ox_lib` optional with native notification and timed progress fallbacks.
+  - [x] Enforce and document the `MBT.CustomInventory(source, itemName, count, metadata)` result contract.
 - [x] Fix and enforce the NUI type contract.
   - [x] Add `extraStateUpdate` to the `NUIMessage` union.
   - [x] Add `typecheck` and `check` package scripts.

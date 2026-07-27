@@ -149,21 +149,38 @@ MBT.HairFixDrawables     = {
 -----------------------------------------------------------
 -- Custom Inventory Fallback
 -- Only needed if you DON'T use ox_inventory or qb-inventory.
--- Uncomment and fill with your inventory's addItem logic.
+-- The callback MUST return true only after the item was added, otherwise
+-- false plus a stable reason such as "inventory_full" or "add_failed".
+-- Metadata must be forwarded unchanged; meta_clothes remains authoritative
+-- for which item and clothing state may be transferred.
 -----------------------------------------------------------
 -- MBT.CustomInventory = function(source, itemName, count, metadata)
---     exports['qs-inventory']:AddItem(source, itemName, count, metadata)
+--     local success = YourInventoryAddItem(source, itemName, count, metadata)
+--     return success == true, success and nil or "add_failed"
 -- end
 
 MBT.Notification         = function(data)
-    -- Preset for ox_lib (uncomment to use)
-    exports.ox_lib:notify({
-        title = data.title or "Clothes",
-        description = data.description,
-        type = data.type or "info",
-        icon = data.icon or "shirt",
-        duration = data.duration or 4000
-    })
+    data = type(data) == "table" and data or { description = tostring(data or "") }
+
+    -- Prefer ox_lib when available, but keep the resource dependency-free.
+    if GetResourceState('ox_lib') == 'started' then
+        local notified = pcall(function()
+            exports.ox_lib:notify({
+                title = data.title or "Clothes",
+                description = data.description,
+                type = data.type or "info",
+                icon = data.icon or "shirt",
+                duration = data.duration or 4000
+            })
+        end)
+        if notified then return end
+        MBT.Warn("ox_lib notification failed; using native GTA feed")
+    end
+
+    -- Native client fallback: always available, regardless of framework.
+    BeginTextCommandThefeedPost("STRING")
+    AddTextComponentSubstringPlayerName(data.description or data.title or "Notification")
+    EndTextCommandThefeedPostTicker(false, true)
 
     -- Preset for ESX Standard
     -- ESX.ShowNotification(data.description or data.title)
