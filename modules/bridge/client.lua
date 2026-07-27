@@ -73,28 +73,28 @@ function MBT.SharedClient.SetupCheckDress(sexToLabel)
     end)
 end
 
---- Setup inventory state check functions (checkMaskState, checkBagState, checkArmorState)
+--- Setup inventory state checks used while building the clothing NUI state.
 function MBT.SharedClient.SetupInventoryChecks()
     if GetResourceState('ox_inventory') ~= 'started' then
-        function checkMaskState() return false end
-        function checkBagState() return false end
-        function checkArmorState() return false end
+        MBT.SharedClient.CheckMaskState = function() return false end
+        MBT.SharedClient.CheckBagState = function() return false end
+        MBT.SharedClient.CheckArmorState = function() return false end
         return
     end
 
-    function checkMaskState()
+    function MBT.SharedClient.CheckMaskState()
         -- Has mask item in inventory AND something non-default is on component 1 (mask slot)
         if exports.ox_inventory:Search('count', 'mask') < 1 then return false end
         return GetPedDrawableVariation(PlayerPedId(), 1) ~= 0
     end
 
-    function checkBagState()
+    function MBT.SharedClient.CheckBagState()
         -- Has bag item in inventory AND something non-default is on component 5 (bag slot)
         if exports.ox_inventory:Search('count', 'bag') < 1 then return false end
         return GetPedDrawableVariation(PlayerPedId(), 5) ~= 0
     end
 
-    function checkArmorState()
+    function MBT.SharedClient.CheckArmorState()
         -- Has any armor item in inventory AND something non-default is on component 9 (armor slot)
         local hasItem = exports.ox_inventory:Search('count', 'smallarmor') >= 1
                      or exports.ox_inventory:Search('count', 'medarmor') >= 1
@@ -110,7 +110,7 @@ function MBT.SharedClient.SetupStealDress()
     local stealTarget = {}
     local stealItemsList = {}
 
-    function stealPlayerDress(data)
+    function MBT.SharedClient.OpenStealMenu(data)
         local ped = PlayerPedId()
         local closestPlayer = data and data.entity
 

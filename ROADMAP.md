@@ -128,6 +128,9 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
 - [x] Document installation, dependency order, supported compatibility matrix,
       inventory item definitions, database behavior, build, deploy, and upgrades.
 - [ ] Remove obsolete event paths and reduce global functions shared between modules.
+  - [x] Move inventory-return, wearable-state, and steal-menu helpers into their
+    existing MBT module namespaces instead of resource-wide Lua globals.
+  - [ ] Remove the one-release compatibility tombstones after the 2.0 transition.
 - [ ] Add a migration/version field to persisted wearing data.
 
 ## Feature candidates after stabilization

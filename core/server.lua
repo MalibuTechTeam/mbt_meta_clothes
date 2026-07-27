@@ -253,7 +253,7 @@ RegisterNetEvent('mbt_meta_clothes:giveDress', function(data)
         return sendUndressResult(src, data.RequestId, "drawable", index, { ok = false, reason = "character_changed" })
     end
     MBT.Debugger("<<< giveDress: undressing slot", index)
-    sendUndressResult(src, data.RequestId, "drawable", index, giveDress(src, { Index = index }))
+    sendUndressResult(src, data.RequestId, "drawable", index, MBT.GiveItems.ReturnDrawable(src, index))
 end)
 
 RegisterNetEvent('mbt_meta_clothes:giveDressKit', function(data)
@@ -266,7 +266,7 @@ RegisterNetEvent('mbt_meta_clothes:giveDressKit', function(data)
         return sendUndressResult(src, data.RequestId, "torso", nil, { ok = false, reason = "character_changed" })
     end
     MBT.Debugger("<<< giveDressKit: undressing top")
-    sendUndressResult(src, data.RequestId, "torso", nil, giveDressKit(src))
+    sendUndressResult(src, data.RequestId, "torso", nil, MBT.GiveItems.ReturnTorso(src))
 end)
 
 RegisterNetEvent('mbt_meta_clothes:giveProp', function(data)
@@ -283,7 +283,7 @@ RegisterNetEvent('mbt_meta_clothes:giveProp', function(data)
         return sendUndressResult(src, data.RequestId, "prop", index, { ok = false, reason = "character_changed" })
     end
     MBT.Debugger("<<< giveProp: undressing prop slot", index)
-    sendUndressResult(src, data.RequestId, "prop", index, giveProp(src, { Index = index }))
+    sendUndressResult(src, data.RequestId, "prop", index, MBT.GiveItems.ReturnProp(src, index))
 end)
 
 AddEventHandler('playerDropped', function()

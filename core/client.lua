@@ -389,7 +389,7 @@ end)
 
 RegisterNetEvent('mbt_meta_clothes:stealPlayerDress')
 AddEventHandler('mbt_meta_clothes:stealPlayerDress', function(data)
-    stealPlayerDress(data)
+    MBT.SharedClient.OpenStealMenu(data)
 end, false)
 
 -----------------------------------------------------------
@@ -460,9 +460,9 @@ end)
 
 RegisterCommand("toggleUndress", function()
     if IsPedOnFoot(PlayerPedId()) and not IsPedDeadOrDying(PlayerPedId(), false) and not IsPedCuffed(PlayerPedId()) then
-        local bagState = type(checkBagState) == 'function' and checkBagState() or false
-        local maskState = type(checkMaskState) == 'function' and checkMaskState() or false
-        local armorState = type(checkArmorState) == 'function' and checkArmorState() or false
+        local bagState = MBT.SharedClient.CheckBagState and MBT.SharedClient.CheckBagState() or false
+        local maskState = MBT.SharedClient.CheckMaskState and MBT.SharedClient.CheckMaskState() or false
+        local armorState = MBT.SharedClient.CheckArmorState and MBT.SharedClient.CheckArmorState() or false
         local resourceState = MBT.Utils.MbtWearableProps()
 
         -- Build wearing state for NUI: which slots have non-default drawables
@@ -614,7 +614,7 @@ RegisterCommand("steal", function()
     end
 
     if closestPed then
-        stealPlayerDress({ entity = closestPed })
+        MBT.SharedClient.OpenStealMenu({ entity = closestPed })
     else
         MBT.Notification(MBT.Locale["nothing_to_steal"])
     end

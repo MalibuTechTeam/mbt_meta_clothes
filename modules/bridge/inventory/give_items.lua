@@ -437,22 +437,20 @@ function MBT.GiveItems.NewRuntime(config)
     return runtime
 end
 
---- Setup global give* functions used by core/server.lua event handlers
+--- Configure the resource-local inventory return facade used by core/server.lua.
 function MBT.GiveItems.Setup(config)
-
     local runtime = MBT.GiveItems.NewRuntime(config)
     MBT.GiveItems.Runtime = runtime
 
-    function giveDress(src, data)
-        return runtime:ReturnSlot(src, "Drawables", data.Index)
+    function MBT.GiveItems.ReturnDrawable(src, slotIndex)
+        return runtime:ReturnSlot(src, "Drawables", slotIndex)
     end
 
-    function giveDressKit(src)
+    function MBT.GiveItems.ReturnTorso(src)
         return runtime:ReturnTorso(src)
     end
 
-    function giveProp(src, data)
-        return runtime:ReturnSlot(src, "Props", data.Index)
+    function MBT.GiveItems.ReturnProp(src, slotIndex)
+        return runtime:ReturnSlot(src, "Props", slotIndex)
     end
-
 end
