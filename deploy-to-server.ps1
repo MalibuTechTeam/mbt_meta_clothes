@@ -86,7 +86,7 @@ if (-not (Test-Path -LiteralPath $distPath)) {
 }
 
 # --- Ensure target parent exists -------------------------------------------
-$destParent = Split-Path -LiteralPath $Dest -Parent
+$destParent = [System.IO.Path]::GetDirectoryName($Dest.TrimEnd('\','/'))
 if (-not (Test-Path -LiteralPath $destParent)) {
     Write-Error "Target parent folder does not exist: $destParent"
     exit 1
