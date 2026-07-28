@@ -24,7 +24,7 @@ the candidate section are not automatically part of the 2.0 release scope.
 - [x] Complete Lua parser checks, `git diff --check`, web lint, and independent
       protocol/lifecycle code review.
 - [x] Run `mbt_snapshot_selftest` in an actual Cfx server with `MBT.Debug = true`
-      (`34/34` passed on 2026-07-27).
+      (`36/36` passed on 2026-07-28).
 - [x] Verify the primary relog case: logout without jacket and reconnect without
       the jacket being duplicated on the PED and in inventory.
 - [ ] Complete the remaining end-to-end verification: six-or-more-slot external
@@ -70,7 +70,7 @@ matrix above passes.
   - [x] Update deprecated GitHub Actions and output syntax.
 
 The authoritative dress, transactional return, and steal implementations pass
-both their pure-Lua checks and the running Cfx self-tests: snapshot `34/34`,
+both their pure-Lua checks and the running Cfx self-tests: snapshot `36/36`,
 inventory return `21/21`, dress authority `8/8`, inventory adapters `5/5`, client
 startup `1/1`, and steal authority `10/10` on 2026-07-27. The intentional
 `admin_item` rejection warning confirms that forged item metadata reaches neither
