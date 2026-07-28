@@ -17,6 +17,10 @@ the candidate section are not automatically part of the 2.0 release scope.
       only sanitized visual metadata for externally changed slots.
 - [x] Protect restore, internal dress/toggle operations, temporary prop suppression,
       PED replacement, resource restart, and duplicate framework readiness events.
+- [x] Keep connected hot-resource recovery non-obscuring while preserving the
+      guarded hide/reveal lifecycle for spawn and character switching.
+  - [x] Runtime verified on 2026-07-28: connected resource restart restored the
+        authoritative wearing state without changing PED visibility.
 - [x] Complete Lua parser checks, `git diff --check`, web lint, and independent
       protocol/lifecycle code review.
 - [x] Run `mbt_snapshot_selftest` in an actual Cfx server with `MBT.Debug = true`
@@ -25,8 +29,7 @@ the candidate section are not automatically part of the 2.0 release scope.
       the jacket being duplicated on the PED and in inventory.
 - [ ] Complete the remaining end-to-end verification: six-or-more-slot external
       outfit, rich jacket metadata, rejected toggle rollback, rapid character
-      A-to-B switch, abrupt disconnect, unchanged-player idle period, and resource
-      restart while connected.
+      A-to-B switch, abrupt disconnect, and unchanged-player idle period.
 
 The primary relog defect is now runtime-verified. Snapshot synchronization is not
 considered release-verified across all lifecycle paths until the remaining scenario

@@ -47,8 +47,9 @@ local function normalizeMetadata(data)
     return meta
 end
 
--- onResourceStart is handled by the framework bridge (esx/qb/ox client.lua)
--- to avoid duplicate playerReady events
+-- Server-owned resource restart recovery pushes state for connected players.
+-- The client start hook below only rebuilds local runtime registrations and
+-- deliberately does not emit another playerReady event.
 
 local restoreGeneration = 0
 local pendingInitialReveal
@@ -72,24 +73,38 @@ RegisterNetEvent('mbt_meta_clothes:multichar:pauseDetection', function()
     restoreGeneration = restoreGeneration + 1
 end)
 
+-- Rebuild client-only registrations after an ensure/restart without treating
+-- the already spawned player as a new character lifecycle.
+AddEventHandler('onClientResourceStart', function(resourceName)
+    if resourceName ~= GetCurrentResourceName() then return end
+    MBT.Utils.UpdatePlayerClothes()
+    MBT.Utils.Target()
+    MBT.Utils.InitClothingCache()
+    MBT.Utils.StartHybridDetection()
+end)
+
 -- Server requests PED scan (new players only, after Load completed)
 RegisterNetEvent('mbt_meta_clothes:requestPedScan')
-AddEventHandler('mbt_meta_clothes:requestPedScan', function(context)
+AddEventHandler('mbt_meta_clothes:requestPedScan', function(context, lifecycle)
     if not context or not MBT.SnapshotClient.SetContext(context) then return end
+    local shouldObscure = MBT.PedVisibility.ShouldObscure(lifecycle)
     restoreGeneration = restoreGeneration + 1
     local myGen = restoreGeneration
-    pendingInitialReveal = { generation = myGen, session = context.session }
-    if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
-    SetEntityAlpha(PlayerPedId(), 0, false)
-    if MBT.Utils.SchedulePedVisibilityWatchdog then
-        MBT.Utils.SchedulePedVisibilityWatchdog('requestPedScan')
+    pendingInitialReveal = shouldObscure
+        and { generation = myGen, session = context.session }
+        or nil
+    if shouldObscure then
+        if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
+        SetEntityAlpha(PlayerPedId(), 0, false)
+        if MBT.Utils.SchedulePedVisibilityWatchdog then
+            MBT.Utils.SchedulePedVisibilityWatchdog('requestPedScan')
+        end
     end
     -- New player: lascia che l'appearance script applichi il SUO skin,
     -- POI scansiona il PED per popolare il nostro state.
 
-    -- Resume detection SUBITO così l'appearance script può applicare il suo skin
-    -- senza che noi blocchiamo nulla. Il PED resta invisibile (alpha=0 dal bridge)
-    -- durante questo periodo per evitare il flash "nudo → vestito".
+    -- Resume detection immediately so the appearance script can apply its skin.
+    -- Spawn/switch remains hidden; hot resource recovery preserves current alpha.
     if MBT.Utils.ResumeHybridDetection then
         MBT.Utils.ResumeHybridDetection()
     end
@@ -103,7 +118,12 @@ AddEventHandler('mbt_meta_clothes:requestPedScan', function(context)
     -- restoreWearing il player apparirebbe nudo per sempre.
     MBT.SnapshotClient.ForceInitialScan(2500)
 
-    -- Il reveal avviene solo dopo l'ACK server dello snapshot iniziale.
+    if not shouldObscure then
+        MBT.Debugger('ped scan without visibility transition', lifecycle)
+    end
+
+    -- A guarded spawn reveals only after the initial snapshot ACK. Hot resource
+    -- recovery never registered a pending reveal and leaves alpha untouched.
 end)
 
 AddEventHandler('mbt_meta_clothes:initialSnapshotReady', function(ack)
@@ -167,7 +187,7 @@ end
 -- in 1-2s): senza questo guard, i re-apply di char1 firerebbero mentre sei
 -- già su char2 e gli applicherebbero i drawable di char1.
 RegisterNetEvent('mbt_meta_clothes:restoreWearing')
-AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, context)
+AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, context, lifecycle)
     if not wearingState then return end
 
     -- Legacy watchdog unblock: no context means this is not an authoritative
@@ -188,16 +208,19 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, contex
     end
     wearingState = normalized
     if not MBT.SnapshotClient.SetContext(context, wearingState) then return end
+    local shouldObscure = MBT.PedVisibility.ShouldObscure(lifecycle)
     MBT.SnapshotClient.Resume('character')
 
     -- Bump generation: invalida ogni re-apply pendente del restore precedente
     restoreGeneration = restoreGeneration + 1
     local myGen = restoreGeneration
     pendingInitialReveal = nil
-    if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
-    SetEntityAlpha(PlayerPedId(), 0, false)
-    if MBT.Utils.SchedulePedVisibilityWatchdog then
-        MBT.Utils.SchedulePedVisibilityWatchdog('restoreWearing')
+    if shouldObscure then
+        if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
+        SetEntityAlpha(PlayerPedId(), 0, false)
+        if MBT.Utils.SchedulePedVisibilityWatchdog then
+            MBT.Utils.SchedulePedVisibilityWatchdog('restoreWearing')
+        end
     end
 
     -- Enable restore protection: for the next 15 seconds, Hybrid Detection
@@ -215,6 +238,13 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, contex
     -- restoreProtection vede il diff e reverte tornando al nostro state.
     if MBT.Utils.ResumeHybridDetection then
         MBT.Utils.ResumeHybridDetection(wearingState)
+    end
+
+    -- Resource restart recovery never takes ownership of PED alpha. Restore
+    -- protection still converges late appearance changes in the background.
+    if not shouldObscure then
+        MBT.Debugger('ped restore without visibility transition', lifecycle)
+        return
     end
 
     -- Reveal condition-based: il PED deve coincidere continuativamente con lo

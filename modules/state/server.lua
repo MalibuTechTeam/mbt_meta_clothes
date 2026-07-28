@@ -506,7 +506,8 @@ local lastPushAt = {} -- [src] = GetGameTimer()
 --- @param src number Player source
 --- @param attempt number Internal: counter retry (default 1)
 --- @param force boolean Internal: bypass duplicate-readiness debounce after a detected switch
-function MBT.PlayerState.PushStateToClient(src, attempt, force)
+--- @param lifecycle string|nil Server-owned reason for this state push
+function MBT.PlayerState.PushStateToClient(src, attempt, force, lifecycle)
     if not src or src <= 0 then return end
     attempt = attempt or 1
 
@@ -535,7 +536,7 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force)
         Citizen.SetTimeout(200, function()
             -- Verifica che il player non si sia disconnesso nel frattempo
             if GetPlayerName(src) then
-                MBT.PlayerState.PushStateToClient(src, attempt + 1, force)
+                MBT.PlayerState.PushStateToClient(src, attempt + 1, force, lifecycle)
             end
         end)
         return
@@ -561,8 +562,11 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force)
 
     if MBT.PlayerState.HasBaseline(src) then
         local wearingState = MBT.PlayerState.GetAll(src)
-        MBT.Debugger('PushStateToClient: restoring existing wearing state', { source = src })
-        TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, wearingState, context)
+        MBT.Debugger('PushStateToClient: restoring existing wearing state', {
+            source = src,
+            lifecycle = lifecycle,
+        })
+        TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, wearingState, context, lifecycle)
     else
         -- Sia "truly new player" sia "switched-to new char" → requestPedScan.
         --
@@ -580,8 +584,9 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force)
         MBT.Debugger('PushStateToClient: requesting initial PED scan', {
             source = src,
             switched = justSwitched,
+            lifecycle = lifecycle,
         })
-        TriggerClientEvent('mbt_meta_clothes:requestPedScan', src, context)
+        TriggerClientEvent('mbt_meta_clothes:requestPedScan', src, context, lifecycle)
     end
 
     if MBT.UpdateStateBags then

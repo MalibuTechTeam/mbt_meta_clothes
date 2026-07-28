@@ -658,6 +658,18 @@ local cases = {
         end,
     },
     {
+        name = 'resource restart lifecycle preserves current PED visibility',
+        run = function()
+            Assert.equal(false, MBT.PedVisibility.ShouldObscure('resource_restart'))
+        end,
+    },
+    {
+        name = 'spawn lifecycle keeps guarded PED visibility',
+        run = function()
+            Assert.equal(true, MBT.PedVisibility.ShouldObscure(nil))
+        end,
+    },
+    {
         name = 'new reveal wait invalidates an older visibility watchdog',
         run = function()
             local timers = {}

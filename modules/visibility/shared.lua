@@ -1,5 +1,14 @@
 MBT.PedVisibility = MBT.PedVisibility or {}
 
+MBT.PedVisibility.ResourceRestart = 'resource_restart'
+
+--- Return whether this resource owns the PED hide/reveal transition.
+--- Hot recovery preserves alpha chosen by the game/spawn stack; real spawn
+--- and character transitions keep the guarded visibility lifecycle.
+function MBT.PedVisibility.ShouldObscure(lifecycle)
+    return lifecycle ~= MBT.PedVisibility.ResourceRestart
+end
+
 function MBT.PedVisibility.New(deps)
     deps = deps or {}
     local schedule = assert(deps.schedule, 'ped visibility scheduler is required')

@@ -2,7 +2,9 @@ if GetResourceState('es_extended') ~= 'started' then return end
 
 ESX = exports.es_extended:getSharedObject()
 
-local playerReadySent = false
+-- If this resource is ensured while an ESX player is already active, the next
+-- playerLoaded event is a real character switch and must not be discarded.
+local playerReadySent = ESX.IsPlayerLoaded()
 
 -- First login: hide PED to prevent clothing flash
 AddEventHandler('esx:loadingScreenOff', function()
@@ -114,19 +116,6 @@ AddEventHandler('esx:playerLoaded', function()
     MBT.Utils.UpdatePlayerClothes()
     MBT.Utils.Target()
     TriggerServerEvent("mbt_meta_clothes:playerReady")
-    MBT.Utils.StartHybridDetection()
-end)
-
--- Script restart (ensure): NO PED hide, player is already in game
-AddEventHandler('onResourceStart', function(resourceName)
-    if GetCurrentResourceName() ~= resourceName then return end
-    if not ESX.IsPlayerLoaded() then return end
-    playerReadySent = true
-    Citizen.Wait(500)
-    MBT.Utils.UpdatePlayerClothes()
-    MBT.Utils.Target()
-    TriggerServerEvent("mbt_meta_clothes:playerReady")
-    MBT.Utils.InitClothingCache()
     MBT.Utils.StartHybridDetection()
 end)
 

@@ -35,7 +35,14 @@ AddEventHandler('onResourceStart', function(resourceName)
     SetTimeout(1000, function()
         for _, playerId in ipairs(GetPlayers()) do
             local src = tonumber(playerId)
-            if src then MBT.PlayerState.PushStateToClient(src) end
+            if src then
+                MBT.PlayerState.PushStateToClient(
+                    src,
+                    1,
+                    false,
+                    MBT.PedVisibility.ResourceRestart
+                )
+            end
         end
     end)
 end)
