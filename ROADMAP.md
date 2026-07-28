@@ -165,6 +165,13 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
 - [ ] Accessibility pass for keyboard navigation, focus handling, contrast, reduced
       motion, and screen-size scaling in the NUI.
 
+## Rejected investigations
+
+- Ambient-NPC clothing theft was rejected after runtime probing. Standard GTA
+  ambient ped models generally expose baked clothing or alternate dressed
+  variations rather than removable components, and their drawable IDs are
+  model-specific, so they cannot become faithful freemode-player clothing items.
+
 ## Definition of done for 2.0
 
 - No client-triggered path can generate an item without a valid server-owned slot.
