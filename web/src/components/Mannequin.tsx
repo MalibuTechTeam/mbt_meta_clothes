@@ -41,10 +41,6 @@ const HOTSPOT_TO_LAYERS: Record<string, string[]> = {
   accessories: ["Drawables-7", "Props-6", "Props-7"],
 };
 
-const BASE_LAYER_FILTER = [
-  "drop-shadow(0 -1px 3px rgba(255,255,255,0.3))",
-  "drop-shadow(0 8px 14px rgba(0,0,0,0.65))",
-];
 const HOVER_LAYER_FILTER = "drop-shadow(0 0 5px rgba(0,220,255,0.2))";
 const ACTIVE_LAYER_FILTER = "drop-shadow(0 0 7px rgba(0,220,255,0.45))";
 
@@ -260,7 +256,7 @@ export default function Mannequin({
       initial={{ x: 200, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: 200, opacity: 0 }}
-      transition={{ type: "spring", stiffness: 200, damping: 25 }}
+      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       className="absolute inset-0 flex items-center justify-end pr-[0vw] pointer-events-none"
     >
       <div className="relative h-[55vh] aspect-square flex justify-center pointer-events-auto">
@@ -288,7 +284,7 @@ export default function Mannequin({
           src={sex === 1 ? "./mannequin_female.png" : "./mannequin_male.png"}
           alt="Ped Mannequin"
           className={`w-full h-full object-contain transition-all duration-500 z-10
-            ${stealMode ? "sepia-[0.3] hue-rotate-[320deg] brightness-[0.8]" : "drop-shadow-[0_10px_50px_rgba(255,255,255,0.15)]"}`}
+            ${stealMode ? "sepia-[0.3] hue-rotate-[320deg] brightness-[0.8]" : ""}`}
         />
 
         {/* Clothing Layers (Visual Overlays).
@@ -322,10 +318,11 @@ export default function Mannequin({
             // STEP 2: rim light bianca sul top per staccare il capo dal fondo e
             //         dare feel HUD (luce ambientale che colpisce dall'alto).
             // STEP 3: glow ciano se lo slot corrispondente è hover.
-            const layerFilter = [
-              ...BASE_LAYER_FILTER,
-              ...(isLayerHovered ? [HOVER_LAYER_FILTER] : []),
-            ].join(" ");
+            // Avoid rasterizing a large shadow surface for every transparent
+            // layer while the entire mannequin is entering the screen.
+            const layerFilter = isLayerHovered
+              ? HOVER_LAYER_FILTER
+              : undefined;
             const layerSrc = `./layers/${meta.path}_${gender}.png`;
             return (
               // STEP 9: bloom SOLO in exit (quando l'utente svesté con UI
@@ -484,31 +481,22 @@ export default function Mannequin({
               onMouseEnter={() => setHoveredSlot(spot.id)}
               onMouseLeave={() => setHoveredSlot(null)}
             >
-              <motion.div
-                animate={{
-                  scale: isActive || isSelected ? [1, 1.4, 1] : [1, 1.1, 1],
-                  opacity:
-                    isActive || isSelected ? [0.4, 0.8, 0.4] : [0.1, 0.3, 0.1],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-                className={`absolute rounded-full transition-all duration-300 ${accentColor} ${borderColor} border ${isActive || isSelected ? "w-12 h-12" : "w-10 h-10"}`}
+              <div
+                className={`absolute rounded-full transition-[width,height,background-color,border-color] duration-300 ${accentColor} ${borderColor} border ${
+                  isActive || isSelected
+                    ? "w-12 h-12 mbt-hotspot-pulse-active"
+                    : "w-10 h-10 mbt-hotspot-pulse-idle"
+                }`}
               />
-              <motion.div
-                animate={{
-                  scale: isActive || isSelected ? 1.5 : 1,
-                  backgroundColor: dotColor,
-                }}
-                className={`z-10 w-3 h-3 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(255,255,255,0.8)] 
-                  ${isActive || isSelected ? "shadow-[0_0_25px_rgba(239,68,68,1)]" : ""}`}
+              <div
+                style={{ backgroundColor: dotColor }}
+                className={`z-10 w-3 h-3 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(255,255,255,0.8)] transition-[transform,background-color] duration-200
+                  ${isActive || isSelected ? "scale-150 shadow-[0_0_25px_rgba(239,68,68,1)]" : "scale-100"}`}
               >
                 {stealMode && isSelected && (
                   <Check size={8} strokeWidth={4} className="text-white" />
                 )}
-              </motion.div>
+              </div>
               <div className="absolute top-1/2 left-full ml-5 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0 pointer-events-none whitespace-nowrap">
                 <span
                   className={`px-3 py-1.5 text-[11px] font-bold text-white uppercase tracking-[0.25em] rounded-md border-l-4 shadow-2xl transition-colors drop-shadow-[0_2px_12px_rgba(0,0,0,1)]

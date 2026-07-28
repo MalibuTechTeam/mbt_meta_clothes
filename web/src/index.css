@@ -23,6 +23,25 @@ body {
   animation: mbt-layer-glow-pulse 2s ease-in-out infinite;
 }
 
+/* Keep hotspot ambience on compositor-friendly transform and opacity. */
+@keyframes mbt-hotspot-pulse-idle {
+  0%, 100% { transform: scale(1); opacity: 0.1; }
+  50% { transform: scale(1.1); opacity: 0.3; }
+}
+
+@keyframes mbt-hotspot-pulse-active {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50% { transform: scale(1.4); opacity: 0.8; }
+}
+
+.mbt-hotspot-pulse-idle {
+  animation: mbt-hotspot-pulse-idle 2s ease-in-out infinite;
+}
+
+.mbt-hotspot-pulse-active {
+  animation: mbt-hotspot-pulse-active 2s ease-in-out infinite;
+}
+
 /* Scanner ring che si espande dal centro e sfuma — effetto HUD sci-fi.
    Anima SOLO scale: il posizionamento/centramento è gestito dal wrapper
    esterno, così non c'è conflitto tra transform di Tailwind e keyframe. */

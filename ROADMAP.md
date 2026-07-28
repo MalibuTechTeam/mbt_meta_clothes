@@ -116,6 +116,8 @@ inventory-full, partial-batch, and two-player tokenized stealing remain pending.
     every decode concurrently at resource startup.
   - [x] Replace animated multi-filter chains with a static glow filter and an
     opacity-only overlay animation.
+  - [x] Remove permanent large-surface drop shadows during mannequin entrance
+    and move hotspot pulses from Framer Motion controls to compositor CSS.
   - [ ] Compare the first and subsequent openings in game and confirm layer
     alignment, image quality, hover glow, active pulse, and pedestal timing.
 - [x] Add startup configuration validation.
