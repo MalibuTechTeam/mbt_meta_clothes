@@ -549,7 +549,8 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force, lifecycle)
     --   3. PlayerHasDbEntry resta TRUE (residuo del char precedente)
     --   4. PushStateToClient invia restoreWearing con state VUOTO → player nudo
     --
-    -- Soluzione: retry esponenziale fino a 1.5s. Se dopo 1.5s ancora nil,
+    -- Soluzione: retry a intervallo fisso di 200ms, max 8 tentativi (~1.4s).
+    -- Se dopo l'ottavo tentativo l'identifier è ancora nil,
     -- abbandoniamo silenziosamente — un altro evento (es. esx:playerLoaded
     -- che firerà più tardi) rilancerà PushStateToClient.
     if not getPlayerIdentifier or not getPlayerIdentifier(src) then

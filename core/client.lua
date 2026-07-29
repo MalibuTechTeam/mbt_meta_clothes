@@ -54,15 +54,20 @@ end
 local restoreGeneration = 0
 local pendingInitialReveal
 
+--- @return boolean revealed False when the PED is not available yet; the
+--- coordinator keeps the transition open and retries instead of consuming it.
 local function revealPed(reason)
-    if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
     if MBT.Utils.CompletePedVisibilityWait then
-        MBT.Utils.CompletePedVisibilityWait(reason)
-        MBT.Debugger('ped reveal', reason)
-        return true
+        -- The coordinator owns the keep-loop shutdown: it stops it only after
+        -- the PED was really revealed. Stopping it here would release the loop
+        -- that follows model replacement even when the reveal did not happen.
+        local revealed = MBT.Utils.CompletePedVisibilityWait(reason)
+        MBT.Debugger(revealed and 'ped reveal' or 'ped reveal deferred; no ped yet', reason)
+        return revealed
     end
     local ped = PlayerPedId()
     if not DoesEntityExist(ped) then return false end
+    if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
     ResetEntityAlpha(ped)
     SetEntityAlpha(ped, 255, false)
     MBT.Debugger('ped reveal', reason)
@@ -81,6 +86,33 @@ AddEventHandler('onClientResourceStart', function(resourceName)
     MBT.Utils.Target()
     MBT.Utils.InitClothingCache()
     MBT.Utils.StartHybridDetection()
+end)
+
+-- A stop must never leave behind a PED that WE hid. Every timer, the keep loop
+-- and the visibility coordinator die with this instance, and the restart path
+-- deliberately refuses alpha ownership (ShouldObscure == false for
+-- resource_restart) — so nothing downstream would ever reveal it again and the
+-- player stays invisible until a full character reload.
+--
+-- This covers the orderly stop/restart/ensure path only. Surviving an abrupt
+-- client-side crash needs an ownership marker that outlives the Lua state; that
+-- is deliberately not attempted here, because a marker that cannot tell OUR
+-- alpha 0 from another resource's fade would stomp their transition.
+AddEventHandler('onResourceStop', function(resourceName)
+    if resourceName ~= GetCurrentResourceName() then return end
+    if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
+    if MBT.Utils.CancelPedVisibilityWait then MBT.Utils.CancelPedVisibilityWait() end
+    local ped = PlayerPedId()
+    if not DoesEntityExist(ped) then
+        MBT.Debugger('resource stop: no ped to reveal')
+        return
+    end
+    -- L'alpha PRIMA del reset dice se il PED era davvero nascosto da noi: senza
+    -- questo non si distingue "recupero riuscito" da "finestra mancata".
+    local alphaBefore = GetEntityAlpha(ped)
+    ResetEntityAlpha(ped)
+    SetEntityAlpha(ped, 255, false)
+    MBT.Debugger('resource stop: ped revealed', { alphaBefore = alphaBefore })
 end)
 
 -- Server requests PED scan (new players only, after Load completed)

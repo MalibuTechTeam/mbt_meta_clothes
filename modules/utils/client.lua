@@ -340,10 +340,13 @@ local pedVisibility = MBT.PedVisibility.New({
     end,
     reveal = function(reason, watchdog)
         local ped = PlayerPedId()
+        -- Il warn va DOPO il check di esistenza: un reveal fallito viene ora
+        -- ritentato ogni 250ms, e loggarlo prima significherebbe spammare la
+        -- console finché il PED non esiste invece di segnalare il recovery.
+        if not DoesEntityExist(ped) then return false end
         if watchdog then
             MBT.Warn('ped visibility wait expired; auto-recovering visibility', { reason = reason })
         end
-        if not DoesEntityExist(ped) then return false end
         ResetEntityAlpha(ped)
         SetEntityAlpha(ped, 255, false)
         if MBT.Utils.StopKeepPedHidden then
@@ -367,6 +370,13 @@ end
 
 function MBT.Utils.CompletePedVisibilityWait(reason)
     return pedVisibility:Complete(reason)
+end
+
+--- Abbandona la transizione guardata senza rivelare. Usato allo stop della
+--- risorsa, dove il reveal viene fatto direttamente prima che lo stato Lua
+--- muoia: serve solo a fermare il Pulse perché non rinasconda il PED.
+function MBT.Utils.CancelPedVisibilityWait()
+    return pedVisibility:Cancel()
 end
 
 --- Riprende la hybrid detection dopo una pausa (es. multichar switch).

@@ -108,6 +108,13 @@ AddEventHandler('esx:playerLoaded', function()
     -- (attivata dal restoreWearing handler) coprirà per 15s qualsiasi
     -- modifica tardiva dell'appearance script, revertendola al nostro state.
     -- Stesso principio delle armi: le applichi subito, nessuno le tocca.
+    --
+    -- Passa la ownership dell'hide al coordinator PRIMA che inizi a pulsare.
+    -- Lasciare vivo il keep loop significa che il suo fallback a 5s rivela il
+    -- PED mentre il Pulse lo sta ancora nascondendo: flicker e poi fino ad
+    -- altri 5s di invisibilità sbagliata. requestPedScan e restoreWearing
+    -- fanno già questo handoff; questo era l'unico ingresso che lo saltava.
+    if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
     SetEntityAlpha(PlayerPedId(), 0, false)
     -- Watchdog insurance net (vedi commento in loadingScreenOff)
     if MBT.Utils.SchedulePedVisibilityWatchdog then

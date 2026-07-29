@@ -677,7 +677,7 @@ local cases = {
             local visibility = MBT.PedVisibility.New({
                 schedule = function(_, callback) timers[#timers + 1] = callback end,
                 hide = function() end,
-                reveal = function(reason) reveals[#reveals + 1] = reason end,
+                reveal = function(reason) reveals[#reveals + 1] = reason return true end,
             })
 
             visibility:Begin('framework', 5000)
@@ -697,14 +697,68 @@ local cases = {
             local visibility = MBT.PedVisibility.New({
                 schedule = function(_, callback) timer = callback end,
                 hide = function() end,
-                reveal = function(reason) reveals[#reveals + 1] = reason end,
+                reveal = function(reason) reveals[#reveals + 1] = reason return true end,
             })
 
             visibility:Begin('restore', 5000)
-            Assert.equal(true, visibility:Complete('stable'))
+            Assert.equal(true, (visibility:Complete('stable')))
             timer()
             Assert.equal(1, #reveals)
             Assert.equal('stable', reveals[1])
+        end,
+    },
+    {
+        name = 'failed reveal keeps the transition open and retries',
+        run = function()
+            local timers = {}
+            local reveals = {}
+            local pedExists = false
+            local visibility = MBT.PedVisibility.New({
+                schedule = function(_, callback) timers[#timers + 1] = callback end,
+                hide = function() end,
+                reveal = function(reason)
+                    if not pedExists then return false end
+                    reveals[#reveals + 1] = reason
+                    return true
+                end,
+            })
+
+            local generation = visibility:Begin('restore', 5000)
+            Assert.equal(false, (visibility:Complete('stable')))
+            Assert.equal(0, #reveals)
+            -- The transition must survive: consuming it here would burn the
+            -- watchdog and strand a hidden PED with no owner left to reveal it.
+            Assert.equal(true, visibility:Pulse(generation))
+
+            pedExists = true
+            timers[#timers]()
+            Assert.equal(1, #reveals)
+            Assert.equal('stable', reveals[1])
+            Assert.equal(false, visibility:Pulse(generation))
+        end,
+    },
+    {
+        name = 'a newer transition discards a pending reveal retry',
+        run = function()
+            local timers = {}
+            local reveals = {}
+            local visibility = MBT.PedVisibility.New({
+                schedule = function(_, callback) timers[#timers + 1] = callback end,
+                hide = function() end,
+                reveal = function(reason)
+                    reveals[#reveals + 1] = reason
+                    return false
+                end,
+            })
+
+            visibility:Begin('restore', 5000)
+            Assert.equal(false, (visibility:Complete('stable')))
+            local retry = timers[#timers]
+            visibility:Begin('switch', 5000)
+            retry()
+            -- Only the original failed attempt ran: the retry belongs to a
+            -- transition that a newer character lifecycle already replaced.
+            Assert.equal(1, #reveals)
         end,
     },
     {
@@ -714,7 +768,7 @@ local cases = {
             local visibility = MBT.PedVisibility.New({
                 schedule = function() end,
                 hide = function() hides = hides + 1 end,
-                reveal = function() end,
+                reveal = function() return true end,
             })
 
             local oldGeneration = visibility:Begin('framework', 5000)
