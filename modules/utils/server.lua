@@ -109,6 +109,16 @@ function MBT.ServerUtils.IsValidPlayer(src)
     return src and GetPlayerPing(src) > 0
 end
 
+--- Il ladro deve essere vivo. Il client lo controlla già, ma quel gate è
+--- forgiabile: la salute la leggiamo dal ped di rete lato server.
+--- Le manette NON sono osservabili server-side (sono stato di framework), quindi
+--- quel controllo resta solo client-side.
+function MBT.ServerUtils.IsPlayerAlive(src)
+    local ped = GetPlayerPed(src)
+    if not ped or ped == 0 then return false end
+    return GetEntityHealth(ped) > 0
+end
+
 --- Require a victim-owned replicated observation before allowing a steal.
 --- A forged thief payload cannot write another player's state bag; a modified
 --- victim can only consent to being stolen from themselves.

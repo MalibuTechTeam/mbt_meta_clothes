@@ -375,6 +375,7 @@ end
 local function validateStealContext(thiefSource, targetServerId)
     if thiefSource == targetServerId then return false end
     if not MBT.ServerUtils.IsValidPlayer(targetServerId) then return false end
+    if not MBT.ServerUtils.IsPlayerAlive(thiefSource) then return false end
     if not MBT.ServerUtils.CheckProximity(thiefSource, targetServerId, MBT.StealDistance or 5.0) then return false end
     if not MBT.ServerUtils.IsPlayerStealable(targetServerId) then return false end
     if MBT.PlayerState.CheckCharacterSwitch(thiefSource) then return false end
