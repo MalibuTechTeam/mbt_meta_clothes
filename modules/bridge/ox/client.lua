@@ -17,13 +17,7 @@ AddEventHandler('ox:playerLoaded', function(data)
         MBT.Utils.SchedulePedVisibilityWatchdog("ox:playerLoaded")
     end
     TriggerServerEvent("mbt_meta_clothes:playerReady")
-    MBT.Utils.InitClothingCache()
     MBT.Utils.StartHybridDetection()
-end)
-
--- Setup shared handlers with OX sex format ("m" = male, "f" = female)
-MBT.SharedClient.SetupCheckDress(function(sex)
-    return sex == "m" and "male" or "female"
 end)
 
 MBT.SharedClient.SetupInventoryChecks()

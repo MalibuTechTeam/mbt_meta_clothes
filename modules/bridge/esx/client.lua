@@ -22,7 +22,6 @@ AddEventHandler('esx:loadingScreenOff', function()
     MBT.Utils.UpdatePlayerClothes()
     MBT.Utils.Target()
     TriggerServerEvent("mbt_meta_clothes:playerReady")
-    MBT.Utils.InitClothingCache()
     MBT.Utils.StartHybridDetection()
 end)
 
@@ -124,10 +123,6 @@ AddEventHandler('esx:playerLoaded', function()
     MBT.Utils.Target()
     TriggerServerEvent("mbt_meta_clothes:playerReady")
     MBT.Utils.StartHybridDetection()
-end)
-
-MBT.SharedClient.SetupCheckDress(function(sex)
-    return sex == "m" and "male" or "female"
 end)
 
 MBT.SharedClient.SetupInventoryChecks()

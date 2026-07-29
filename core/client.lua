@@ -84,7 +84,6 @@ AddEventHandler('onClientResourceStart', function(resourceName)
     if resourceName ~= GetCurrentResourceName() then return end
     MBT.Utils.UpdatePlayerClothes()
     MBT.Utils.Target()
-    MBT.Utils.InitClothingCache()
     MBT.Utils.StartHybridDetection()
 end)
 
@@ -384,17 +383,18 @@ function MBT.Utils.SendSlotUpdate(slotType, slotIndex, isWearing)
     SendNUIMessage(update)
 end
 
-local function applyDress(data, persist)
+-- Lo stato autorevole lo possiede già il server: queste funzioni applicano solo
+-- il visuale che il server ha appena confermato, non lo ripersistono.
+local function applyDress(data)
     local meta = normalizeMetadata(data)
     MBT.Debugger("applyDress: slot", meta.index, "drawable", meta.drawable, "texture", meta.texture, "type", meta.type)
     MBT.Utils.ExpectChange("Drawables", meta.index)
     SetPedComponentVariation(PlayerPedId(), meta.index, meta.drawable, meta.texture, meta.palette)
-    MBT.Utils.UpdatePlayerClothes() -- keep cache in sync so next checkDress sees the new state
+    MBT.Utils.UpdatePlayerClothes()
     MBT.Utils.SendSlotUpdate("Drawables", meta.index, true)
-    if persist then TriggerServerEvent("mbt_meta_clothes:storeWearing", "Drawables", meta) end
 end
 
-local function applyKitDress(data, persist)
+local function applyKitDress(data)
     local kitMetadata = {}
     for k, v in pairs(data) do
         if type(v) == "table" and v.index then
@@ -412,10 +412,9 @@ local function applyKitDress(data, persist)
     MBT.Utils.SendSlotUpdate("Drawables", 3, true)
     MBT.Utils.SendSlotUpdate("Drawables", 8, true)
     MBT.Utils.SendSlotUpdate("Drawables", 11, true)
-    if persist then TriggerServerEvent("mbt_meta_clothes:storeWearingKit", kitMetadata) end
 end
 
-local function applyProps(data, persist)
+local function applyProps(data)
     local meta = normalizeMetadata(data)
     MBT.Utils.ExpectChange("Props", meta.index)
     SetPedPropIndex(PlayerPedId(), meta.index, meta.drawable, meta.texture, true)
@@ -423,30 +422,14 @@ local function applyProps(data, persist)
     if MBT.Props[meta.index] and MBT.Props[meta.index]["ApplyHairFix"] then
         MBT.Utils.ApplyHatHairFix(PlayerPedId())
     end
-    MBT.Utils.UpdatePlayerClothes() -- keep cache in sync so next checkDress sees the new state
+    MBT.Utils.UpdatePlayerClothes()
     MBT.Utils.SendSlotUpdate("Props", meta.index, true)
-    if persist then TriggerServerEvent("mbt_meta_clothes:storeWearing", "Props", meta) end
 end
 
-RegisterNetEvent('mbt_meta_clothes:applyDress')
-AddEventHandler('mbt_meta_clothes:applyDress', function(data)
-    applyDress(data, true)
-end)
-
-RegisterNetEvent('mbt_meta_clothes:applyKitDress')
-AddEventHandler('mbt_meta_clothes:applyKitDress', function(data)
-    applyKitDress(data, true)
-end)
-
-RegisterNetEvent('mbt_meta_clothes:applyProps')
-AddEventHandler('mbt_meta_clothes:applyProps', function(data)
-    applyProps(data, true)
-end)
-
 RegisterNetEvent('mbt_meta_clothes:applyAuthoritativeDress', function(kind, payload)
-    if kind == 'Drawable' then return applyDress(payload, false) end
-    if kind == 'Prop' then return applyProps(payload, false) end
-    if kind == 'DressKit' then return applyKitDress(payload, false) end
+    if kind == 'Drawable' then return applyDress(payload) end
+    if kind == 'Prop' then return applyProps(payload) end
+    if kind == 'DressKit' then return applyKitDress(payload) end
 end)
 
 RegisterNetEvent('mbt_meta_clothes:stealPlayerDress')

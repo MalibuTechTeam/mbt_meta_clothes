@@ -60,23 +60,6 @@ function MBT.Utils.UpdatePlayerClothes()
 end
 
 ---@param data table
----@return boolean
-function MBT.Utils.HandleTopDress(data)
-    local canWear = true
-
-    for k,v in pairs(data.index) do
-        if type(v) == "table" and k ~= "Arms" then
-            if not MBT.TableContains(MBT[data.type][v.index]["Default"][data.pedSex], MBT.playerWearing["Drawables"][v.index]) then
-                canWear = false
-                break
-            end
-        end
-    end
-
-    return canWear
-end
-
----@param data table
 function MBT.Utils.HandleProps(propIndex)
     if not checkCooldown() then return end
     local playerSex = MBT.Utils.GetPedSex(PlayerPedId())
@@ -304,23 +287,12 @@ function MBT.Utils.Target()
     end
 end
 
-function MBT.Utils.MbtWearableProps()
-    local resourceState = GetResourceState("mbt_wearable_props") ~= "missing"
-    return resourceState
-end
-
 -----------------------------------------------------------
--- Hybrid Detection System (CORE-5)
--- Polls PED drawables/props every 1000ms (100ms during restore)
--- Detects external changes from appearance scripts
+-- PED detection & visibility
+-- La detection vera vive in MBT.SnapshotClient (protocollo snapshot
+-- acknowledged). Qui restano il coordinator della visibilità e i wrapper
+-- che il resto della risorsa e i bridge continuano a chiamare.
 -----------------------------------------------------------
-
-local clothingCache = { Drawables = {}, Props = {} }
-local expectedChanges = {}
-local detectionRunning = false
-local detectionPaused = false
-local restoreProtection = false
-local restoreState = nil
 
 --- Pause hybrid detection (used during multicharacter transitions so that
 --- PED drawable changes from the appearance script of the new character
@@ -396,26 +368,6 @@ function MBT.Utils.ExpectChange(slotType, slotIndex)
     end
 end
 
---- Initialize clothing cache from current PED state
-function MBT.Utils.InitClothingCache()
-    local ped = PlayerPedId()
-    clothingCache = { Drawables = {}, Props = {} }
-
-    for k, _ in pairs(MBT.Drawables) do
-        clothingCache.Drawables[k] = {
-            drawable = GetPedDrawableVariation(ped, k),
-            texture = GetPedTextureVariation(ped, k)
-        }
-    end
-
-    for k, _ in pairs(MBT.Props) do
-        clothingCache.Props[k] = {
-            drawable = GetPedPropIndex(ped, k),
-            texture = GetPedPropTextureIndex(ped, k)
-        }
-    end
-end
-
 --- Scan current PED and send wearing state to server (for NEW players)
 --- This captures what the player is wearing from the appearance script
 function MBT.Utils.SyncWearingState()
@@ -435,135 +387,20 @@ function MBT.Utils.EnableRestoreProtection(wearingState, durationMs)
     end)
 end
 
--- Pre-cache expected change keys (built after config loads to avoid string concat in hot loop)
-local expectedChangeKeys = { Drawables = {}, Props = {} }
-SetTimeout(0, function()
-    for k in pairs(MBT.Drawables or {}) do expectedChangeKeys.Drawables[k] = "Drawables_" .. tostring(k) end
-    for k in pairs(MBT.Props or {}) do expectedChangeKeys.Props[k] = "Props_" .. tostring(k) end
-end)
-
---- Process a single slot change in the detection loop
-local function processSlotChange(ped, slotType, k, v, sex, currentDrawable, currentTexture, isProps)
-    local key = (expectedChangeKeys[slotType] or {})[k] or (slotType .. "_" .. tostring(k))
-
-    if expectedChanges[key] then
-        expectedChanges[key] = nil
-        clothingCache[slotType][k] = { drawable = currentDrawable, texture = currentTexture }
-        if restoreProtection and restoreState and restoreState[slotType] then
-            local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
-            if isDefault then
-                restoreState[slotType][tostring(k)] = nil
-                restoreState[slotType][k] = nil
-            else
-                restoreState[slotType][tostring(k)] = { drawable = currentDrawable, texture = currentTexture }
-            end
-        end
-    elseif restoreProtection and restoreState then
-        local stored = restoreState[slotType] and (restoreState[slotType][tostring(k)] or restoreState[slotType][k])
-        if stored and stored.drawable then
-            if isProps then
-                SetPedPropIndex(ped, k, stored.drawable, stored.texture or 0, true)
-            else
-                SetPedComponentVariation(ped, k, stored.drawable, stored.texture or 0, stored.palette or 0)
-            end
-            clothingCache[slotType][k] = { drawable = stored.drawable, texture = stored.texture or 0 }
-        else
-            local default = v["Default"][sex]
-            if type(default) == "table" then
-                if isProps then
-                    ClearPedProp(ped, k)
-                    clothingCache[slotType][k] = { drawable = -1, texture = 0 }
-                else
-                    SetPedComponentVariation(ped, k, default[1], 0, 0)
-                    clothingCache[slotType][k] = { drawable = default[1], texture = 0 }
-                end
-            end
-        end
-    else
-        clothingCache[slotType][k] = { drawable = currentDrawable, texture = currentTexture }
-        local isDefault = MBT.TableContains(v["Default"][sex], currentDrawable)
-        if isDefault then
-            if isProps and MBT.Props[k] and MBT.Props[k]["ApplyHairFix"] then MBT.Utils.RestoreHairFromHatFix(ped) end
-        else
-            if isProps and MBT.Props[k] and MBT.Props[k]["ApplyHairFix"] then MBT.Utils.ApplyHatHairFix(ped) end
-        end
-    end
-end
-
---- Start the Hybrid Detection polling loop
+--- Avvia il loop di sincronizzazione snapshot.
+--- Il nome resta quello storico perché i bridge di ogni framework lo chiamano;
+--- la vecchia detection a polling locale è stata sostituita dal protocollo
+--- acknowledged in MBT.SnapshotClient.
 function MBT.Utils.StartHybridDetection()
     if MBT.SnapshotClient then return MBT.SnapshotClient.Start() end
-    if detectionRunning then return end
-    detectionRunning = true
-
-    -- Avvia il loop in pausa: il loop NON genererà externalDress/externalUndress
-    -- finché restoreWearing o requestPedScan non avrà chiamato ResumeHybridDetection.
-    --
-    -- Senza questa pausa iniziale, c'è una finestra tra il start del loop e
-    -- l'arrivo del primo restoreWearing in cui l'appearance script (illenium,
-    -- fivem-appearance, qb-clothing ecc.) applica il SUO skin sul PED. Il loop
-    -- vede currentDrawable != cached, entra nel branch finale `else` (perché
-    -- restoreProtection non è ancora attiva), e MANDA externalDress al server.
-    -- Risultato: il server SetSlot con i drawable di illenium PRIMA di inviare
-    -- il vero restoreWearing — il restoreWearing che arriva poi include quei
-    -- drawable, e il player rilogga vestito come illenium dice anziché come
-    -- meta_clothes (es: occhiali tolti via meta_clothes ma rimessi da illenium
-    -- al relog perché illenium-appearance ha ancora gli occhiali nel suo skin).
-    --
-    -- Resume puntuale: restoreWearing handler e requestPedScan handler già
-    -- chiamano ResumeHybridDetection → loop riprende con cache corretto.
-    detectionPaused = true
-
-    Citizen.CreateThread(function()
-        Wait(500)
-
-        while true do
-            local pollInterval = restoreProtection and 500 or 1000
-            Wait(pollInterval)
-
-            -- Pausa multicharacter: se NON c'è restoreProtection attiva, skippa
-            -- tutto il loop (non vogliamo che i drawable del nuovo char siano
-            -- attribuiti al char vecchio via externalDress).
-            -- SE invece restoreProtection è attiva, lasciamo girare il loop
-            -- così la restoreProtection può revertire le modifiche
-            -- dell'appearance script anche durante la pausa.
-            if detectionPaused and not restoreProtection then goto continue end
-
-            local ped = PlayerPedId()
-            if not DoesEntityExist(ped) then goto continue end
-
-            local sex = MBT.Utils.GetPedSex(ped)
-            if not sex or sex == "customSkin" then goto continue end
-
-            -- Check Drawables
-            for k, v in pairs(MBT.Drawables) do
-                local cached = clothingCache.Drawables[k]
-                local currentDrawable = GetPedDrawableVariation(ped, k)
-                local currentTexture = GetPedTextureVariation(ped, k)
-                if cached and (cached.drawable ~= currentDrawable or cached.texture ~= currentTexture) then
-                    processSlotChange(ped, "Drawables", k, v, sex, currentDrawable, currentTexture, false)
-                end
-            end
-
-            -- Check Props
-            for k, v in pairs(MBT.Props) do
-                local cached = clothingCache.Props[k]
-                local currentDrawable = GetPedPropIndex(ped, k)
-                local currentTexture = GetPedPropTextureIndex(ped, k)
-                if cached and (cached.drawable ~= currentDrawable or cached.texture ~= currentTexture) then
-                    processSlotChange(ped, "Props", k, v, sex, currentDrawable, currentTexture, true)
-                end
-            end
-
-            ::continue::
-        end
-    end)
 end
 
 -----------------------------------------------------------
 -- External API: allow other scripts to mark expected changes
 -- and suppress restore protection for specific slots.
--- Used by mbt_wearable_props to hide hat/glasses when wearing mask.
+-- mbt_wearable_props usa suppressSlot/restoreSlot per nascondere e ripristinare
+-- cappello/occhiali quando indossi una maschera; expectChange è esposto ma al
+-- 2026-07-29 nessuna risorsa MBT lo chiama.
 -----------------------------------------------------------
 exports('expectChange', function(slotType, slotIndex)
     MBT.Utils.ExpectChange(slotType, slotIndex)
