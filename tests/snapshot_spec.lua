@@ -781,6 +781,37 @@ local cases = {
         end,
     },
     {
+        name = 'a forced initial scan sends on the first eligible tick',
+        run = function()
+            local fixture = snapshotClientFixture()
+            local client = fixture.client
+            client:SetContext({ session = 41, revision = 0 }, { Drawables = {}, Props = {} })
+            client:Resume('startup')
+            client:ForceInitialScan(2500)
+
+            -- Prima della finestra non deve partire nulla: se questo tick
+            -- inviasse, le asserzioni successive passerebbero a vuoto.
+            client:Tick()
+            Assert.equal(0, #fixture.sent)
+
+            -- Dentro la finestra si osserva soltanto: nessun invio.
+            fixture.advance(1000)
+            client:Tick()
+            Assert.equal(0, #fixture.sent)
+            fixture.advance(1000)
+            client:Tick()
+            Assert.equal(0, #fixture.sent)
+
+            -- Scaduta la finestra il fingerprint è già stabile da 2000ms, quindi
+            -- parte SUBITO. Prima serviva un altro poll solo per registrare un
+            -- candidato che non era mai cambiato: ~1s buttato a ogni primo login.
+            fixture.advance(1000)
+            client:Tick()
+            Assert.equal(1, #fixture.sent)
+            Assert.equal(true, fixture.sent[1].initial)
+        end,
+    },
+    {
         name = 'new client session clears suppression state',
         run = function()
             local fixture = snapshotClientFixture()

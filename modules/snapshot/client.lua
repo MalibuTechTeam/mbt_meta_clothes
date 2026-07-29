@@ -393,7 +393,14 @@ function SnapshotClient.New(deps)
         local at = now()
         cleanupExpiringGuards(at)
         if not context or next(pauses) then return end
-        if forceInitialAt and at < forceInitialAt then return end
+        -- Durante l'attesa dello scan iniziale non si invia, ma si OSSERVA.
+        -- Prima questo ramo usciva subito, quindi il cronometro del debounce
+        -- partiva solo DOPO i 2500ms e bruciava un poll intero a ri-registrare
+        -- un candidato che era già stabile: ~1-2s buttati sul ramo DB-miss.
+        -- Misurare la stabilità durante l'attesa permette di spedire al primo
+        -- tick utile, senza rinunciare alla garanzia di non catturare uno stato
+        -- a metà (si invia comunque solo un fingerprint stabile da >= debounce).
+        local awaitingInitial = forceInitialAt ~= nil and at < forceInitialAt
         if restoreActive then
             refreshBaselineModel()
             if deps.enforce and acknowledgedVisual then
@@ -402,7 +409,8 @@ function SnapshotClient.New(deps)
             end
             return
         end
-        if next(internalTokens) or at < retryAfter then return end
+        if next(internalTokens) then return end
+        if not awaitingInitial and at < retryAfter then return end
         if pending then
             if at - pending.sentAt >= (MBT.SnapshotAckTimeout or 2000) then
                 send(pending.payload)
@@ -413,8 +421,8 @@ function SnapshotClient.New(deps)
 
         local visual, model, fingerprint = captureCanonical()
         if not visual then return end
-        local forceInitial = forceInitialAt and at >= forceInitialAt
-        if not forceInitial and fingerprint == acknowledgedFingerprint then
+        local forceInitial = forceInitialAt ~= nil and at >= forceInitialAt
+        if not forceInitial and not awaitingInitial and fingerprint == acknowledgedFingerprint then
             candidateFingerprint = nil
             candidateSince = nil
             return
@@ -424,8 +432,9 @@ function SnapshotClient.New(deps)
             candidateSince = at
             return
         end
-        if not forceInitial and at - candidateSince < (MBT.SnapshotDebounce or 400) then return end
-        if forceInitial and candidateSince and at - candidateSince < (MBT.SnapshotDebounce or 400) then return end
+        -- Osservazione senza invio: la finestra iniziale non è ancora scaduta.
+        if awaitingInitial then return end
+        if not candidateSince or at - candidateSince < (MBT.SnapshotDebounce or 400) then return end
 
         nextSeq = nextSeq + 1
         local payload = {
