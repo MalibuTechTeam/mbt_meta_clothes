@@ -60,6 +60,7 @@ server_scripts {
     'tests/dress_adapter_spec.lua',
     'tests/client_start_spec.lua',
     'tests/steal_authority_spec.lua',
+    'tests/state_save_spec.lua',
 }
 
 client_scripts {

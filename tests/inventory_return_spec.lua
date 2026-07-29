@@ -45,6 +45,11 @@ local function runtimeFixture(initial, add_item, options)
         return metadata
     end
 
+    function playerState.SetSlot(_, slot_type, slot_index, metadata)
+        state[slot_type] = state[slot_type] or {}
+        state[slot_type][slot_index] = metadata
+    end
+
     local runtime = MBT.GiveItems.NewRuntime({
         addItem = add_item,
         getPlayer = function(src) return { source = src, name = 'Test Player' } end,
@@ -79,9 +84,9 @@ end
 
 local cases = {
     {
-        name = 'add failure never commits authoritative state',
+        name = 'add failure restores authoritative state',
         run = function()
-            local committed = 0
+            local committed, rolledBack = 0, 0
             local coordinator = MBT.GiveItems.New({
                 addItem = function() return false, 'inventory_full' end,
                 log = function() end,
@@ -91,11 +96,15 @@ local cases = {
             end, function()
                 committed = committed + 1
                 return true
+            end, function()
+                rolledBack = rolledBack + 1
+                return true
             end)
 
             Assert.equal(false, result.ok)
             Assert.equal('inventory_full', result.reason)
-            Assert.equal(0, committed)
+            Assert.equal(1, committed)
+            Assert.equal(1, rolledBack)
         end,
     },
     {
@@ -117,12 +126,40 @@ local cases = {
             end, function()
                 committed = committed + 1
                 return true, { slotType = 'Drawables', slotIndex = 11 }
+            end, function()
+                fail('rollback must not run after a successful add')
             end)
 
             Assert.equal(true, result.ok)
             Assert.equal(1, added)
             Assert.equal(1, committed)
             Assert.equal(11, result.committed.slotIndex)
+        end,
+    },
+    {
+        name = 'commit rejection rolls back before inventory add',
+        run = function()
+            local added, rolledBack = 0, 0
+            local coordinator = MBT.GiveItems.New({
+                addItem = function()
+                    added = added + 1
+                    return true
+                end,
+                log = function() end,
+            })
+            local result = coordinator:Transfer('7:Drawables:4', function()
+                return payload(7, 'trousers')
+            end, function()
+                return false
+            end, function()
+                rolledBack = rolledBack + 1
+                return true
+            end)
+
+            Assert.equal(false, result.ok)
+            Assert.equal('commit_failed', result.reason)
+            Assert.equal(0, added)
+            Assert.equal(1, rolledBack)
         end,
     },
     {
@@ -157,6 +194,7 @@ local cases = {
         name = 'dependency exception releases the lock',
         run = function()
             local should_throw = true
+            local rolledBack = 0
             local coordinator = MBT.GiveItems.New({
                 addItem = function()
                     if should_throw then error('inventory exploded') end
@@ -168,12 +206,26 @@ local cases = {
                 return payload(9, 'watch')
             end
 
-            local failed = coordinator:Transfer('9:Props:6', build, function() return true end)
+            local failed = coordinator:Transfer(
+                '9:Props:6',
+                build,
+                function() return true end,
+                function()
+                    rolledBack = rolledBack + 1
+                    return true
+                end
+            )
             should_throw = false
-            local retried = coordinator:Transfer('9:Props:6', build, function() return true end)
+            local retried = coordinator:Transfer(
+                '9:Props:6',
+                build,
+                function() return true end,
+                function() return true end
+            )
 
             Assert.equal(false, failed.ok)
             Assert.equal('internal_error', failed.reason)
+            Assert.equal(1, rolledBack)
             Assert.equal(true, retried.ok)
         end,
     },
@@ -319,7 +371,7 @@ local cases = {
             Assert.equal('inventory_full', result.reason)
             Assert.equal(stored, state.Drawables[11])
             Assert.equal('original', stored.description)
-            Assert.equal(0, #clears)
+            Assert.equal(1, #clears)
         end,
     },
     {
@@ -424,7 +476,7 @@ local cases = {
         end,
     },
     {
-        name = 'failed torso add clears no slot',
+        name = 'failed torso add restores every cleared slot',
         run = function()
             local runtime, state, clears = runtimeFixture({
                 Drawables = {
@@ -440,7 +492,7 @@ local cases = {
             local result = runtime:ReturnTorso(14)
 
             Assert.equal(false, result.ok)
-            Assert.equal(0, #clears)
+            Assert.equal(3, #clears)
             Assert.equal(29, state.Drawables[11].drawable)
         end,
     },

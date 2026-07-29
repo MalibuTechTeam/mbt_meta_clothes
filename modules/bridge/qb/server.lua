@@ -37,12 +37,6 @@ MBT.GiveItems.Setup({
     addItem = addItem
 })
 
-RegisterNetEvent('mbt_meta_clothes:removeWear', function(itemName)
-    local Player = QBCore.Functions.GetPlayer(source)
-    if not Player then return end
-    Player.Functions.RemoveItem(itemName, 1)
-end)
-
 ---@param src number
 ---@return string
 function getPlayerIdentifier(src)

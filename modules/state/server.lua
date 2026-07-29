@@ -11,11 +11,17 @@ local PlayerWearing = {}
 local DirtyPlayers = {}
 local PlayerIdentifiers = {}
 local PlayerRevisions = {}
+local PlayerSaveGenerations = {}
 local PlayerHasDbEntry = {}
 local PlayerHasBaseline = {}
 local PlayerDripXp = {}
 local PlayerJustSwitched = {} -- true quando CheckCharacterSwitch ha rilevato uno switch
 local initialized = false
+
+local function markDirty(src)
+    DirtyPlayers[src] = true
+    PlayerSaveGenerations[src] = (PlayerSaveGenerations[src] or 0) + 1
+end
 
 function MBT.PlayerState.Init()
     if initialized then return end
@@ -62,7 +68,7 @@ function MBT.PlayerState.Init()
                             local after = slotData.last_worn_by and #slotData.last_worn_by or 0
                             if after < before then
                                 cleaned = cleaned + 1
-                                DirtyPlayers[src] = true
+                                markDirty(src)
                             end
                         end
                     end
@@ -73,7 +79,7 @@ function MBT.PlayerState.Init()
                             local after = slotData.last_worn_by and #slotData.last_worn_by or 0
                             if after < before then
                                 cleaned = cleaned + 1
-                                DirtyPlayers[src] = true
+                                markDirty(src)
                             end
                         end
                     end
@@ -91,6 +97,7 @@ function MBT.PlayerState.InitPlayer(src)
     PlayerWearing[src] = { Drawables = {}, Props = {} }
     PlayerDripXp[src] = PlayerDripXp[src] or 0
     PlayerRevisions[src] = PlayerRevisions[src] or 0
+    PlayerSaveGenerations[src] = PlayerSaveGenerations[src] or 0
     DirtyPlayers[src] = false
     PlayerHasBaseline[src] = PlayerHasBaseline[src] or false
 end
@@ -112,6 +119,12 @@ function MBT.PlayerState.GetIdentifier(src)
     return PlayerIdentifiers[src]
 end
 
+function MBT.PlayerState.IsSaveGuardCurrent(expectedIdentifier, expectedGeneration, currentIdentifier, currentGeneration)
+    return expectedIdentifier ~= nil
+        and expectedIdentifier == currentIdentifier
+        and expectedGeneration == currentGeneration
+end
+
 function MBT.PlayerState.SetSlot(src, slotType, slotIndex, metadata)
     -- Safety net multicharacter: se il character è cambiato senza che gli event
     -- framework siano scattati (alcuni multichar non emettono esx:playerLoaded
@@ -123,7 +136,7 @@ function MBT.PlayerState.SetSlot(src, slotType, slotIndex, metadata)
     slotIndex = tonumber(slotIndex) or slotIndex
     if not PlayerWearing[src] then MBT.PlayerState.InitPlayer(src) end
     PlayerWearing[src][slotType][slotIndex] = metadata
-    DirtyPlayers[src] = true
+    markDirty(src)
     touchRevision(src)
     -- Broadcast for consumers (e.g. mbt_wearable_props capacity).
     -- Server-side event so listeners can recompute without polling.
@@ -147,7 +160,7 @@ function MBT.PlayerState.ClearSlot(src, slotType, slotIndex)
     local metadata = PlayerWearing[src][slotType][slotIndex]
     PlayerWearing[src][slotType][slotIndex] = nil
     if metadata then
-        DirtyPlayers[src] = true
+        markDirty(src)
         touchRevision(src)
         TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, slotIndex, nil, 'state')
     end
@@ -164,7 +177,7 @@ function MBT.PlayerState.ClearAllSlots(src, slotType)
     local allMetadata = PlayerWearing[src][slotType] or {}
     PlayerWearing[src][slotType] = {}
     if next(allMetadata) then
-        DirtyPlayers[src] = true
+        markDirty(src)
         touchRevision(src)
         TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, nil, nil, 'state')
     end
@@ -188,7 +201,7 @@ function MBT.PlayerState.CommitSnapshot(src, nextState, changes)
     if #changes == 0 then return MBT.PlayerState.GetRevision(src) end
 
     PlayerWearing[src] = nextState
-    DirtyPlayers[src] = true
+    markDirty(src)
     local revision = touchRevision(src)
     for _, change in ipairs(changes) do
         TriggerEvent(
@@ -247,7 +260,7 @@ function MBT.PlayerState.UpdateSlotVisual(src, slotType, slotIndex, visual)
     updated.texture = normalized.texture
     updated.palette = normalized.palette
     PlayerWearing[src][slotType][normalized.index] = updated
-    DirtyPlayers[src] = true
+    markDirty(src)
     local revision = touchRevision(src)
     TriggerEvent(
         'mbt_meta_clothes:onClothingChanged',
@@ -270,12 +283,12 @@ end
 
 function MBT.PlayerState.SetDripXp(src, xp)
     PlayerDripXp[src] = xp
-    DirtyPlayers[src] = true
+    markDirty(src)
 end
 
 function MBT.PlayerState.AddDripXp(src, amount)
     PlayerDripXp[src] = (PlayerDripXp[src] or 0) + amount
-    DirtyPlayers[src] = true
+    markDirty(src)
 end
 
 -----------------------------------------------------------
@@ -308,6 +321,7 @@ function MBT.PlayerState.Save(src, identifier)
     end
     local data = json.encode(forJson)
     local dripXp = PlayerDripXp[src] or 0
+    local saveGeneration = PlayerSaveGenerations[src] or 0
 
     -- Usare la variante sincrona (.await) garantisce che il save completi
     -- prima che il resource muoia in onResourceStop. MySQL.insert async
@@ -316,9 +330,19 @@ function MBT.PlayerState.Save(src, identifier)
         "INSERT INTO mbt_player_wearing (identifier, wearing_data, drip_xp) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE wearing_data = VALUES(wearing_data), drip_xp = VALUES(drip_xp), updated_at = CURRENT_TIMESTAMP",
         { identifier, data, dripXp }
     )
-    DirtyPlayers[src] = false
-    if MBT.SnapshotServer and MBT.SnapshotServer.CancelPendingSave then
-        MBT.SnapshotServer.CancelPendingSave(src)
+    -- The await yields to other handlers. Preserve a newer dirty state instead
+    -- of marking it as persisted by this older database write.
+    local saveCurrent = MBT.PlayerState.IsSaveGuardCurrent(
+        identifier,
+        saveGeneration,
+        PlayerIdentifiers[src],
+        PlayerSaveGenerations[src] or 0
+    )
+    if saveCurrent then
+        DirtyPlayers[src] = false
+        if MBT.SnapshotServer and MBT.SnapshotServer.CancelPendingSave then
+            MBT.SnapshotServer.CancelPendingSave(src)
+        end
     end
 end
 
@@ -348,6 +372,7 @@ function MBT.PlayerState.CheckCharacterSwitch(src)
     PlayerWearing[src] = nil
     DirtyPlayers[src] = nil
     PlayerIdentifiers[src] = nil
+    PlayerSaveGenerations[src] = nil
     PlayerHasDbEntry[src] = nil
     PlayerHasBaseline[src] = nil
     PlayerDripXp[src] = nil
@@ -391,6 +416,7 @@ function MBT.PlayerState.Load(src, identifier)
 
     if PlayerIdentifiers[src] ~= identifier then
         PlayerRevisions[src] = 0
+        PlayerSaveGenerations[src] = 0
     end
     PlayerIdentifiers[src] = identifier
 
@@ -440,6 +466,7 @@ function MBT.PlayerState.Load(src, identifier)
     end
 
     DirtyPlayers[src] = false
+    PlayerSaveGenerations[src] = PlayerSaveGenerations[src] or 0
 end
 
 --- Check if a player has an existing DB record
@@ -467,6 +494,7 @@ function MBT.PlayerState.Cleanup(src, discard)
     DirtyPlayers[src] = nil
     PlayerIdentifiers[src] = nil
     PlayerRevisions[src] = nil
+    PlayerSaveGenerations[src] = nil
     PlayerHasDbEntry[src] = nil
     PlayerHasBaseline[src] = nil
     PlayerDripXp[src] = nil

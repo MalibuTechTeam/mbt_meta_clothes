@@ -7,6 +7,8 @@
 MBT.TargetModule = {}
 
 local activeTarget = nil
+local eligibilityTrackerStarted = false
+local lastStealableState
 
 --- Detect which target script is running
 local function detectTarget()
@@ -34,8 +36,26 @@ local function canStealFrom(entity)
     return false
 end
 
+local function startEligibilityTracker()
+    if eligibilityTrackerStarted then return end
+    eligibilityTrackerStarted = true
+
+    CreateThread(function()
+        while true do
+            local ped = PlayerPedId()
+            local stealable = DoesEntityExist(ped) and canStealFrom(ped) or false
+            if stealable ~= lastStealableState then
+                lastStealableState = stealable
+                LocalPlayer.state:set(MBT.StealableStateKey, stealable, true)
+            end
+            Wait(500)
+        end
+    end)
+end
+
 --- Register the steal dress target on all players
 function MBT.TargetModule.Setup()
+    startEligibilityTracker()
     if not MBT.TargetEnabled then return end
 
     activeTarget = detectTarget()
@@ -80,3 +100,10 @@ function MBT.TargetModule.Setup()
         })
     end
 end
+
+
+AddEventHandler('onResourceStop', function(resourceName)
+    if resourceName == GetCurrentResourceName() and lastStealableState then
+        LocalPlayer.state:set(MBT.StealableStateKey, false, true)
+    end
+end)

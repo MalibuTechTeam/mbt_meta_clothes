@@ -64,6 +64,18 @@ end
 
 local cases = {
     {
+        name = 'begin rejects a victim without an authoritative eligible state',
+        run = function()
+            local runtime, _, processed = fixture({
+                validateBegin = function() return false end,
+            })
+            local result = runtime:Begin(11, singlePayload())
+            Assert.equal(false, result.ok)
+            Assert.equal('not_allowed', result.reason)
+            Assert.equal(0, processed())
+        end,
+    },
+    {
         name = 'complete without begin is rejected',
         run = function()
             local runtime, _, processed = fixture()

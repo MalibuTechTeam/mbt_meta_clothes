@@ -1,4 +1,8 @@
 MBT = MBT or {}
+
+-- Victim-owned observation used by the server to ensure a thief cannot forge
+-- another player's surrender/down state in beginSteal payloads.
+MBT.StealableStateKey = 'mbt_meta_clothes:stealableObserved'
 Locales = Locales or {}
 
 -- Canonical MalibuTech logger aliases. Direct references preserve caller depth.

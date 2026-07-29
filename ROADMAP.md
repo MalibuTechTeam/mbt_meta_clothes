@@ -43,10 +43,11 @@ matrix above passes.
   - [x] Build returned-item metadata from the authoritative server wearing state.
   - [x] Correlate item use with the server-side inventory operation.
 - [x] Make inventory returns transactional.
-  - Add the item before removing a worn slot, using the inventory adapter result
-    as the capacity/failure decision.
-  - Clear the wearing state only after `AddItem` succeeds.
-  - Preserve the previous state when an inventory adapter fails.
+  - Reserve the operation per logical slot and commit the authoritative wearing
+    state before `AddItem`, restoring the exact previous metadata if the adapter
+    rejects or throws.
+  - Avoid inventory-specific compensating deletes, which cannot reliably identify
+    the exact slot created by every supported inventory.
   - Return a localized error notification to the player.
 - [x] Repair steal single, multiple, and steal-all ownership transfer.
   - Preserve authoritative lowercase visual metadata, DNA, and original metadata
@@ -59,6 +60,8 @@ matrix above passes.
     complete; reject direct, replayed, early, and stale completion attempts.
   - Revalidate target, character context, proximity, and normalized selections
     before the authoritative inventory transfer.
+  - Require the victim-owned replicated down/surrender observation at both begin
+    and completion so a modified thief cannot forge another player's eligibility.
   - Select victim/thief animations and effective durations from a fixed server
     catalog; clients cannot relay arbitrary dictionaries, clips, or durations.
   - Serialize active thief/victim sessions and retain the old event names only as
@@ -69,10 +72,11 @@ matrix above passes.
   - [x] Validate the archive against every path referenced by `fxmanifest.lua`.
   - [x] Update deprecated GitHub Actions and output syntax.
 
-The authoritative dress, transactional return, and steal implementations pass
-both their pure-Lua checks and the running Cfx self-tests: snapshot `36/36`,
-inventory return `21/21`, dress authority `8/8`, inventory adapters `5/5`, client
-startup `1/1`, and steal authority `10/10` on 2026-07-27. The intentional
+The authoritative dress, transactional return, persistence guard, and steal
+implementations pass both their pure-Lua checks and the running Cfx self-tests:
+snapshot `36/36`, inventory return `22/22`, dress authority `8/8`, inventory
+adapters `5/5`, client startup `1/1`, steal authority `11/11`, and state save
+guard `3/3` (latest runtime verification on 2026-07-29). The intentional
 `admin_item` rejection warning confirms that forged item metadata reaches neither
 the inventory add operation nor the authoritative state commit.
 Equip, undress, relog, and connected resource-restart paths were also verified in

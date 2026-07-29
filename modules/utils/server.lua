@@ -109,6 +109,15 @@ function MBT.ServerUtils.IsValidPlayer(src)
     return src and GetPlayerPing(src) > 0
 end
 
+--- Require a victim-owned replicated observation before allowing a steal.
+--- A forged thief payload cannot write another player's state bag; a modified
+--- victim can only consent to being stolen from themselves.
+function MBT.ServerUtils.IsPlayerStealable(src)
+    if not MBT.ServerUtils.IsValidPlayer(src) then return false end
+    local player = Player(src)
+    return player and player.state[MBT.StealableStateKey] == true or false
+end
+
 --- Resolve the active PED sex from the server-owned network entity.
 --- This keeps inventory metadata independent from client-provided sex values.
 ---@param src number Player source

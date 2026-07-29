@@ -119,9 +119,9 @@ function MBT.GiveItems.NormalizeStealSelections(selections, config)
     return normalized
 end
 
---- Create a small add-before-commit coordinator.
---- The caller owns payload construction and the authoritative state commit;
---- this helper only guarantees ordering and per-logical-slot exclusion.
+--- Create a state-first transactional coordinator.
+--- The authoritative slot is cleared before AddItem and restored if the
+--- inventory rejects the item, so no inventory-specific delete is required.
 ---@param config table
 ---@return table coordinator
 function MBT.GiveItems.New(config)
@@ -134,17 +134,38 @@ function MBT.GiveItems.New(config)
     ---@param lockKey string
     ---@param buildPayload function
     ---@param commitState function
+    ---@param rollbackState function
     ---@return table result
-    function coordinator:Transfer(lockKey, buildPayload, commitState)
+    function coordinator:Transfer(lockKey, buildPayload, commitState, rollbackState)
         if locks[lockKey] then
             return { ok = false, reason = "busy" }
         end
 
         locks[lockKey] = true
+        local payload
+        local committedData
+        local stateCommitted = false
         local protected, result = xpcall(function()
-            local payload, buildReason = buildPayload()
+            local buildReason
+            payload, buildReason = buildPayload()
             if not payload then
                 return { ok = false, reason = buildReason or "no_item" }
+            end
+
+            stateCommitted = true
+            local committed
+            committed, committedData = commitState(payload)
+            if committed ~= true then
+                local rolledBack = rollbackState(payload, committedData)
+                stateCommitted = rolledBack ~= true
+                if config.log then
+                    config.log("commit_failed", lockKey, payload.itemName)
+                end
+                return {
+                    ok = false,
+                    reason = rolledBack == true and "commit_failed" or "rollback_failed",
+                    itemName = payload.itemName,
+                }
             end
 
             local added, addReason = config.addItem(
@@ -154,24 +175,15 @@ function MBT.GiveItems.New(config)
                 payload.metadata
             )
             if added ~= true then
+                local rolledBack = rollbackState(payload, committedData)
+                stateCommitted = rolledBack ~= true
                 return {
                     ok = false,
-                    reason = addReason or "add_failed",
+                    reason = rolledBack == true and (addReason or "add_failed") or "rollback_failed",
                     itemName = payload.itemName,
                 }
             end
-
-            local committed, committedData = commitState(payload)
-            if committed ~= true then
-                if config.log then
-                    config.log("commit_failed", lockKey, payload.itemName)
-                end
-                return {
-                    ok = false,
-                    reason = "commit_failed",
-                    itemName = payload.itemName,
-                }
-            end
+            stateCommitted = false
 
             return {
                 ok = true,
@@ -184,6 +196,14 @@ function MBT.GiveItems.New(config)
 
         if protected then
             return result
+        end
+
+        if stateCommitted and payload then
+            local rollbackProtected, rolledBack = pcall(rollbackState, payload, committedData)
+            if not rollbackProtected or rolledBack ~= true then
+                if config.log then config.log("rollback_failed", lockKey, result) end
+                return { ok = false, reason = "rollback_failed" }
+            end
         end
 
         if config.log then
@@ -330,6 +350,12 @@ function MBT.GiveItems.NewRuntime(config)
             end
             local cleared = playerState.ClearSlot(ownerSrc, slotType, slotIndex)
             return cleared ~= nil, { slotType = slotType, slotIndex = slotIndex }
+        end, function()
+            if playerState.GetSlot(ownerSrc, slotType, slotIndex) ~= nil then
+                return false
+            end
+            playerState.SetSlot(ownerSrc, slotType, slotIndex, original)
+            return playerState.GetSlot(ownerSrc, slotType, slotIndex) == original
         end)
     end
 
@@ -421,6 +447,18 @@ function MBT.GiveItems.NewRuntime(config)
                 end
             end
             return true, committed
+        end, function()
+            for _, slotIndex in ipairs(torsoSlots) do
+                if playerState.GetSlot(ownerSrc, "Drawables", slotIndex) ~= nil then
+                    return false
+                end
+            end
+            for _, slotIndex in ipairs(torsoSlots) do
+                if originals[slotIndex] then
+                    playerState.SetSlot(ownerSrc, "Drawables", slotIndex, originals[slotIndex])
+                end
+            end
+            return true
         end)
     end
 
