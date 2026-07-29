@@ -162,16 +162,29 @@ MBT.HairFixDrawables     = {
 MBT.Notification         = function(data)
     data = type(data) == "table" and data or { description = tostring(data or "") }
 
+    -- Every provider below is optional and guarded: the resource stays
+    -- dependency-free and always falls through to the native GTA feed.
+    local payload = {
+        title = data.title or "Clothes",
+        description = data.description,
+        type = data.type or "info",
+        icon = data.icon or "shirt",
+        duration = data.duration or 4000
+    }
+
+    -- Preset for mbt_visual
+    if GetResourceState('mbt_visual') == 'started' then
+        local notified = pcall(function()
+            exports.mbt_visual:notify(payload)
+        end)
+        if notified then return end
+        MBT.Warn("mbt_visual notification failed; falling back")
+    end
+
     -- Prefer ox_lib when available, but keep the resource dependency-free.
     if GetResourceState('ox_lib') == 'started' then
         local notified = pcall(function()
-            exports.ox_lib:notify({
-                title = data.title or "Clothes",
-                description = data.description,
-                type = data.type or "info",
-                icon = data.icon or "shirt",
-                duration = data.duration or 4000
-            })
+            exports.ox_lib:notify(payload)
         end)
         if notified then return end
         MBT.Warn("ox_lib notification failed; using native GTA feed")
