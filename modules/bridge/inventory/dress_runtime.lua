@@ -48,6 +48,7 @@ local function createAuthority()
         Bounds = MBT.SnapshotBounds,
         normalizeSex = MBT.NormalizeSex,
         getPlayerSex = MBT.ServerUtils.GetPlayerSex,
+        dnaMaxEntries = MBT.DnaMaxEntries,
         injectDNA = MBT.ServerUtils.InjectDNA,
         apply = function(src, kind, payload)
             TriggerClientEvent('mbt_meta_clothes:applyAuthoritativeDress', src, kind, payload)

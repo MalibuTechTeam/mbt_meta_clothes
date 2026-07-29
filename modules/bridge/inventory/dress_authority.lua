@@ -22,6 +22,40 @@ local function itemNames(slotConfig)
     return configured
 end
 
+--- La DNA viaggia legittimamente con l'item — rubi una camicia e la sua storia
+--- forense viene con lei — ma arriva dalla metadata dell'inventario, quindi non
+--- è fidata: va validata in forma e limitata. Senza questo un item forgiato può
+--- iniettare una catena forense arbitraria e far crescere senza limite il JSON
+--- persistito per quel giocatore.
+local function sanitizeDna(entries, maxEntries)
+    if type(entries) ~= 'table' then return nil end
+
+    local cleaned = {}
+    for _, entry in ipairs(entries) do
+        if type(entry) == 'table'
+            and type(entry.identifier) == 'string'
+            and entry.identifier ~= ''
+            and #entry.identifier <= 128 then
+            -- Timestamp assente o non valido → 0, coerente con CleanExpiredDNA
+            -- che già legge `dna.timestamp or 0`. La voce resta ma risulta
+            -- scaduta, invece di sparire in silenzio da uno storico forense che
+            -- potrebbe essere legittimo e solo più vecchio del campo timestamp.
+            local timestamp = entry.timestamp
+            if type(timestamp) ~= 'number' or timestamp ~= timestamp
+                or timestamp == math.huge or timestamp < 0 then
+                timestamp = 0
+            end
+            cleaned[#cleaned + 1] = {
+                identifier = entry.identifier,
+                timestamp = math.floor(timestamp),
+            }
+        end
+    end
+
+    while #cleaned > maxEntries do table.remove(cleaned, 1) end
+    return #cleaned > 0 and cleaned or nil
+end
+
 local function normalizedInteger(value)
     local number = tonumber(value)
     if not number or number ~= math.floor(number) then return nil end
@@ -75,6 +109,7 @@ function MBT.DressAuthority.New(config)
         palette = { min = 0, max = 3 },
     }
     local getPlayerSex = config.getPlayerSex
+    local dnaMaxEntries = tonumber(config.dnaMaxEntries) or 3
     local injectDNA = config.injectDNA or function() end
     local apply = config.apply or function() end
     local itemMap = {}
@@ -132,6 +167,7 @@ function MBT.DressAuthority.New(config)
                 bounds
             ) or nil
             if not normalized then return nil, 'invalid_metadata' end
+            normalized.last_worn_by = sanitizeDna(normalized.last_worn_by, dnaMaxEntries)
 
             prepared.slots[#prepared.slots + 1] = {
                 slotType = 'Drawables',
@@ -161,6 +197,7 @@ function MBT.DressAuthority.New(config)
             bounds
         )
         if not normalized then return nil, 'invalid_metadata' end
+        normalized.last_worn_by = sanitizeDna(normalized.last_worn_by, dnaMaxEntries)
 
         normalized.item_name = itemName
         return {
