@@ -502,9 +502,21 @@ function MBT.PlayerState.Cleanup(src, discard)
 end
 
 function MBT.PlayerState.SaveAllDirty()
-    local count = 0
+    -- Save yielda su MySQL.insert.await. Un playerDropped durante lo yield
+    -- chiama Cleanup, che rimuove da DirtyPlayers una chiave DIVERSA da quella
+    -- corrente: in Lua rimuovere una chiave non-corrente durante pairs() è
+    -- undefined e può alzare "invalid key to 'next'", abortendo il salvataggio
+    -- di tutti i giocatori rimanenti. Fissiamo la lista prima di cedere.
+    local pending = {}
     for src, dirty in pairs(DirtyPlayers) do
-        if dirty then
+        if dirty then pending[#pending + 1] = src end
+    end
+
+    local count = 0
+    for _, src in ipairs(pending) do
+        -- Ricontrolla: nel frattempo il player può essere uscito e Cleanup
+        -- averlo già salvato.
+        if DirtyPlayers[src] then
             MBT.PlayerState.Save(src)
             count = count + 1
         end
