@@ -555,11 +555,17 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force, lifecycle)
     -- che firerà più tardi) rilancerà PushStateToClient.
     if not getPlayerIdentifier or not getPlayerIdentifier(src) then
         if attempt >= 8 then
-            MBT.Warn('PushStateToClient: identifier unavailable; waiting for next lifecycle trigger', {
-                source = src,
-                attempts = attempt,
-                elapsedMs = attempt * 200,
-            })
+            local detail = { source = src, attempts = attempt, elapsedMs = attempt * 200 }
+            -- Il recovery del restart cicla su TUTTI i connessi, compresi quelli
+            -- fermi nel selector senza character: lì l'identifier assente è lo
+            -- stato normale e il push arriverà col loro playerLoaded. Warnare
+            -- significherebbe un allarme per ogni giocatore nel selector a ogni
+            -- restart della risorsa.
+            if lifecycle == MBT.PedVisibility.ResourceRestart then
+                MBT.Debugger('PushStateToClient: no character yet; deferring to next lifecycle trigger', detail)
+            else
+                MBT.Warn('PushStateToClient: identifier unavailable; waiting for next lifecycle trigger', detail)
+            end
             return
         end
         Citizen.SetTimeout(200, function()

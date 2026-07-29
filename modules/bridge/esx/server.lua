@@ -114,10 +114,18 @@ AddEventHandler('esx:playerLogout', function(src)
     -- auto-recoverare.
     Citizen.SetTimeout(4000, function()
         if pendingPauseSince[src] then
-            MBT.Warn('esx bridge: load event missing after logout; forcing client unblock', {
-                source = src,
-                timeoutMs = 4000,
-            })
+            -- Un multichar a selector lascia il player senza character finché
+            -- non sceglie: può volerci un minuto ed è attesa legittima, non una
+            -- catena rotta. Solo un load mancante CON identifier già presente
+            -- indica un guasto vero. Il comportamento non cambia — cambia il
+            -- livello di log, perché un allarme che scatta a ogni relog di ogni
+            -- giocatore smette di essere un allarme.
+            local detail = { source = src, timeoutMs = 4000 }
+            if getPlayerIdentifier and getPlayerIdentifier(src) then
+                MBT.Warn('esx bridge: load event missing after logout; forcing client unblock', detail)
+            else
+                MBT.Debugger('esx bridge: no character after logout (selector); unblocking client', detail)
+            end
             pendingPauseSince[src] = nil
             -- Trigger un restoreWearing vuoto sul client. Se il src non è più
             -- valido (player disconnesso), TriggerClientEvent è no-op.
