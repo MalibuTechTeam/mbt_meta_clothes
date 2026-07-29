@@ -5,17 +5,71 @@
 -- and periodically adds it to their cumulative Drip XP.
 -- XP never decreases — it's a fashion career, not a score.
 --
--- Server owners configure DripValues per drawable in config.lua.
--- Unconfigured drawables use DefaultDrip fallback.
+-- Server owners configure per-slot weights in MBT.DripSlotWeights, or override
+-- per drawable with DripValues inside a slot config.
 -- Default drawables (nude/base) = 0 rate.
 --
--- Exports:
---   getPlayerDripXp(src) → number
---   getPlayerDripLevel(src) → name, index, progress
---   getPlayerDripRate(src) → number
+-- No exports: consumers read the player state bags instead
+-- (mbt_dripLevel, mbt_dripTitle, mbt_dripXp, mbt_slotsWorn).
 -----------------------------------------------------------
 
 MBT.Drip = {}
+
+local SLOT_TYPES = { "Drawables", "Props" }
+
+-- Un valore drip che arriva dalla metadata dell'item non è fidato: deve essere
+-- finito, non negativo e limitato. Senza questo, un item con dripValue enorme,
+-- negativo o NaN corrompe l'XP in modo permanente — e "l'XP non decresce mai"
+-- smette di essere vero. Il tetto è generoso: serve a escludere l'assurdo, non
+-- a limitare un'economia legittima.
+local MAX_ITEM_DRIP = 1000
+
+local function sanitizeItemDrip(value)
+    if type(value) ~= "number" then return nil end
+    if value ~= value then return nil end -- NaN
+    if value == math.huge or value == -math.huge then return nil end
+    if value < 0 then return 0 end
+    if value > MAX_ITEM_DRIP then return MAX_ITEM_DRIP end
+    return value
+end
+
+--- Risolve i punti drip di un singolo slot indossato.
+--- Precedenza: metadata dell'item → DripValues per drawable → DefaultDrip dello
+--- slot → MBT.DripSlotWeights → MBT.DefaultDrip.
+--- @param slotType string "Drawables" | "Props"
+--- @param slotIndex number
+--- @param metadata table Metadata dello slot da PlayerState
+--- @return number rate
+local function resolveSlotRate(slotType, slotIndex, metadata)
+    local slots = slotType == "Drawables" and MBT.Drawables or MBT.Props
+    local slotConfig = slots and slots[slotIndex]
+    if not slotConfig or not metadata or not metadata.drawable then return 0 end
+
+    local fromItem = sanitizeItemDrip(metadata.dripValue)
+    if fromItem then return fromItem end
+
+    local drawableIdx = tonumber(metadata.drawable) or metadata.drawable
+    local dripValues = slotConfig["DripValues"]
+    if dripValues and dripValues[drawableIdx] then
+        return dripValues[drawableIdx]
+    end
+    if slotConfig["DefaultDrip"] then
+        return slotConfig["DefaultDrip"]
+    end
+
+    -- Pesi per slot da config.lua. Prima di questo non venivano letti da nessuna
+    -- riga della risorsa: ogni capo valeva DefaultDrip, quindi un orecchino
+    -- pesava quanto un giubbotto e la tabella dei pesi era inerte.
+    local weights = MBT.DripSlotWeights and MBT.DripSlotWeights[slotType]
+    local weight = weights and weights[slotIndex]
+    if weight ~= nil then return weight end
+
+    return MBT.DefaultDrip or 1
+end
+
+-- Esposta perché è una funzione pura e testabile: la catena di precedenza è
+-- proprio dove si era rotta (i pesi di config non venivano letti da nessuno).
+MBT.Drip.ResolveSlotRate = resolveSlotRate
 
 --- Calculate the instantaneous drip rate from a player's current outfit
 --- @param src number Player source
@@ -25,47 +79,9 @@ function MBT.Drip.CalculateRate(src)
     if not wearing then return 0 end
 
     local rate = 0
-    local defaultDrip = MBT.DefaultDrip or 1
-
-    -- Drawables
-    for slotIndex, metadata in pairs(wearing.Drawables or {}) do
-        local slotConfig = MBT.Drawables[slotIndex]
-        if slotConfig and metadata and metadata.drawable then
-            -- metadata.dripValue overrides all config-based values (validate number to prevent injection)
-            if type(metadata.dripValue) == "number" then
-                rate = rate + metadata.dripValue
-            else
-                local drawableIdx = tonumber(metadata.drawable) or metadata.drawable
-                local dripValues = slotConfig["DripValues"]
-                if dripValues and dripValues[drawableIdx] then
-                    rate = rate + dripValues[drawableIdx]
-                elseif slotConfig["DefaultDrip"] then
-                    rate = rate + slotConfig["DefaultDrip"]
-                else
-                    rate = rate + defaultDrip
-                end
-            end
-        end
-    end
-
-    -- Props
-    for slotIndex, metadata in pairs(wearing.Props or {}) do
-        local slotConfig = MBT.Props[slotIndex]
-        if slotConfig and metadata and metadata.drawable then
-            -- metadata.dripValue overrides all config-based values (validate number)
-            if type(metadata.dripValue) == "number" then
-                rate = rate + metadata.dripValue
-            else
-                local drawableIdx = tonumber(metadata.drawable) or metadata.drawable
-                local dripValues = slotConfig["DripValues"]
-                if dripValues and dripValues[drawableIdx] then
-                    rate = rate + dripValues[drawableIdx]
-                elseif slotConfig["DefaultDrip"] then
-                    rate = rate + slotConfig["DefaultDrip"]
-                else
-                    rate = rate + defaultDrip
-                end
-            end
+    for _, slotType in ipairs(SLOT_TYPES) do
+        for slotIndex, metadata in pairs(wearing[slotType] or {}) do
+            rate = rate + resolveSlotRate(slotType, slotIndex, metadata)
         end
     end
 
@@ -86,54 +102,11 @@ function MBT.Drip.CalculateBreakdown(src)
     if not wearing then return {} end
 
     local breakdown = {}
-    local defaultDrip = MBT.DefaultDrip or 1
-
-    -- Drawables
-    for slotIndex, metadata in pairs(wearing.Drawables or {}) do
-        local slotConfig = MBT.Drawables[slotIndex]
-        if slotConfig and metadata and metadata.drawable then
-            local rate = 0
-            if type(metadata.dripValue) == "number" then
-                rate = metadata.dripValue
-            else
-                local drawableIdx = tonumber(metadata.drawable) or metadata.drawable
-                local dripValues = slotConfig["DripValues"]
-                if dripValues and dripValues[drawableIdx] then
-                    rate = dripValues[drawableIdx]
-                elseif slotConfig["DefaultDrip"] then
-                    rate = slotConfig["DefaultDrip"]
-                else
-                    rate = defaultDrip
-                end
-            end
-
+    for _, slotType in ipairs(SLOT_TYPES) do
+        for slotIndex, metadata in pairs(wearing[slotType] or {}) do
+            local rate = resolveSlotRate(slotType, slotIndex, metadata)
             if rate > 0 then
-                table.insert(breakdown, { slotType = "Drawables", slotIndex = slotIndex, rate = rate })
-            end
-        end
-    end
-
-    -- Props
-    for slotIndex, metadata in pairs(wearing.Props or {}) do
-        local slotConfig = MBT.Props[slotIndex]
-        if slotConfig and metadata and metadata.drawable then
-            local rate = 0
-            if type(metadata.dripValue) == "number" then
-                rate = metadata.dripValue
-            else
-                local drawableIdx = tonumber(metadata.drawable) or metadata.drawable
-                local dripValues = slotConfig["DripValues"]
-                if dripValues and dripValues[drawableIdx] then
-                    rate = dripValues[drawableIdx]
-                elseif slotConfig["DefaultDrip"] then
-                    rate = slotConfig["DefaultDrip"]
-                else
-                    rate = defaultDrip
-                end
-            end
-
-            if rate > 0 then
-                table.insert(breakdown, { slotType = "Props", slotIndex = slotIndex, rate = rate })
+                breakdown[#breakdown + 1] = { slotType = slotType, slotIndex = slotIndex, rate = rate }
             end
         end
     end
