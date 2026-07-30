@@ -59,7 +59,14 @@ MBT.PedRevealTimeout      = 4500 -- bounded wait; the 5s visibility watchdog rem
 -- Hybrid snapshot synchronization. The client polls locally but submits only
 -- stable full-state changes; the server remains authoritative for metadata.
 MBT.SnapshotPollInterval        = 1000
-MBT.SnapshotRestorePollInterval = 500
+-- 0 = ogni frame. Durante la finestra di restore protection un appearance
+-- script può rimettere un capo che il giocatore aveva tolto (illenium, skinchanger,
+-- qb-clothing, chiunque): il tempo che passa fra la sua scrittura e la nostra
+-- correzione è esattamente il "lampo" che si vede — e che vedono anche gli altri
+-- giocatori, perché i vestiti viaggiano in rete mentre l'alpha no.
+-- Controllare a ogni frame costa ~11 letture native e riduce quella finestra da
+-- 500ms a un frame. Non ci lega a nessuno script: guardiamo il PED, non gli eventi.
+MBT.SnapshotRestorePollInterval = 0
 MBT.SnapshotDebounce            = 400
 MBT.SnapshotAckTimeout          = 2000
 MBT.SnapshotWriteBehind         = 5000

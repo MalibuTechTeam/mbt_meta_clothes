@@ -383,13 +383,16 @@ function ConfigValidation.Validate(config, locales)
         'StealAllDuration', 'VictimAnimCap', 'StealTokenGrace', 'StealRequestTimeout',
         'RateLimitWindow', 'RateLimitMax', 'StateSaveInterval', 'RestoreProtection',
         'PedRevealStableWindow', 'PedRevealTimeout', 'SnapshotPollInterval',
-        'SnapshotRestorePollInterval', 'SnapshotAckTimeout', 'SnapshotWriteBehind',
+        'SnapshotAckTimeout', 'SnapshotWriteBehind',
         'SnapshotMaxPayload', 'DnaMaxEntries', 'DnaExpiryHours', 'DripInterval',
         'PropCleanupTime',
     }) do
         validatePositiveNumber(config, key, report.errors, false)
     end
     validatePositiveNumber(config, 'SnapshotDebounce', report.errors, true)
+    -- Zero è legittimo e significa "ogni frame": è il valore che rende la
+    -- correzione di un apply esterno praticamente istantanea.
+    validatePositiveNumber(config, 'SnapshotRestorePollInterval', report.errors, true)
     validatePositiveNumber(config, 'DefaultDrip', report.errors, true)
 
     validateBounds(config, report.errors)
