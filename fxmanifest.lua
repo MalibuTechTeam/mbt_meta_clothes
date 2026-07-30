@@ -65,6 +65,8 @@ server_scripts {
 }
 
 client_scripts {
+    -- 0. Lifecycle tracer (millisecond resolution, no-op unless MBT.Debug)
+    'modules/trace/client.lua',
     -- 1. Client utilities (MBT.Utils)
     'modules/utils/client.lua',
     -- 2. Target module (MBT.TargetModule)

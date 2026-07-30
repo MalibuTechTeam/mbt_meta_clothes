@@ -67,7 +67,7 @@ local function revealPed(reason)
     end
     local ped = PlayerPedId()
     if not DoesEntityExist(ped) then return false end
-    if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
+    MBT.Trace.OwnAlpha(255)
     ResetEntityAlpha(ped)
     SetEntityAlpha(ped, 255, false)
     MBT.Debugger('ped reveal', reason)
@@ -99,7 +99,6 @@ end)
 -- alpha 0 from another resource's fade would stomp their transition.
 AddEventHandler('onResourceStop', function(resourceName)
     if resourceName ~= GetCurrentResourceName() then return end
-    if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
     if MBT.Utils.CancelPedVisibilityWait then MBT.Utils.CancelPedVisibilityWait() end
     local ped = PlayerPedId()
     if not DoesEntityExist(ped) then
@@ -109,6 +108,7 @@ AddEventHandler('onResourceStop', function(resourceName)
     -- L'alpha PRIMA del reset dice se il PED era davvero nascosto da noi: senza
     -- questo non si distingue "recupero riuscito" da "finestra mancata".
     local alphaBefore = GetEntityAlpha(ped)
+    MBT.Trace.OwnAlpha(255)
     ResetEntityAlpha(ped)
     SetEntityAlpha(ped, 255, false)
     MBT.Debugger('resource stop: ped revealed', { alphaBefore = alphaBefore })
@@ -117,6 +117,7 @@ end)
 -- Server requests PED scan (new players only, after Load completed)
 RegisterNetEvent('mbt_meta_clothes:requestPedScan')
 AddEventHandler('mbt_meta_clothes:requestPedScan', function(context, lifecycle)
+    MBT.Trace.Mark('requestPedScan', { lifecycle = lifecycle })
     if not context or not MBT.SnapshotClient.SetContext(context) then return end
     local shouldObscure = MBT.PedVisibility.ShouldObscure(lifecycle)
     restoreGeneration = restoreGeneration + 1
@@ -125,7 +126,7 @@ AddEventHandler('mbt_meta_clothes:requestPedScan', function(context, lifecycle)
         and { generation = myGen, session = context.session }
         or nil
     if shouldObscure then
-        if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
+        MBT.Trace.OwnAlpha(0)
         SetEntityAlpha(PlayerPedId(), 0, false)
         if MBT.Utils.SchedulePedVisibilityWatchdog then
             MBT.Utils.SchedulePedVisibilityWatchdog('requestPedScan')
@@ -219,6 +220,7 @@ end
 -- già su char2 e gli applicherebbero i drawable di char1.
 RegisterNetEvent('mbt_meta_clothes:restoreWearing')
 AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, context, lifecycle)
+    MBT.Trace.Mark('restoreWearing', { lifecycle = lifecycle, context = context ~= nil })
     if not wearingState then return end
 
     -- Legacy watchdog unblock: no context means this is not an authoritative
@@ -247,7 +249,7 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, contex
     local myGen = restoreGeneration
     pendingInitialReveal = nil
     if shouldObscure then
-        if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
+        MBT.Trace.OwnAlpha(0)
         SetEntityAlpha(PlayerPedId(), 0, false)
         if MBT.Utils.SchedulePedVisibilityWatchdog then
             MBT.Utils.SchedulePedVisibilityWatchdog('restoreWearing')
@@ -261,6 +263,7 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, contex
 
     -- Apply immediately — restore guard (100ms polling, 15s) handles late appearance script changes
     applyWearingState(wearingState)
+    MBT.Trace.Mark('apply:done')
 
     -- Riprende la detection con il cache settato sullo stato ATTESO (wearingState).
     -- Questo è cruciale post-multichar: se l'appearance script ha applicato
@@ -301,6 +304,7 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, contex
                 if mismatch ~= lastMismatch then
                     lastMismatch = mismatch
                     MBT.Debugger('ped reveal waiting', mismatch)
+                    MBT.Trace.Mark('converge:mismatch', { slot = mismatch })
                 end
                 applyWearingState(wearingState)
             end

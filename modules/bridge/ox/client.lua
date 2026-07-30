@@ -7,8 +7,10 @@ chunk()
 
 -- Player loaded event
 AddEventHandler('ox:playerLoaded', function(data)
+    MBT.Trace.Begin('ox:playerLoaded')
     MBT.Utils.UpdatePlayerClothes()
     MBT.Utils.Target()
+    MBT.Trace.OwnAlpha(0)
     SetEntityAlpha(PlayerPedId(), 0, false)
     -- Watchdog: se entro 5s nessun restoreWearing/requestPedScan resetta alpha,
     -- forza la visibilità per non lasciare il player invisibile (multichar

@@ -308,6 +308,7 @@ local pedVisibility = MBT.PedVisibility.New({
     hide = function()
         local ped = PlayerPedId()
         if not DoesEntityExist(ped) then return end
+        MBT.Trace.OwnAlpha(0)
         SetEntityAlpha(ped, 0, false)
     end,
     reveal = function(reason, watchdog)
@@ -319,11 +320,10 @@ local pedVisibility = MBT.PedVisibility.New({
         if watchdog then
             MBT.Warn('ped visibility wait expired; auto-recovering visibility', { reason = reason })
         end
+        MBT.Trace.OwnAlpha(255)
+        MBT.Trace.Mark('coordinator:reveal', { reason = reason, watchdog = watchdog == true })
         ResetEntityAlpha(ped)
         SetEntityAlpha(ped, 255, false)
-        if MBT.Utils.StopKeepPedHidden then
-            MBT.Utils.StopKeepPedHidden()
-        end
         if watchdog and MBT.Utils.ResumeHybridDetection then
             MBT.Utils.ResumeHybridDetection()
         end
@@ -333,6 +333,7 @@ local pedVisibility = MBT.PedVisibility.New({
 
 --- @param reason string|nil Etichetta diagnostica per il log
 function MBT.Utils.SchedulePedVisibilityWatchdog(reason)
+    MBT.Trace.Mark('coordinator:begin', { reason = reason })
     local generation = pedVisibility:Begin(reason, 5000)
     Citizen.CreateThread(function()
         while pedVisibility:Pulse(generation) do Citizen.Wait(50) end

@@ -12,6 +12,8 @@ AddEventHandler('esx:loadingScreenOff', function()
     if playerReadySent then return end
     playerReadySent = true
 
+    MBT.Trace.Begin('esx:loadingScreenOff')
+    MBT.Trace.OwnAlpha(0)
     SetEntityAlpha(PlayerPedId(), 0, false)
     -- Watchdog: se entro 5s nessun restoreWearing/requestPedScan resetta alpha,
     -- forza la visibilità per non lasciare il player invisibile.
@@ -29,63 +31,33 @@ end)
 -- tramite net event custom. Il server sa con certezza quando scatta il logout
 -- (esx:playerLogout) e il load (esx:playerLoaded), mentre il corrispettivo
 -- esx:onPlayerLogout client-side non scatta in tutti i setup multicharacter.
-local keepPedHidden = false
-
 RegisterNetEvent('mbt_meta_clothes:multichar:pauseDetection')
 AddEventHandler('mbt_meta_clothes:multichar:pauseDetection', function()
+    MBT.Trace.Begin('pauseDetection')
     if MBT.Utils.PauseHybridDetection then
         MBT.Utils.PauseHybridDetection()
     end
     -- Nascondi il PED SUBITO (all'inizio del /relog), prima che l'appearance
     -- script del nuovo char applichi drawable sbagliati. Verrà riportato
     -- visibile dal restoreWearing handler dopo l'apply corretto.
+    MBT.Trace.OwnAlpha(0)
     SetEntityAlpha(PlayerPedId(), 0, false)
 
-    -- Protezione extra: durante il switch il model swap crea un nuovo PED
-    -- che è visibile di default. Loop di 5s che mantiene alpha=0 così anche
-    -- il nuovo PED resta invisibile finché restoreWearing/requestPedScan
-    -- chiama StopKeepPedHidden (exit flag) e fa ResetEntityAlpha.
+    -- NIENTE loop di riasserzione. Qui c'era un ciclo che rimetteva alpha=0 ogni
+    -- 50ms per cinque secondi. Misurato in gioco il 2026-07-30: il multichar
+    -- rimette il PED visibile e questo loop lo rinascondeva entro 7-49ms, in
+    -- un'oscillazione regolare — dodici transizioni in 300ms, a schermo visibile.
+    -- Quello ERA il lampo.
     --
-    -- RESILIENCE FALLBACK: se il loop scade SENZA che keepPedHidden venga
-    -- resettato (cioè nessun evento restoreWearing/requestPedScan è arrivato
-    -- entro 5s — può succedere con multichar fast-switch o eventi persi),
-    -- forziamo manualmente alpha=255 + resume detection per non lasciare il
-    -- player invisibile. WARN sempre stampato per visibilità del bug a monte.
-    keepPedHidden = true
-    Citizen.CreateThread(function()
-        local startTime = GetGameTimer()
-        local stoppedNormally = false
-        while keepPedHidden and GetGameTimer() - startTime < 5000 do
-            local ped = PlayerPedId()
-            if DoesEntityExist(ped) and GetEntityAlpha(ped) > 0 then
-                SetEntityAlpha(ped, 0, false)
-            end
-            if not keepPedHidden then
-                stoppedNormally = true
-                break
-            end
-            Wait(50)
-        end
-        if not stoppedNormally and keepPedHidden then
-            MBT.Warn('keepPedHidden timer expired without restore or PED scan; auto-recovering visibility')
-            keepPedHidden = false
-            local ped = PlayerPedId()
-            if DoesEntityExist(ped) then
-                ResetEntityAlpha(ped)
-                SetEntityAlpha(ped, 255, false)
-            end
-            if MBT.Utils.ResumeHybridDetection then
-                MBT.Utils.ResumeHybridDetection()
-            end
-        end
-    end)
+    -- L'alpha non è una proprietà nostra: la scrivono anche i multicharacter
+    -- (verificato in mbt_character e in esx_multicharacter), ed è giusto così
+    -- perché sono loro a decidere quando mostrarti il personaggio. Un loop che
+    -- contraddice l'altro scrittore non vince la discussione: la rende visibile.
+    --
+    -- L'hide qui sopra resta come dichiarazione d'intento una tantum, e chi
+    -- gestisce lo spawn fa il resto. I capi sbagliati applicati nel frattempo
+    -- li corregge la restore protection, che ora reagisce entro un frame.
 end)
-
--- Exit flag usato dal restoreWearing lato client per fermare il loop di
--- SetEntityAlpha(0) quando è ora di far vedere il PED.
-function MBT.Utils.StopKeepPedHidden()
-    keepPedHidden = false
-end
 
 -- Multicharacter: esx:playerLoaded fires per ogni character (compreso lo switch).
 -- Al primo login il flag playerReadySent è già true dopo loadingScreenOff, quindi
@@ -113,7 +85,8 @@ AddEventHandler('esx:playerLoaded', function()
     -- PED mentre il Pulse lo sta ancora nascondendo: flicker e poi fino ad
     -- altri 5s di invisibilità sbagliata. requestPedScan e restoreWearing
     -- fanno già questo handoff; questo era l'unico ingresso che lo saltava.
-    if MBT.Utils.StopKeepPedHidden then MBT.Utils.StopKeepPedHidden() end
+    MBT.Trace.Begin('esx:playerLoaded')
+    MBT.Trace.OwnAlpha(0)
     SetEntityAlpha(PlayerPedId(), 0, false)
     -- Watchdog insurance net (vedi commento in loadingScreenOff)
     if MBT.Utils.SchedulePedVisibilityWatchdog then

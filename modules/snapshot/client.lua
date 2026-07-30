@@ -505,6 +505,13 @@ local function enforcePed(target, getGuardReason)
             local texture = GetPedTextureVariation(ped, slotIndex)
             local palette = GetPedPaletteVariation(ped, slotIndex)
             if drawable ~= slot.drawable or texture ~= slot.texture or palette ~= (slot.palette or 0) then
+                -- Qualcuno ha scritto su uno slot nostro e lo stiamo correggendo:
+                -- il tempo fra la sua scrittura e questa riga È il lampo visibile.
+                MBT.Trace.Mark('enforce:corrected', {
+                    slot = 'Drawables:' .. tostring(slotIndex),
+                    was = drawable,
+                    now = slot.drawable,
+                })
                 SetPedComponentVariation(ped, slotIndex, slot.drawable, slot.texture, slot.palette or 0)
             end
         end
@@ -519,6 +526,11 @@ local function enforcePed(target, getGuardReason)
             local drawable = GetPedPropIndex(ped, slotIndex)
             local texture = GetPedPropTextureIndex(ped, slotIndex)
             if drawable ~= slot.drawable or texture ~= slot.texture then
+                MBT.Trace.Mark('enforce:corrected', {
+                    slot = 'Props:' .. tostring(slotIndex),
+                    was = drawable,
+                    now = slot.drawable,
+                })
                 if slot.drawable == -1 then
                     ClearPedProp(ped, slotIndex)
                 else
@@ -536,7 +548,10 @@ local production = SnapshotClient.New({
         local ped = PlayerPedId()
         return DoesEntityExist(ped) and GetEntityModel(ped) or nil
     end,
-    send = function(payload) TriggerServerEvent('mbt_meta_clothes:submitSnapshot', payload) end,
+    send = function(payload)
+        MBT.Trace.Mark('snapshot:send', { seq = payload.seq, initial = payload.initial == true })
+        TriggerServerEvent('mbt_meta_clothes:submitSnapshot', payload)
+    end,
     enforce = enforcePed,
     onInitialAcknowledged = function(ack)
         TriggerEvent('mbt_meta_clothes:initialSnapshotReady', ack)
@@ -588,6 +603,10 @@ function SnapshotClient.Start()
 end
 
 RegisterNetEvent('mbt_meta_clothes:snapshotAck', function(ack)
+    MBT.Trace.Mark('snapshot:ack', {
+        ok = type(ack) == 'table' and ack.ok == true,
+        code = type(ack) == 'table' and ack.code or nil,
+    })
     production:HandleAck(ack)
 end)
 
