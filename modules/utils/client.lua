@@ -334,11 +334,16 @@ local pedVisibility = MBT.PedVisibility.New({
 --- @param reason string|nil Etichetta diagnostica per il log
 function MBT.Utils.SchedulePedVisibilityWatchdog(reason)
     MBT.Trace.Mark('coordinator:begin', { reason = reason })
-    local generation = pedVisibility:Begin(reason, 5000)
-    Citizen.CreateThread(function()
-        while pedVisibility:Pulse(generation) do Citizen.Wait(50) end
-    end)
-    return generation
+    -- `Begin` nasconde una volta sola e arma il reveal di sicurezza. NON parte
+    -- nessun loop di riasserzione: qui c'era un `Pulse` ogni 50ms, gemello del
+    -- loop `keepPedHidden` rimosso il 2026-07-30 dopo averlo misurato mentre
+    -- produceva dodici transizioni in 300ms contro il multicharacter.
+    --
+    -- Il Pulse serviva a inseguire il rimpiazzo del PED (quello nuovo nasce
+    -- visibile). Quel caso ora è coperto meglio dall'altra parte: la restore
+    -- protection controlla a ogni frame e rivestiamo un PED nuovo entro un
+    -- frame, invece di nasconderlo a forza litigando con chi lo sta gestendo.
+    return pedVisibility:Begin(reason, 5000)
 end
 
 function MBT.Utils.CompletePedVisibilityWait(reason)
