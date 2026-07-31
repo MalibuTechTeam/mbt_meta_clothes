@@ -350,9 +350,10 @@ function MBT.Utils.CompletePedVisibilityWait(reason)
     return pedVisibility:Complete(reason)
 end
 
---- Abbandona la transizione guardata senza rivelare. Usato allo stop della
---- risorsa, dove il reveal viene fatto direttamente prima che lo stato Lua
---- muoia: serve solo a fermare il Pulse perché non rinasconda il PED.
+--- Abbandona la transizione guardata senza rivelare, invalidandone la
+--- generation. Usato allo stop della risorsa, dove il reveal viene fatto
+--- direttamente prima che lo stato Lua muoia: serve a impedire che un reveal
+--- di sicurezza già programmato scatti su un'istanza che non esiste più.
 function MBT.Utils.CancelPedVisibilityWait()
     return pedVisibility:Cancel()
 end

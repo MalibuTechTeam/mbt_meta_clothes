@@ -723,18 +723,18 @@ local cases = {
                 end,
             })
 
-            local generation = visibility:Begin('restore', 5000)
+            visibility:Begin('restore', 5000)
             Assert.equal(false, (visibility:Complete('stable')))
             Assert.equal(0, #reveals)
-            -- The transition must survive: consuming it here would burn the
-            -- watchdog and strand a hidden PED with no owner left to reveal it.
-            Assert.equal(true, visibility:Pulse(generation))
 
+            -- La prova che la transizione è sopravvissuta al Complete fallito è
+            -- il retry stesso: trova ancora la propria generation e rivela. Se
+            -- il Complete l'avesse consumata, il ticket sarebbe stale e qui non
+            -- accadrebbe nulla — il PED resterebbe nascosto senza proprietario.
             pedExists = true
             timers[#timers]()
             Assert.equal(1, #reveals)
             Assert.equal('stable', reveals[1])
-            Assert.equal(false, visibility:Pulse(generation))
         end,
     },
     {
@@ -762,22 +762,30 @@ local cases = {
         end,
     },
     {
-        name = 'visibility pulse keeps only the current spawn generation hidden',
+        name = 'only a successful reveal consumes the transition',
         run = function()
+            local revealed = false
             local hides = 0
             local visibility = MBT.PedVisibility.New({
                 schedule = function() end,
                 hide = function() hides = hides + 1 end,
-                reveal = function() return true end,
+                reveal = function() return revealed end,
             })
 
-            local oldGeneration = visibility:Begin('framework', 5000)
-            local currentGeneration = visibility:Begin('snapshot', 5000)
-            Assert.equal(false, visibility:Pulse(oldGeneration))
-            Assert.equal(true, visibility:Pulse(currentGeneration))
-            Assert.equal(3, hides)
-            visibility:Complete('ready')
-            Assert.equal(false, visibility:Pulse(currentGeneration))
+            -- Un Complete fallito non tocca la generation, quindi il Begin
+            -- successivo la incrementa di uno solo.
+            local first = visibility:Begin('framework', 5000)
+            Assert.equal(false, (visibility:Complete('too early')))
+            Assert.equal(first + 1, visibility:Begin('snapshot', 5000))
+
+            -- Un Complete riuscito la consuma: fra i due Begin avanza di due.
+            revealed = true
+            local third = visibility:Begin('restore', 5000)
+            Assert.equal(true, (visibility:Complete('stable')))
+            Assert.equal(third + 2, visibility:Begin('next', 5000))
+
+            -- Ogni Begin nasconde una volta sola: nessuna riasserzione.
+            Assert.equal(4, hides)
         end,
     },
     {

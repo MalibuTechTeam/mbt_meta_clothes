@@ -67,12 +67,6 @@ function MBT.PedVisibility.New(deps)
         return revealed, wasWaiting
     end
 
-    function coordinator:Pulse(expectedGeneration)
-        if not waiting or expectedGeneration ~= generation then return false end
-        hide()
-        return true
-    end
-
     function coordinator:Cancel()
         generation = generation + 1
         waiting = false
