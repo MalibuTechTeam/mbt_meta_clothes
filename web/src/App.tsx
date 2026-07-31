@@ -518,23 +518,36 @@ export default function App() {
             transition={{ duration: 0.3 }}
             className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden"
           >
+            {/* Backdrop a TUTTO schermo. Il contenuto resta nel box 16:9 qui
+                sotto, ma lo sfondo no: tenendolo dentro al box il gradiente
+                finiva sul bordo dei 16:9 e su ultrawide si vedeva una cucitura
+                verticale netta, con il gioco che riappariva a destra.
+
+                Le tappe sono ancorate al box con unità vh invece che in
+                percentuale: 88.88vh è metà di un riquadro 16:9, quindi
+                calc(50% ± 88.88vh) sono esattamente i suoi bordi. Su 16:9 quei
+                calc valgono 0% e 100% e il risultato è identico a prima; su
+                ultrawide il gradiente segue il box e la striscia oltre il bordo
+                viene riempita del colore finale.
+
+                Resta dentro la stessa AnimatePresence per non perdere la
+                sincronia di opacità con il resto della UI. */}
+            <motion.div
+              variants={{
+                hidden: { opacity: 0 },
+                show: { opacity: 1 },
+              }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 z-0 bg-transparent pointer-events-auto"
+              style={{
+                background:
+                  "linear-gradient(to right, transparent 0, transparent calc(50% - 35.55vh), rgba(5, 11, 20, 0.8) calc(50% + 26.66vh), rgba(0, 4, 10, 0.95) calc(50% + 88.88vh), rgba(0, 4, 10, 0.95) 100%)",
+              }}
+              onClick={() => setActiveCategory({ id: null, rect: null })}
+            />
+
             {/* Safe Center Area: Constrains UI to a virtual 16:9 box on Ultrawide */}
             <div className="relative w-full h-full max-w-[177.77vh] mx-auto pointer-events-none">
-              {/* Background Backdrop - Moved inside for sync */}
-              <motion.div
-                variants={{
-                  hidden: { opacity: 0 },
-                  show: { opacity: 1 },
-                }}
-                transition={{ duration: 0.3 }}
-                className="absolute inset-0 z-0 bg-transparent pointer-events-auto"
-                style={{
-                  background:
-                    "linear-gradient(to right, transparent 0%, transparent 30%, rgba(5, 11, 20, 0.8) 65%, rgba(0, 4, 10, 0.95) 100%)",
-                }}
-                onClick={() => setActiveCategory({ id: null, rect: null })}
-              />
-
               <Mannequin
                 activeCategory={activeCategory.id}
                 // In stealMode mostriamo il VICTIM (wearing+sex ricevuti dal
