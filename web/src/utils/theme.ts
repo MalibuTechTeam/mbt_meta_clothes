@@ -11,6 +11,19 @@ export function hexToRgb(hex: string): string {
 const HEX6 = /^[0-9a-fA-F]{6}$/;
 
 /**
+ * Scurisce un accento moltiplicandone le componenti.
+ * Serve per i riempimenti pieni: un accento brillante come #00e676 non regge
+ * né un glifo bianco (contrasto ~1.6:1) né uno nero che si perde nel sottile.
+ * Il design originale era fondo scuro + glifo bianco, e per conservarlo serve
+ * una versione scurita del colore scelto dall'owner, non una traslucida.
+ */
+function shade(hex: string, factor: number): string {
+  const channel = (offset: number) =>
+    Math.round(parseInt(hex.slice(offset, offset + 2), 16) * factor);
+  return `rgb(${channel(0)}, ${channel(2)}, ${channel(4)})`;
+}
+
+/**
  * Build the CSS custom-property set from the server theme (config.lua
  * MBT.Theme). App applies these on :root, so laser, hotspot markers, scanner
  * rings and active states all share one accent — changing MBT.Theme.Accent
@@ -31,6 +44,8 @@ export function buildThemeVars(theme: ThemeConfig): Record<string, string> {
     "--mbt-accent": `#${theme.Accent}`,
     "--mbt-accent-rgb": accent,
     "--mbt-accent-strong": `rgba(${accent}, 0.82)`,
+    "--mbt-accent-dark": shade(theme.Accent, 0.62),
+    "--mbt-accent-deep": shade(theme.Accent, 0.42),
     "--mbt-accent-glow": `rgba(${accent}, 0.25)`,
     "--mbt-accent-soft": `rgba(${accent}, 0.08)`,
   };

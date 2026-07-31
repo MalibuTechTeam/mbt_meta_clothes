@@ -542,9 +542,9 @@ export default function Mannequin({
                     ? item.id === "drip"
                       ? "bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-[0_0_20px_rgba(249,115,22,0.4)] w-10"
                       : item.id === "clothes"
-                        ? "bg-gradient-to-br from-[var(--mbt-accent)] to-[var(--mbt-accent-strong)] text-black shadow-[0_0_20px_rgba(var(--mbt-accent-rgb),0.4)] w-10"
+                        ? "bg-gradient-to-br from-[var(--mbt-accent-dark)] to-[var(--mbt-accent-deep)] text-white shadow-[0_0_20px_rgba(var(--mbt-accent-rgb),0.4)] w-10"
                         : item.id === "hair"
-                          ? "bg-gradient-to-br from-[rgba(var(--mbt-accent-rgb),0.7)] to-[rgba(var(--mbt-accent-rgb),0.45)] text-black shadow-[0_0_20px_rgba(var(--mbt-accent-rgb),0.3)] w-10"
+                          ? "bg-gradient-to-br from-[var(--mbt-accent-dark)] to-[var(--mbt-accent-deep)] text-white shadow-[0_0_20px_rgba(var(--mbt-accent-rgb),0.3)] w-10 opacity-80"
                           : "bg-white text-black w-10"
                     : "text-white/50 hover:text-white hover:bg-white/10 w-10")
                 }`}

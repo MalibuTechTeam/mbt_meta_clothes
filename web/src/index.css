@@ -8,6 +8,10 @@
   /* Tripletta RGB per comporre qualunque opacità: rgba(var(--mbt-accent-rgb), 0.4) */
   --mbt-accent-rgb: 0, 230, 118;
   --mbt-accent-strong: rgba(0, 230, 118, 0.82);
+  /* Versioni scurite per i riempimenti pieni, dove serve un glifo bianco
+     leggibile: sull'accento pieno il bianco non si legge e il nero si perde. */
+  --mbt-accent-dark: rgb(0, 143, 73);
+  --mbt-accent-deep: rgb(0, 97, 50);
   --mbt-accent-glow: rgba(0, 230, 118, 0.25);
   --mbt-accent-soft: rgba(0, 230, 118, 0.08);
 }
