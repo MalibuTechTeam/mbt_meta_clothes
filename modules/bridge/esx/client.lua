@@ -20,10 +20,19 @@ AddEventHandler('esx:loadingScreenOff', function()
     if MBT.Utils.SchedulePedVisibilityWatchdog then
         MBT.Utils.SchedulePedVisibilityWatchdog("loadingScreenOff")
     end
-    Citizen.Wait(2000)
+    -- playerReady va per PRIMO e senza attese: è il segnale che fa partire il
+    -- push dello stato dal server, e ogni millisecondo speso qui è un
+    -- millisecondo in cui il PED è visibile con l'outfit sbagliato.
+    --
+    -- Qui c'era un `Citizen.Wait(2000)`. Misurato il 2026-07-31: il restore
+    -- arrivava a +2083ms, cioè 2000 di attesa nostra più 83 di round-trip —
+    -- la finestra di esposizione era interamente autoinflitta. Quell'attesa
+    -- duplicava una protezione che il server ha già (retry sull'identifier,
+    -- 8 × 200ms), con la differenza che questa la pagava il giocatore.
+    -- QB e OX non l'hanno mai avuta.
+    TriggerServerEvent("mbt_meta_clothes:playerReady")
     MBT.Utils.UpdatePlayerClothes()
     MBT.Utils.Target()
-    TriggerServerEvent("mbt_meta_clothes:playerReady")
     MBT.Utils.StartHybridDetection()
 end)
 
@@ -79,12 +88,6 @@ AddEventHandler('esx:playerLoaded', function()
     -- (attivata dal restoreWearing handler) coprirà per 15s qualsiasi
     -- modifica tardiva dell'appearance script, revertendola al nostro state.
     -- Stesso principio delle armi: le applichi subito, nessuno le tocca.
-    --
-    -- Passa la ownership dell'hide al coordinator PRIMA che inizi a pulsare.
-    -- Lasciare vivo il keep loop significa che il suo fallback a 5s rivela il
-    -- PED mentre il Pulse lo sta ancora nascondendo: flicker e poi fino ad
-    -- altri 5s di invisibilità sbagliata. requestPedScan e restoreWearing
-    -- fanno già questo handoff; questo era l'unico ingresso che lo saltava.
     MBT.Trace.Begin('esx:playerLoaded')
     MBT.Trace.OwnAlpha(0)
     SetEntityAlpha(PlayerPedId(), 0, false)
