@@ -393,8 +393,15 @@ export default function App() {
   // Il pannello si aprirà esattamente a 40px di distanza dal punto cliccato sul manichino
   const laserLength = 100;
 
-  // Scaling factor for absolute pixel calculations
-  const scale = window.innerHeight / 1080;
+  // NB: il tracciato del laser NON è scalato per l'altezza dello schermo, e non
+  // è una dimenticanza. Il pannello a cui si aggancia è posizionato in `rem`
+  // (`calc(100% - startX + 6.25rem)`) e la sua griglia è in `rem`: scalare solo
+  // la linea la faceva allungare del 33% a 1440p mentre il pannello restava
+  // fermo, e la coda sporgeva oltre il pannello di ~180px.
+  //
+  // La cura completa sarebbe scalare TUTTO il pannello insieme al palco, non
+  // togliere lo scaling alla linea — ma è un lavoro sulla griglia e sulle icone,
+  // non due righe qui. Finché il pannello vive in rem, ci vive anche la linea.
 
   const activeCategorySlots = useMemo(() => {
     if (!hasActive || !activeCategory.id) return null;
@@ -608,12 +615,12 @@ export default function App() {
                         animate={{ pathLength: 1 }}
                         exit={{ pathLength: 0 }}
                         transition={{ duration: 0.4, ease: "easeOut" }}
-                        d={`M ${startX} ${startY} 
-                         L ${startX - 20 * scale} ${startY} 
-                         L ${startX - 40 * scale} ${startY + 20 * scale} 
-                         L ${startX - 100 * scale} ${startY + 20 * scale} 
-                         L ${startX - 120 * scale} ${startY} 
-                         L ${startX - (laserLength + 260) * scale} ${startY}`}
+                        d={`M ${startX} ${startY}
+                         L ${startX - 20} ${startY}
+                         L ${startX - 40} ${startY + 20}
+                         L ${startX - 100} ${startY + 20}
+                         L ${startX - 120} ${startY}
+                         L ${startX - (laserLength + 260)} ${startY}`}
                         stroke="rgba(255,255,255,0.25)"
                         strokeWidth="1"
                         fill="none"
@@ -640,12 +647,12 @@ export default function App() {
                             ease: "linear",
                           },
                         }}
-                        d={`M ${startX} ${startY} 
-                         L ${startX - 20 * scale} ${startY} 
-                         L ${startX - 40 * scale} ${startY + 20 * scale} 
-                         L ${startX - 100 * scale} ${startY + 20 * scale} 
-                         L ${startX - 120 * scale} ${startY} 
-                         L ${startX - (laserLength + 260) * scale} ${startY}`}
+                        d={`M ${startX} ${startY}
+                         L ${startX - 20} ${startY}
+                         L ${startX - 40} ${startY + 20}
+                         L ${startX - 100} ${startY + 20}
+                         L ${startX - 120} ${startY}
+                         L ${startX - (laserLength + 260)} ${startY}`}
                         stroke="url(#laserGradient)"
                         strokeWidth="1.5"
                         strokeDasharray="10 20"
