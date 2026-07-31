@@ -1,18 +1,13 @@
 -----------------------------------------------------------
--- Lifecycle tracer (client, debug only)
+-- Lifecycle tracer (client, solo con MBT.Debug)
 --
--- Esiste perché le misure fatte leggendo i log normali hanno una granularità di
--- UN SECONDO, mentre le finestre che dobbiamo rispettare sono da 400ms. Con
--- barre d'errore più grandi del fenomeno si indovina, non si misura.
+-- I log normali hanno granularità di un secondo, ma le finestre che dobbiamo
+-- rispettare sono da 400ms: serve il millisecondo per misurare invece di
+-- indovinare.
 --
--- Tre domande a cui deve rispondere:
---   1. quanto dura la finestra in cui lo schermo è nero (il giocatore non vede)
---   2. dove ci cade dentro il nostro reveal
---   3. CHI cambia l'alpha del PED oltre a noi
---
--- La terza è la più importante: l'alpha è una proprietà condivisa e i
--- multicharacter la scrivono anche loro. Registrando quale valore abbiamo
--- impostato NOI, ogni cambiamento diverso è per esclusione di qualcun altro.
+-- Risponde a: quanto dura la finestra a schermo nero, dove ci cade dentro il
+-- reveal, e soprattutto CHI tocca l'alpha oltre a noi — dichiarando i nostri
+-- valori, ogni altro cambiamento è di qualcun altro per esclusione.
 -----------------------------------------------------------
 
 MBT.Trace = MBT.Trace or {}

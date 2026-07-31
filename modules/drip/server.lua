@@ -1,15 +1,11 @@
 -----------------------------------------------------------
 -- Drip Reputation Engine (server-side)
 --
--- Calculates a "drip rate" from the player's current outfit
--- and periodically adds it to their cumulative Drip XP.
--- XP never decreases — it's a fashion career, not a score.
+-- Calcola un "drip rate" dall'outfit indossato e lo somma periodicamente all'XP
+-- cumulativo, che non decresce mai. I capi di default valgono 0.
 --
--- Server owners configure per-slot weights in MBT.DripSlotWeights, or override
--- per drawable with DripValues inside a slot config.
--- Default drawables (nude/base) = 0 rate.
---
--- No exports: consumers read the player state bags instead
+-- I pesi si configurano in MBT.DripSlotWeights, o per singolo drawable con
+-- DripValues dentro lo slot. Nessun export: i consumatori leggono gli state bag
 -- (mbt_dripLevel, mbt_dripTitle, mbt_dripXp, mbt_slotsWorn).
 -----------------------------------------------------------
 

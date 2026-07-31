@@ -87,16 +87,13 @@ AddEventHandler('onClientResourceStart', function(resourceName)
     MBT.Utils.StartHybridDetection()
 end)
 
--- A stop must never leave behind a PED that WE hid. Every timer, the keep loop
--- and the visibility coordinator die with this instance, and the restart path
--- deliberately refuses alpha ownership (ShouldObscure == false for
--- resource_restart) — so nothing downstream would ever reveal it again and the
--- player stays invisible until a full character reload.
+-- Uno stop non deve mai lasciare nascosto un PED che abbiamo nascosto noi: i
+-- timer muoiono con l'istanza e il percorso di restart rifiuta di proposito la
+-- ownership dell'alpha, quindi non lo rivelerebbe più nessuno.
 --
--- This covers the orderly stop/restart/ensure path only. Surviving an abrupt
--- client-side crash needs an ownership marker that outlives the Lua state; that
--- is deliberately not attempted here, because a marker that cannot tell OUR
--- alpha 0 from another resource's fade would stomp their transition.
+-- Copre solo lo stop ordinato. Per sopravvivere a un crash servirebbe un marker
+-- esterno allo stato Lua, che però non saprebbe distinguere il nostro alpha 0
+-- dal fade di un'altra risorsa e calpesterebbe la sua transizione.
 AddEventHandler('onResourceStop', function(resourceName)
     if resourceName ~= GetCurrentResourceName() then return end
     if MBT.Utils.CancelPedVisibilityWait then MBT.Utils.CancelPedVisibilityWait() end
@@ -143,11 +140,9 @@ AddEventHandler('mbt_meta_clothes:requestPedScan', function(context, lifecycle)
     MBT.SnapshotClient.Resume('character')
     MBT.SnapshotClient.SetRestoreProtection(false)
 
-    -- IMPORTANTE: il scan del PED è ritardato di 2.5s per dare tempo a
-    -- illenium-appearance (o qualunque skin script) di applicare il vero
-    -- outfit del char. Senza delay, il scan cattura uno stato BARE (modello
-    -- default appena spawnato) e lo salva come baseline → al prossimo
-    -- restoreWearing il player apparirebbe nudo per sempre.
+    -- I 2.5s danno all'appearance script il tempo di applicare il vero outfit.
+    -- Senza, il scan cattura il modello nudo appena spawnato e lo salva come
+    -- baseline: da lì in poi il player rilogga nudo per sempre.
     MBT.SnapshotClient.ForceInitialScan(2500)
 
     if not shouldObscure then
@@ -211,13 +206,9 @@ local function applyWearingState(wearingState)
     MBT.Utils.UpdatePlayerClothes()
 end
 
--- Generation counter per restoreWearing — incrementato ad ogni nuovo restore.
--- I re-apply ritardati controllano la generation prima di applicare: se un
--- nuovo restoreWearing è arrivato (generation incrementata) in mezzo, il
--- re-apply diventa no-op così non sovrascrivono lo state più recente con
--- uno vecchio. CRITICO per multichar fast-switch (char1 -> char2 -> char1
--- in 1-2s): senza questo guard, i re-apply di char1 firerebbero mentre sei
--- già su char2 e gli applicherebbero i drawable di char1.
+-- Ogni restore incrementa la generation, e i re-apply ritardati la controllano
+-- prima di scrivere. Senza questo guard, in un fast-switch char1→char2→char1 i
+-- re-apply del primo character atterrerebbero sul secondo.
 RegisterNetEvent('mbt_meta_clothes:restoreWearing')
 AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, context, lifecycle)
     MBT.Trace.Mark('restoreWearing', { lifecycle = lifecycle, context = context ~= nil })
@@ -265,11 +256,9 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, contex
     applyWearingState(wearingState)
     MBT.Trace.Mark('apply:done')
 
-    -- Riprende la detection con il cache settato sullo stato ATTESO (wearingState).
-    -- Questo è cruciale post-multichar: se l'appearance script ha applicato
-    -- qualcosa che non ci dovrebbe essere (es. vecchio cappello salvato da
-    -- esx_skin), il cache non lo congela come normale — al prossimo poll la
-    -- restoreProtection vede il diff e reverte tornando al nostro state.
+    -- Riparte con la baseline sullo stato ATTESO, non sul PED corrente: quello
+    -- che l'appearance script ha messo di troppo resta così un diff da
+    -- correggere invece di essere congelato come normale.
     if MBT.Utils.ResumeHybridDetection then
         MBT.Utils.ResumeHybridDetection(wearingState)
     end
@@ -547,14 +536,9 @@ RegisterCommand("toggleUndress", function()
         -- Determine sex as numeric (0=male, 1=female) for NUI mannequin image
         local sexNumeric = (sex == "female") and 1 or 0
 
-        -- Build toggleable slots list: which slots have ClothingStates configured.
-        -- Solo Drawables e Props interessano per gli slot indicizzati; Hair ha
-        -- una struttura diversa (flat array, non per-slot) e non va iterata qui.
-        -- IMPORTANTE: ogni stato ha un campo `sex` — dobbiamo filtrarli per
-        -- il sesso del player, altrimenti un maschio con drawable X finisce
-        -- marcato toggleable quando esiste solo uno stato female con from=X
-        -- (falso positivo che fa apparire l'icona di toggle per item non
-        -- toggleabili per quel sesso).
+        -- Quali slot hanno un ClothingState. Hair è escluso perché ha struttura
+        -- flat, non per-slot. Il filtro sul sesso è necessario: senza, un maschio
+        -- con drawable X risulterebbe toggleabile per via di uno stato female.
         local toggleableSlots = { Drawables = {}, Props = {} }
         if MBT.ClothingStates then
             for _, slotType in ipairs({ "Drawables", "Props" }) do

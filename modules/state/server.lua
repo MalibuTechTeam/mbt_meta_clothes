@@ -491,15 +491,10 @@ end
 -----------------------------------------------------------
 -- Push state to client (load + decide branch + trigger client event)
 -----------------------------------------------------------
--- Estratto da playerReady handler così sia il client (via playerReady event)
--- sia il server (via esx:playerLoaded bridge handler) possono guidare il push.
--- Indispensabile per multichar che bypassano il client-side esx:playerLoaded
--- chain (es. mbt_character fast-switch): senza questo, il ped resta in pausa
--- finché il watchdog client non scatta a 5s.
---
--- Idempotente: se chiamato di nuovo entro 500ms per lo stesso src, no-op.
--- Questo evita doppio push quando entrambi i flow (server bridge + client
--- playerReady) firano per lo stesso load event.
+-- Il push può essere guidato sia dal client (playerReady) sia dal server
+-- (bridge): serve per i multichar che non propagano la catena client-side, dove
+-- altrimenti il PED resterebbe in pausa fino al watchdog. Il debounce da 500ms
+-- assorbe il caso in cui firino entrambi per lo stesso load.
 local lastPushAt = {} -- [src] = GetGameTimer()
 
 --- Carica lo stato del player dal DB (se non già fatto), decide quale branch
@@ -513,19 +508,11 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force, lifecycle)
     if not src or src <= 0 then return end
     attempt = attempt or 1
 
-    -- IDENTIFIER READINESS GUARD
-    -- Alcuni multichar (mbt_character, esx_multicharacter veloce ecc.) emettono
-    -- esx:onPlayerJoined PRIMA che ESX.GetPlayerFromId(src).identifier sia
-    -- popolato. Nei 50-300ms successivi xPlayer è parzialmente inizializzato
-    -- ma .identifier è ancora nil. Se proseguiamo:
-    --   1. CheckCharacterSwitch vede newId=nil → non rileva lo switch
-    --   2. Load vede identifier=nil → azzera PlayerWearing
-    --   3. PushStateToClient invia restoreWearing vuoto → player nudo
-    --
-    -- Soluzione: retry a intervallo fisso di 200ms, max 8 tentativi (~1.4s).
-    -- Se dopo l'ottavo tentativo l'identifier è ancora nil,
-    -- abbandoniamo silenziosamente — un altro evento (es. esx:playerLoaded
-    -- che firerà più tardi) rilancerà PushStateToClient.
+    -- Alcuni multichar emettono esx:onPlayerJoined prima che l'identifier sia
+    -- popolato: proseguire con nil significherebbe non rilevare lo switch,
+    -- azzerare PlayerWearing e mandare un restoreWearing vuoto — player nudo.
+    -- Retry fisso a 200ms, max 8 tentativi; poi si lascia perdere, tanto un
+    -- evento successivo rilancerà il push.
     if not getPlayerIdentifier or not getPlayerIdentifier(src) then
         if attempt >= 8 then
             local detail = { source = src, attempts = attempt, elapsedMs = attempt * 200 }
@@ -576,18 +563,10 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force, lifecycle)
         })
         TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, wearingState, context, lifecycle)
     else
-        -- Sia "truly new player" sia "switched-to new char" → requestPedScan.
-        --
-        -- In passato lo switch-flag triggherava un restoreWearing vuoto per
-        -- "ripulire" il PED dai drawable del char precedente. Ma applyWearingState
-        -- vuoto applica i DEFAULT degli MBT.Drawables (slot 3 = 15, ecc.) → questo
-        -- combatte contro illenium-appearance che sta applicando il vero skin del
-        -- nuovo char e li sovrascrive con default vanilla.
-        --
-        -- requestPedScan lascia applicare la skin esterna; il client invia una
-        -- visuale completa rimasta stabile per il debounce. Il server valida
-        -- struttura e limiti, senza trattare drawable 0/default come una skin
-        -- necessariamente incompleta: sono stati legittimi per molti script.
+        -- Player nuovo e char nuovo prendono la stessa strada: requestPedScan.
+        -- Un restoreWearing vuoto applicherebbe i default di MBT.Drawables e
+        -- combatterebbe contro l'appearance script che sta mettendo il vero skin.
+        -- Lo scan invece lo lascia lavorare e legge il risultato quando è stabile.
         local justSwitched = MBT.PlayerState.ConsumeSwitchFlag(src)
         MBT.Debugger('PushStateToClient: requesting initial PED scan', {
             source = src,

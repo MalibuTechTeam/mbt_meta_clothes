@@ -35,26 +35,21 @@ function getPlayerIdentifier(src)
 end
 
 -----------------------------------------------------------
--- Multicharacter switch — server-side handlers
--- Analisi flusso esx_multicharacter:
---  /relog → esx_multicharacter:relog → esx:playerLogout (SERVER) →
---           ES core chiama onPlayerDropped() → emette esx:playerDropped
---  character scelto → esx:playerLoaded (SERVER) con xPlayer nuovo
--- NB: esx:onPlayerLogout è CLIENT-side (TriggerClientEvent), NON scatta sul server.
+-- Multicharacter switch — handler server-side
 --
--- COMPATIBILITÀ MULTICHAR ALTERNATIVI:
--- Alcuni multichar (es. mbt_character con fast-switch) emettono solo
--- esx:onPlayerJoined senza che ES core triggeri esx:playerLoaded a valle: in
--- quei casi il load del nuovo char non si chiude e il client resta in pausa.
--- Ascoltiamo anche esx:onPlayerJoined come trigger alternativo.
+-- Flusso esx_multicharacter: /relog → esx:playerLogout → onPlayerDropped →
+-- esx:playerDropped; scelto il character → esx:playerLoaded col nuovo xPlayer.
+-- `esx:onPlayerLogout` è client-side e sul server non scatta.
+--
+-- Alcuni multichar (mbt_character in fast-switch) emettono solo
+-- esx:onPlayerJoined senza che ES core propaghi esx:playerLoaded: senza un
+-- trigger alternativo il load non si chiude e il client resta in pausa.
 -----------------------------------------------------------
 
--- Track delle pause attive: serve al watchdog server-side per sapere se
--- una pause è scaduta senza un load corrispondente (= nessun playerReady
--- è arrivato dal client per quel src nei N secondi successivi al logout).
-local pendingPauseSince = {} -- [src] = GetGameTimer() del logout
+-- [src] = GetGameTimer() del logout. Serve al watchdog per accorgersi di una
+-- pausa scaduta senza il load corrispondente.
+local pendingPauseSince = {}
 
--- Lifecycle traces use the shared MBT logger and remain debug-gated.
 local function logEsxEvent(name, src, extra)
     MBT.Debugger('esx bridge lifecycle', {
         event = name,
@@ -63,26 +58,17 @@ local function logEsxEvent(name, src, extra)
     })
 end
 
--- Carica nuovo character — guida direttamente il push al client.
---
--- IMPORTANTE: NON ci basiamo sul client esx:playerLoaded handler per inviare
--- playerReady a noi. Alcuni multichar (mbt_character fast-switch) propagano
--- esx:playerLoaded server-side ma NON client-side, lasciando il nostro flow
--- bloccato. Chiamando PushStateToClient direttamente qui, il flow funziona
--- indipendentemente dal client-event chain di ESX.
---
--- PushStateToClient è debounced 500ms — se il client ALSO manda playerReady,
--- la seconda chiamata è no-op silenzioso.
+-- Il push lo guida il server, non il playerReady del client: alcuni multichar
+-- propagano esx:playerLoaded server-side ma non client-side, e il flow resterebbe
+-- bloccato. Se poi arriva anche dal client, il debounce da 500ms lo assorbe.
 AddEventHandler('esx:playerLoaded', function(src, xPlayer, isNew)
     logEsxEvent("esx:playerLoaded", src, "isNew=" .. tostring(isNew))
     pendingPauseSince[src] = nil
     MBT.PlayerState.PushStateToClient(src)
 end)
 
--- Fallback per multichar che non fanno fire esx:playerLoaded a valle di
--- esx:onPlayerJoined. Aspettiamo 50ms per dare tempo allo xPlayer di esistere
--- in ESX.GetPlayerFromId, poi push. Se esx:playerLoaded fira anche, il
--- debounce 500ms in PushStateToClient evita la doppia chiamata.
+-- Fallback per chi non propaga esx:playerLoaded. I 50ms danno allo xPlayer il
+-- tempo di comparire in ESX.GetPlayerFromId.
 AddEventHandler('esx:onPlayerJoined', function(src)
     logEsxEvent("esx:onPlayerJoined", src)
     Citizen.SetTimeout(50, function()
@@ -102,21 +88,16 @@ AddEventHandler('esx:playerLogout', function(src)
         MBT.PlayerState.Save(src)
     end
     MBT.SnapshotServer.Cleanup(src)
-    -- Server-side watchdog: se entro 4s nessun playerLoaded/onPlayerJoined
-    -- ha resettato pendingPauseSince[src], significa che la catena del
-    -- multichar si è rotta e il client è bloccato in pausa. Forziamo manualmente
-    -- un restoreWearing vuoto al client per sbloccarlo (e aggiungiamo un WARN).
-    -- 4s < 5s del watchdog client così se entrambi sono attivi, scatta prima
-    -- questo (più informativo) e il client riceve l'unblock prima di doversi
-    -- auto-recoverare.
+    -- Se entro 4s nessun load ha resettato pendingPauseSince, la catena del
+    -- multichar si è rotta e il client resta in pausa: lo sblocchiamo. 4s sta
+    -- sotto i 5s del watchdog client, così l'unblock arriva prima dell'auto
+    -- recovery ed è più informativo.
     Citizen.SetTimeout(4000, function()
         if pendingPauseSince[src] then
-            -- Un multichar a selector lascia il player senza character finché
-            -- non sceglie: può volerci un minuto ed è attesa legittima, non una
-            -- catena rotta. Solo un load mancante CON identifier già presente
-            -- indica un guasto vero. Il comportamento non cambia — cambia il
-            -- livello di log, perché un allarme che scatta a ogni relog di ogni
-            -- giocatore smette di essere un allarme.
+            -- Con un multichar a selector il player resta senza character finché
+            -- non sceglie, anche per un minuto: è attesa legittima. Solo un load
+            -- mancante CON identifier già presente è un guasto vero — da cui il
+            -- livello di log diverso, altrimenti l'allarme scatta a ogni relog.
             local detail = { source = src, timeoutMs = 4000 }
             if getPlayerIdentifier and getPlayerIdentifier(src) then
                 MBT.Warn('esx bridge: load event missing after logout; forcing client unblock', detail)
@@ -124,8 +105,6 @@ AddEventHandler('esx:playerLogout', function(src)
                 MBT.Debugger('esx bridge: no character after logout (selector); unblocking client', detail)
             end
             pendingPauseSince[src] = nil
-            -- Trigger un restoreWearing vuoto sul client. Se il src non è più
-            -- valido (player disconnesso), TriggerClientEvent è no-op.
             TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, { Drawables = {}, Props = {} })
         end
     end)
@@ -142,8 +121,7 @@ AddEventHandler('esx:playerDropped', function(src)
     MBT.SnapshotServer.Cleanup(src)
 end)
 
--- playerDropped (FiveM nativo): cleanup del watchdog tracking se il player
--- esce davvero (non un /relog interno). Evita leak di memoria su pendingPauseSince.
+-- Drop vero (non /relog interno): evita che pendingPauseSince accumuli voci.
 AddEventHandler('playerDropped', function()
     pendingPauseSince[source] = nil
 end)
