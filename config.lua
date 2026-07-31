@@ -10,6 +10,23 @@ MBT.ActionCooldown       = 1500  -- ms between actions (prevents animation spam)
 MBT.TargetEnabled        = true  -- Auto-detects ox_target, qb-target, or qtarget
 
 -----------------------------------------------------------
+-- Theme
+-- Stessa convenzione di mbt_emote_menu: hex SENZA '#'. Viene inviato alla NUI
+-- all'apertura e trasformato in custom properties CSS, così un solo valore
+-- ritinge laser, anelli, marcatori del manichino e stati attivi.
+--
+-- Oggi meta_clothes espone solo l'accento: le altre chiavi di emote_menu
+-- (Background, Card, Text…) non sono qui perché la sua UI non le usa ancora, e
+-- una config che non fa niente è peggio di una config assente.
+--
+-- Il rosso della modalità furto NON è tematizzabile di proposito: lì il colore
+-- distingue "sto rubando" da "sto vestendomi", non è decorazione.
+-----------------------------------------------------------
+MBT.Theme                = {
+    Accent = '00e676', -- Brand green
+}
+
+-----------------------------------------------------------
 -- Stealing
 -----------------------------------------------------------
 MBT.StealDistance        = 5.0   -- Max distance (meters) to steal from a player

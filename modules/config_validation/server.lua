@@ -82,6 +82,20 @@ local function validatePositiveNumber(config, key, errors, allowZero)
     end
 end
 
+local function validateTheme(config, errors)
+    local theme = config.Theme
+    if type(theme) ~= 'table' then
+        addIssue(errors, 'MBT.Theme', 'must be a table')
+        return
+    end
+    -- Stessa convenzione di mbt_emote_menu: sei cifre esadecimali senza '#'.
+    -- Un '#' iniziale è l'errore più probabile di chi copia un colore da un
+    -- picker, quindi vale la pena che il messaggio lo dica.
+    if type(theme.Accent) ~= 'string' or not theme.Accent:match('^%x%x%x%x%x%x$') then
+        addIssue(errors, 'MBT.Theme.Accent', "must be a 6-digit hex colour without '#', e.g. '00e676'")
+    end
+end
+
 local function validateBounds(config, errors)
     local bounds = config.SnapshotBounds
     if type(bounds) ~= 'table' then
@@ -395,6 +409,7 @@ function ConfigValidation.Validate(config, locales)
     validatePositiveNumber(config, 'SnapshotRestorePollInterval', report.errors, true)
     validatePositiveNumber(config, 'DefaultDrip', report.errors, true)
 
+    validateTheme(config, report.errors)
     validateBounds(config, report.errors)
     validateTorsoKit(config, report.errors)
     validateSlots(config, report.errors, report.warnings, report.stats)

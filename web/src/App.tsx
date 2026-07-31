@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Mannequin from "./components/Mannequin";
 import { fetchNui } from "./utils/fetchNui";
 import { preloadImage, preloadImagesWhenIdle } from "./utils/imagePreload";
+import { applyTheme } from "./utils/theme";
 import {
   Shirt,
   Glasses,
@@ -180,6 +181,7 @@ export default function App() {
             setHairToggleable(d.hairToggleable);
           if (d.drip) setDrip(d.drip);
           if (d.labels) setLabels(d.labels);
+          applyTheme(d.theme);
         }
         if (!isVisible) {
           setActiveCategory({ id: null, rect: null });
@@ -200,6 +202,7 @@ export default function App() {
           setStealWearing(d.wearing || { Drawables: {}, Props: {} });
           if (d.sex !== undefined) setStealSex(d.sex);
           if (d.labels) setLabels(d.labels);
+          applyTheme(d.theme);
         } else {
           setStealItems([]);
           setStealWearing({ Drawables: {}, Props: {} });
@@ -481,7 +484,7 @@ export default function App() {
           {worn && (
             <motion.div
               layoutId="orbit-ring"
-              className="absolute -inset-1.5 border border-blue-500/40 rounded-full"
+              className="absolute -inset-1.5 border border-[rgba(var(--mbt-accent-rgb),0.4)] rounded-full"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
@@ -510,7 +513,7 @@ export default function App() {
               e.stopPropagation();
               handleToggleClick(slotType, slotIndex);
             }}
-            className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-cyan-500/80 border border-cyan-300/50 flex items-center justify-center cursor-pointer shadow-[0_0_10px_rgba(34,211,238,0.4)] hover:bg-cyan-400/90 transition-colors z-10"
+            className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[rgba(var(--mbt-accent-rgb),0.8)] border border-[rgba(var(--mbt-accent-rgb),0.5)] flex items-center justify-center cursor-pointer shadow-[0_0_10px_rgba(var(--mbt-accent-rgb),0.4)] hover:bg-[rgba(var(--mbt-accent-rgb),0.95)] transition-colors z-10"
             title="Toggle style"
           >
             <RefreshCw size={11} strokeWidth={2.5} className="text-white" />
@@ -666,14 +669,14 @@ export default function App() {
                           x2="100%"
                           y2="0%"
                         >
-                          <stop offset="0%" stopColor="rgba(37, 99, 235, 0)" />
+                          <stop offset="0%" style={{ stopColor: "rgba(var(--mbt-accent-rgb), 0)" }} />
                           <stop
                             offset="50%"
-                            stopColor="rgba(37, 99, 235, 0.8)"
+                            style={{ stopColor: "rgba(var(--mbt-accent-rgb), 0.8)" }}
                           />
                           <stop
                             offset="100%"
-                            stopColor="rgba(37, 99, 235, 0)"
+                            style={{ stopColor: "rgba(var(--mbt-accent-rgb), 0)" }}
                           />
                         </linearGradient>
                       </defs>

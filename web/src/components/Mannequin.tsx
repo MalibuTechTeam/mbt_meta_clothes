@@ -406,7 +406,7 @@ export default function Mannequin({
                 Wrapper esterno: posizionamento statico. Inner: solo scale. */}
             <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[38%] h-4 pointer-events-none z-0">
               <div
-                className="w-full h-full rounded-[100%] border border-cyan-400/60 mbt-scanner-ring"
+                className="w-full h-full rounded-[100%] border border-[rgba(var(--mbt-accent-rgb),0.6)] mbt-scanner-ring"
                 style={{
                   boxShadow: "0 0 12px rgba(0,220,255,0.45)",
                 }}
@@ -416,7 +416,7 @@ export default function Mannequin({
             {/* Layer 4: scanner ring 2 — sfasato nel tempo per continuità */}
             <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[38%] h-4 pointer-events-none z-0">
               <div
-                className="w-full h-full rounded-[100%] border border-cyan-400/50 mbt-scanner-ring-delay"
+                className="w-full h-full rounded-[100%] border border-[rgba(var(--mbt-accent-rgb),0.5)] mbt-scanner-ring-delay"
                 style={{
                   boxShadow: "0 0 12px rgba(0,220,255,0.4)",
                 }}
@@ -452,12 +452,12 @@ export default function Mannequin({
             ? isSelected
               ? "bg-red-500"
               : "bg-red-500/20"
-            : "bg-blue-500/20";
+            : "bg-[rgba(var(--mbt-accent-rgb),0.2)]";
           const borderColor = stealMode
             ? isSelected
               ? "border-red-400"
               : "border-red-500/40"
-            : "border-blue-500/40";
+            : "border-[rgba(var(--mbt-accent-rgb),0.4)]";
           const dotColor = stealMode
             ? isSelected
               ? "#ef4444"
@@ -500,7 +500,7 @@ export default function Mannequin({
               <div className="absolute top-1/2 left-full ml-5 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0 pointer-events-none whitespace-nowrap">
                 <span
                   className={`px-3 py-1.5 text-[11px] font-bold text-white uppercase tracking-[0.25em] rounded-md border-l-4 shadow-2xl transition-colors drop-shadow-[0_2px_12px_rgba(0,0,0,1)]
-                  ${stealMode ? "bg-red-950 border-red-600" : "bg-[#0F172A] border-blue-600"}`}
+                  ${stealMode ? "bg-red-950 border-red-600" : "bg-[#0F172A] border-[var(--mbt-accent)]"}`}
                 >
                   {spot.label}
                 </span>
@@ -535,9 +535,9 @@ export default function Mannequin({
                     ? item.id === "drip"
                       ? "bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-[0_0_20px_rgba(249,115,22,0.4)] w-10"
                       : item.id === "clothes"
-                        ? "bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)] w-10"
+                        ? "bg-gradient-to-br from-[var(--mbt-accent)] to-[var(--mbt-accent-strong)] text-black shadow-[0_0_20px_rgba(var(--mbt-accent-rgb),0.4)] w-10"
                         : item.id === "hair"
-                          ? "bg-gradient-to-br from-cyan-500 to-teal-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] w-10"
+                          ? "bg-gradient-to-br from-[rgba(var(--mbt-accent-rgb),0.7)] to-[rgba(var(--mbt-accent-rgb),0.45)] text-black shadow-[0_0_20px_rgba(var(--mbt-accent-rgb),0.3)] w-10"
                           : "bg-white text-black w-10"
                     : "text-white/50 hover:text-white hover:bg-white/10 w-10")
                 }`}

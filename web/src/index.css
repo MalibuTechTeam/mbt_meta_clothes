@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+:root {
+  /* Default del tema. Il Lua li sovrascrive con MBT.Theme all'apertura del
+     menu (vedi utils/theme.ts); questi restano se il messaggio non arriva o
+     porta un valore malformato. Verde MalibuTech, stesso di mbt_emote_menu. */
+  --mbt-accent: #00e676;
+  /* Tripletta RGB per comporre qualunque opacità: rgba(var(--mbt-accent-rgb), 0.4) */
+  --mbt-accent-rgb: 0, 230, 118;
+  --mbt-accent-strong: rgba(0, 230, 118, 0.82);
+  --mbt-accent-glow: rgba(0, 230, 118, 0.25);
+  --mbt-accent-soft: rgba(0, 230, 118, 0.08);
+}
+
 body {
   margin: 0;
   overflow: hidden; /* Important for FiveM NUI */

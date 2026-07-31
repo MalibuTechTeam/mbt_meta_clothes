@@ -45,6 +45,11 @@ export interface ToggleableSlots {
 }
 
 // NUI message types from Lua
+/** config.lua MBT.Theme — colori in hex SENZA '#', come in mbt_emote_menu. */
+export interface ThemeConfig {
+  Accent: string;
+}
+
 export interface NUIMessageUI {
   action: 'ui';
   status: boolean | string | number;
@@ -59,6 +64,8 @@ export interface NUIMessageUI {
   hairToggleable?: boolean;
   drip?: DripState;
   labels?: UILabels;
+  /** Tema dal server (config.lua MBT.Theme). */
+  theme?: ThemeConfig;
 }
 
 export interface NUIMessageHairToggleUpdate {
@@ -115,6 +122,8 @@ export interface NUIMessageStealMenu {
   wearing?: WearingState;
   sex?: 0 | 1;
   labels?: UILabels;
+  /** Tema dal server (config.lua MBT.Theme). */
+  theme?: ThemeConfig;
 }
 
 /**

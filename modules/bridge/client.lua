@@ -149,6 +149,7 @@ function MBT.SharedClient.SetupStealDress()
             wearing = victimWearing,
             sex = targetSex == "female" and 1 or 0,
             labels = MBT.Locale.UI or {},
+            theme = MBT.Theme,
         })
     end
 

@@ -603,6 +603,7 @@ RegisterCommand("toggleUndress", function()
             -- UI labels dal locale attivo (hotspots, slot names, steal strings).
             -- Un solo source of truth per lingua: il Lua pilota, React consuma.
             labels = MBT.Locale.UI or {},
+            theme = MBT.Theme,
         })
     end
 end, false)
