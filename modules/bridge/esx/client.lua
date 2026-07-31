@@ -36,7 +36,7 @@ AddEventHandler('esx:loadingScreenOff', function()
     MBT.Utils.StartHybridDetection()
 end)
 
--- Multicharacter: pause/resume della hybrid detection pilotati dal server
+-- Multicharacter: pause/resume pilotati dal server
 -- tramite net event custom. Il server sa con certezza quando scatta il logout
 -- (esx:playerLogout) e il load (esx:playerLoaded), mentre il corrispettivo
 -- esx:onPlayerLogout client-side non scatta in tutti i setup multicharacter.

@@ -12,7 +12,6 @@ local DirtyPlayers = {}
 local PlayerIdentifiers = {}
 local PlayerRevisions = {}
 local PlayerSaveGenerations = {}
-local PlayerHasDbEntry = {}
 local PlayerHasBaseline = {}
 local PlayerDripXp = {}
 local PlayerJustSwitched = {} -- true quando CheckCharacterSwitch ha rilevato uno switch
@@ -167,23 +166,6 @@ function MBT.PlayerState.ClearSlot(src, slotType, slotIndex)
     return metadata
 end
 
-function MBT.PlayerState.ClearAllSlots(src, slotType)
-    -- Safety net multicharacter
-    if MBT.PlayerState.CheckCharacterSwitch(src) then
-        MBT.PlayerState.Load(src)
-    end
-
-    if not PlayerWearing[src] then return {} end
-    local allMetadata = PlayerWearing[src][slotType] or {}
-    PlayerWearing[src][slotType] = {}
-    if next(allMetadata) then
-        markDirty(src)
-        touchRevision(src)
-        TriggerEvent('mbt_meta_clothes:onClothingChanged', src, slotType, nil, nil, 'state')
-    end
-    return allMetadata
-end
-
 function MBT.PlayerState.GetAll(src)
     return PlayerWearing[src]
 end
@@ -281,11 +263,6 @@ function MBT.PlayerState.GetDripXp(src)
     return PlayerDripXp[src] or 0
 end
 
-function MBT.PlayerState.SetDripXp(src, xp)
-    PlayerDripXp[src] = xp
-    markDirty(src)
-end
-
 function MBT.PlayerState.AddDripXp(src, amount)
     PlayerDripXp[src] = (PlayerDripXp[src] or 0) + amount
     markDirty(src)
@@ -373,7 +350,6 @@ function MBT.PlayerState.CheckCharacterSwitch(src)
     DirtyPlayers[src] = nil
     PlayerIdentifiers[src] = nil
     PlayerSaveGenerations[src] = nil
-    PlayerHasDbEntry[src] = nil
     PlayerHasBaseline[src] = nil
     PlayerDripXp[src] = nil
     -- Flag: il prossimo playerReady è dovuto a switch, NON deve fare PED scan
@@ -400,13 +376,10 @@ function MBT.PlayerState.Load(src, identifier)
         end
     end
     if not identifier then
-        -- IDENTIFIER NIL — non azzerare lo stato! Il caller (es. PushStateToClient)
-        -- ha la sua logica di retry e si aspetta di poter ritentare. Se chiamassimo
-        -- InitPlayer qui, perderemmo PlayerWearing del char precedente (che potrebbe
-        -- non essere ancora stato salvato) e PlayerHasDbEntry resterebbe stantio
-        -- → restoreWearing inviato vuoto al client → player nudo.
-        --
-        -- Init a vuoto SOLO se PlayerWearing[src] non esiste ancora (truly first call).
+        -- IDENTIFIER NIL — non azzerare lo stato. Il caller ha la sua logica di
+        -- retry: azzerare qui perderebbe il PlayerWearing del char precedente,
+        -- magari non ancora salvato, e manderemmo un restoreWearing vuoto.
+        -- Init a vuoto SOLO se non esiste ancora nulla (prima chiamata vera).
         if not PlayerWearing[src] then
             MBT.PlayerState.InitPlayer(src)
         end
@@ -451,12 +424,10 @@ function MBT.PlayerState.Load(src, identifier)
             MBT.Debugger("PlayerState: corrupted DB data for", identifier, "- resetting")
             MBT.PlayerState.InitPlayer(src)
         end
-        PlayerHasDbEntry[src] = true
         PlayerHasBaseline[src] = true
         MBT.Debugger('PlayerState.Load: DB hit', { source = src, identifier = identifier })
     else
         MBT.PlayerState.InitPlayer(src)
-        PlayerHasDbEntry[src] = false
         PlayerHasBaseline[src] = false
         MBT.Debugger('PlayerState.Load: DB miss', {
             source = src,
@@ -467,14 +438,6 @@ function MBT.PlayerState.Load(src, identifier)
 
     DirtyPlayers[src] = false
     PlayerSaveGenerations[src] = PlayerSaveGenerations[src] or 0
-end
-
---- Check if a player has an existing DB record
---- Used by syncInitialWearing to skip PED scan for returning players
---- @param src number Player source
---- @return boolean
-function MBT.PlayerState.HasDbEntry(src)
-    return PlayerHasDbEntry[src] == true
 end
 
 
@@ -495,7 +458,6 @@ function MBT.PlayerState.Cleanup(src, discard)
     PlayerIdentifiers[src] = nil
     PlayerRevisions[src] = nil
     PlayerSaveGenerations[src] = nil
-    PlayerHasDbEntry[src] = nil
     PlayerHasBaseline[src] = nil
     PlayerDripXp[src] = nil
     PlayerJustSwitched[src] = nil
@@ -556,10 +518,9 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force, lifecycle)
     -- esx:onPlayerJoined PRIMA che ESX.GetPlayerFromId(src).identifier sia
     -- popolato. Nei 50-300ms successivi xPlayer è parzialmente inizializzato
     -- ma .identifier è ancora nil. Se proseguiamo:
-    --   1. CheckCharacterSwitch vede newId=nil → ritorna false (non rileva lo switch)
-    --   2. Load vede identifier=nil → early return con InitPlayer (AZZERA PlayerWearing)
-    --   3. PlayerHasDbEntry resta TRUE (residuo del char precedente)
-    --   4. PushStateToClient invia restoreWearing con state VUOTO → player nudo
+    --   1. CheckCharacterSwitch vede newId=nil → non rileva lo switch
+    --   2. Load vede identifier=nil → azzera PlayerWearing
+    --   3. PushStateToClient invia restoreWearing vuoto → player nudo
     --
     -- Soluzione: retry a intervallo fisso di 200ms, max 8 tentativi (~1.4s).
     -- Se dopo l'ottavo tentativo l'identifier è ancora nil,

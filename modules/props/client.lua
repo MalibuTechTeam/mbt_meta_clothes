@@ -158,28 +158,6 @@ function MBT.ClothingProps.ScatterFromPed(ped, propModel, slotType, slotIndex)
     return obj
 end
 
-function MBT.ClothingProps.ScatterAllFromPed(ped, sex)
-    if not MBT.ClothingPropsEnabled then return end
-    if not sex or sex == "customSkin" then return end
-
-    for k, v in pairs(MBT.Drawables) do
-        if v["PropModel"] and v["Default"][sex] then
-            local current = GetPedDrawableVariation(ped, k)
-            if not MBT.TableContains(v["Default"][sex], current) then
-                MBT.ClothingProps.ScatterFromPed(ped, v["PropModel"], "Drawables", k)
-            end
-        end
-    end
-
-    for k, v in pairs(MBT.Props) do
-        if v["PropModel"] and v["Default"][sex] then
-            local current = GetPedPropIndex(ped, k)
-            if not MBT.TableContains(v["Default"][sex], current) then
-                MBT.ClothingProps.ScatterFromPed(ped, v["PropModel"], "Props", k)
-            end
-        end
-    end
-end
 
 -----------------------------------------------------------
 -- Cleanup

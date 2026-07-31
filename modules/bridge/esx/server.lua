@@ -44,10 +44,9 @@ end
 --
 -- COMPATIBILITÀ MULTICHAR ALTERNATIVI:
 -- Alcuni multichar (es. mbt_character con fast-switch) emettono solo
--- esx:onPlayerJoined senza che ES core triggeri esx:playerLoaded a valle —
--- in quei casi il flow "load del nuovo char" non si chiude e il client resta
--- in pausa keepPedHidden. Per coprire questo edge case ascoltiamo anche
--- esx:onPlayerJoined come trigger alternativo per CheckCharacterSwitch.
+-- esx:onPlayerJoined senza che ES core triggeri esx:playerLoaded a valle: in
+-- quei casi il load del nuovo char non si chiude e il client resta in pausa.
+-- Ascoltiamo anche esx:onPlayerJoined come trigger alternativo.
 -----------------------------------------------------------
 
 -- Track delle pause attive: serve al watchdog server-side per sapere se
@@ -92,11 +91,9 @@ AddEventHandler('esx:onPlayerJoined', function(src)
     end)
 end)
 
--- Logout (compreso /relog): salva lo stato usando l'identifier ancora
--- valido in cache PRIMA che l'xPlayer venga sostituito dal nuovo character,
--- e mette in pausa la hybrid detection del client per evitare che i
--- drawable applicati dall'appearance script del nuovo char siano attribuiti
--- al char vecchio tramite externalDress.
+-- Logout (compreso /relog): salva lo stato con l'identifier ancora valido in
+-- cache, PRIMA che l'xPlayer venga sostituito dal nuovo character, e mette in
+-- pausa il client perché i drawable del char nuovo non finiscano sul vecchio.
 AddEventHandler('esx:playerLogout', function(src)
     logEsxEvent("esx:playerLogout", src)
     TriggerClientEvent('mbt_meta_clothes:multichar:pauseDetection', src)

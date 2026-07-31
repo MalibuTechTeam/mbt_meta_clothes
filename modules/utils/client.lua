@@ -294,9 +294,9 @@ end
 -- che il resto della risorsa e i bridge continuano a chiamare.
 -----------------------------------------------------------
 
---- Pause hybrid detection (used during multicharacter transitions so that
---- PED drawable changes from the appearance script of the new character
---- don't get attributed to the OLD character via externalDress events).
+--- Sospende la sincronizzazione durante una transizione multicharacter: i
+--- drawable che l'appearance script applica al char nuovo non devono finire
+--- nello stato del char vecchio.
 function MBT.Utils.PauseHybridDetection()
     if MBT.SnapshotClient then MBT.SnapshotClient.Pause('legacy') end
 end
@@ -334,15 +334,11 @@ local pedVisibility = MBT.PedVisibility.New({
 --- @param reason string|nil Etichetta diagnostica per il log
 function MBT.Utils.SchedulePedVisibilityWatchdog(reason)
     MBT.Trace.Mark('coordinator:begin', { reason = reason })
-    -- `Begin` nasconde una volta sola e arma il reveal di sicurezza. NON parte
-    -- nessun loop di riasserzione: qui c'era un `Pulse` ogni 50ms, gemello del
-    -- loop `keepPedHidden` rimosso il 2026-07-30 dopo averlo misurato mentre
-    -- produceva dodici transizioni in 300ms contro il multicharacter.
-    --
-    -- Il Pulse serviva a inseguire il rimpiazzo del PED (quello nuovo nasce
-    -- visibile). Quel caso ora è coperto meglio dall'altra parte: la restore
-    -- protection controlla a ogni frame e rivestiamo un PED nuovo entro un
-    -- frame, invece di nasconderlo a forza litigando con chi lo sta gestendo.
+    -- Nasconde UNA volta e arma il reveal di sicurezza. Mai riasserire in loop:
+    -- l'alpha la scrivono anche i multicharacter, e contraddirli ogni 50ms
+    -- produce uno stroboscopio invece di un PED nascosto. Un PED rimpiazzato lo
+    -- rivestiamo entro un frame dalla restore protection, che è più economico
+    -- che litigare con chi lo sta gestendo.
     return pedVisibility:Begin(reason, 5000)
 end
 
@@ -358,12 +354,9 @@ function MBT.Utils.CancelPedVisibilityWait()
     return pedVisibility:Cancel()
 end
 
---- Riprende la hybrid detection dopo una pausa (es. multichar switch).
---- Se viene passato wearingState, il cache viene settato sullo stato ATTESO
---- invece che dal PED corrente. Questo evita che modifiche dell'appearance
---- script applicate durante la pausa vengano "congelate" nel cache come
---- normali: invece, al prossimo poll, il loop vede un diff dal PED e la
---- restoreProtection reverte quello che non dovrebbe esserci.
+--- Riprende dopo una pausa. Con `wearingState` la baseline è lo stato ATTESO e
+--- non il PED corrente: quello che l'appearance script ha applicato durante la
+--- pausa risulta così un diff da correggere, invece di essere dato per buono.
 function MBT.Utils.ResumeHybridDetection(wearingState)
     if MBT.SnapshotClient then MBT.SnapshotClient.Resume('legacy', wearingState) end
 end
@@ -373,12 +366,6 @@ function MBT.Utils.ExpectChange(slotType, slotIndex)
     if MBT.SnapshotClient then
         return MBT.SnapshotClient.ExpectInternalSlot(slotType, slotIndex, 3000)
     end
-end
-
---- Scan current PED and send wearing state to server (for NEW players)
---- This captures what the player is wearing from the appearance script
-function MBT.Utils.SyncWearingState()
-    if MBT.SnapshotClient then MBT.SnapshotClient.ForceInitialScan(0) end
 end
 
 --- Enable restore protection (prevents appearance script from overriding our state)
