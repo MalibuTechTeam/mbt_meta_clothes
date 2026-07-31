@@ -62,9 +62,8 @@ interface MannequinProps {
   // Usa la logica centrale di App per capire se uno slot è indossato.
   // Necessaria per mask/bag/armor che non stanno nella wearing table ma in extraState.
   isSlotWorn?: (slotType: "Drawables" | "Props", slotIndex: number) => boolean;
-  // Dizionario UI localizzato (hotspot/slot/steal). Inviato dal Lua ad ogni
-  // apertura della NUI. Se assente, il componente mostra le label di default
-  // (italiano) grazie al fallback in App.
+  // Dizionario UI dal Lua. Se non è ancora arrivato valgono i fallback inline
+  // definiti più sotto, uno per hotspot.
   labels?: UILabels;
   onCategoryClick: (id: string, rect: { left: number; top: number }) => void;
   onClose: () => void;
@@ -89,7 +88,6 @@ export default function Mannequin({
   const [selectedToSteal, setSelectedToSteal] = useState<Set<string>>(
     new Set(),
   );
-  // STEP 3: slot attualmente hoverato — illumina ciano il capo corrispondente
   const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
 
   // Warm the pedestal once during an idle period. Later menu openings reuse
@@ -111,8 +109,6 @@ export default function Mannequin({
     return () => window.clearTimeout(handle);
   }, []);
 
-  // Label dai locale ricevuti dal Lua — con fallback inglese inline se il
-  // payload non è ancora arrivato (primo frame post-mount prima del setLabels).
   const hotspotLabels = labels?.hotspots;
   const allHotspots: Hotspot[] = [
     { id: "head", label: hotspotLabels?.head ?? "Head & Face", top: "12%", left: "50%" },
@@ -278,7 +274,7 @@ export default function Mannequin({
           </motion.div>
         )}
 
-        {/* 3D Mannequin Base Image (Background container kept empty or removed if not needed) */}
+        {/* Immagine base del mannequin */}
         <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none" />
 
         <img
@@ -307,40 +303,29 @@ export default function Mannequin({
             if (!worn) return null;
             const gender = sex === 1 ? "female" : "male";
             if (!meta.availableFor.includes(gender)) return null;
-            // STEP 3: se lo slot hoverato è mappato a questo layer, applica glow ciano
             const isLayerHovered =
               hoveredSlot !== null &&
               (HOTSPOT_TO_LAYERS[hoveredSlot] || []).includes(key);
-            // STEP 4: an active slot gets a duplicate glow overlay whose
-            // opacity animates without recalculating the filter every frame.
+            // Lo slot attivo riceve un overlay di glow separato, così l'opacità
+            // si anima senza ricalcolare il filtro a ogni frame.
             const isLayerActive =
               activeCategory !== null &&
               (HOTSPOT_TO_LAYERS[activeCategory] || []).includes(key);
-            // STEP 1: ombra nera sotto il capo per farlo "poggiare" sul mannequin.
-            // STEP 2: rim light bianca sul top per staccare il capo dal fondo e
-            //         dare feel HUD (luce ambientale che colpisce dall'alto).
-            // STEP 3: glow ciano se lo slot corrispondente è hover.
-            // Avoid rasterizing a large shadow surface for every transparent
-            // layer while the entire mannequin is entering the screen.
+            // Ombra sotto il capo per farlo "poggiare", rim light bianca in alto
+            // per staccarlo dal fondo, glow d'accento se lo slot è in hover.
+            // Il filtro resta assente durante l'entrata del mannequin: rasterizzare
+            // un'ombra grande per ogni layer trasparente costa una comparsa ritardata.
             const layerFilter = isLayerHovered
               ? HOVER_LAYER_FILTER
               : undefined;
             const layerSrc = `./layers/${meta.path}_${gender}.png`;
             return (
-              // STEP 9: bloom SOLO in exit (quando l'utente svesté con UI
-              // aperta). Entry è solo fade/scale — con UI aperta il player
-              // non esegue dress, quindi l'entry bloom non si vedrebbe mai.
+              // Bloom solo in uscita: con la UI aperta il player non si veste,
+              // quindi un bloom in entrata non si vedrebbe mai.
               //
-              // IMPORTANTE: filter usa un HEX invece di rgba()/var() perché
-              // framer-motion ha un bug che sbaglia a parsare le parentesi
-              // nested dentro drop-shadow, producendo "Invalid keyframe value
-              // for property filter".
-              //
-              // È l'UNICO colore della UI che non segue MBT.Theme: essendo un
-              // valore animato non può contenere var(--mbt-accent). Resta
-              // allineato a mano al verde di default; cambiando l'accento in
-              // config questo lampo di 350ms sull'undress non lo segue.
-              //
+              // Il colore è un HEX e non var(--mbt-accent): framer-motion non
+              // parsa le parentesi nested dentro drop-shadow. È l'unico colore
+              // della UI che non segue MBT.Theme, e va allineato a mano.
               <motion.div
                 key={`layer-${key}`}
                 // Niente filter in initial/animate: crearlo al primo paint
@@ -386,12 +371,11 @@ export default function Mannequin({
           })}
         </AnimatePresence>
 
-        {/* STEP 5: Pedestal sci-fi — ambient glow + scanner rings.
-            The first mount waits for an idle period; later openings reuse the
-            warmed state and do not schedule another delayed initialization. */}
+        {/* Piedistallo: glow ambientale + anelli scanner. Il primo mount aspetta
+            un periodo di idle; le aperture successive riusano lo stato scaldato. */}
         {pedestalReady && (
           <>
-            {/* Layer 1: ambient radial light — mood light ciano/bianca che respira. */}
+            {/* Layer 1: luce radiale d'ambiente che respira. */}
             <div
               className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[65%] h-24 mbt-pedestal-breath pointer-events-none z-0"
               style={{

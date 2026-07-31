@@ -34,10 +34,8 @@ import type {
   UILabels,
 } from "./types";
 
-// Fallback inglese usato se il Lua non invia ancora il dizionario labels
-// (race condition tra primo render e primo NUI message). Inglese perché è
-// la lingua più universale: un server non-italiano non deve vedere testo
-// in italiano anche solo per un frame.
+// Fallback per il frame fra primo render e primo messaggio NUI. In inglese:
+// un server non-italiano non deve vedere italiano nemmeno per un istante.
 const DEFAULT_LABELS: UILabels = {
   hotspots: {
     head: "Head & Face",
@@ -117,16 +115,13 @@ export default function App() {
   const [hairToggleable, setHairToggleable] = useState(false);
   const [stealMode, setStealMode] = useState(false);
   const [stealItems, setStealItems] = useState<StealItem[]>([]);
-  // Snapshot di cosa la vittima indossa, ricevuto dal server quando apre il
-  // menu steal. Usato per far vedere sul mannequin i suoi vestiti (non i nostri)
-  // durante lo steal mode.
+  // In steal mode il mannequin mostra i vestiti della vittima, non i nostri.
   const [stealWearing, setStealWearing] = useState<WearingState>({
     Drawables: {},
     Props: {},
   });
   const [stealSex, setStealSex] = useState<0 | 1>(0);
-  // Dizionario UI inviato dal Lua (Locales[lang].UI). Aggiornato a ogni
-  // apertura della NUI così la lingua può cambiare a runtime senza restart.
+  // Riletto a ogni apertura, così la lingua cambia a runtime senza restart.
   const [labels, setLabels] = useState<UILabels>(DEFAULT_LABELS);
 
   const handleExitUI = useCallback(() => {
@@ -197,8 +192,6 @@ export default function App() {
           setStealMode(true);
           setActiveCategory({ id: null, rect: null }); // FIX: Clear stale category on open
           if (d.items) setStealItems(d.items);
-          // Snapshot del victim wearing: cosa indossa l'obiettivo del furto.
-          // Passato al mannequin in steal mode così vedi i SUOI vestiti, non i tuoi.
           setStealWearing(d.wearing || { Drawables: {}, Props: {} });
           if (d.sex !== undefined) setStealSex(d.sex);
           if (d.labels) setLabels(d.labels);
@@ -380,31 +373,18 @@ export default function App() {
   // Laser HUD math
   const hasActive = activeCategory.id !== null && activeCategory.rect !== null;
 
-  // `rect` arriva da getBoundingClientRect: sono coordinate VIEWPORT. L'SVG e il
-  // pannello vivono però dentro il box 16:9 centrato (`max-w-[177.77vh] mx-auto`),
-  // quindi la loro origine è il bordo sinistro del box, non dello schermo.
-  // Su 16:9 le due coincidono e non si nota; su ultrawide il box è rientrato e
-  // linee e pannello finivano spostati a destra di metà banda laterale, mentre
-  // il manichino — posizionato in percentuale sul box — restava al suo posto.
-  // Verticalmente non serve correzione: il box è alto quanto lo schermo.
+  // `rect` è in coordinate viewport, ma SVG e pannello vivono nel box 16:9
+  // centrato (`max-w-[177.77vh] mx-auto`): su ultrawide le due origini non
+  // coincidono. In verticale il box è alto quanto lo schermo, nessun offset.
   const stageWidth = Math.min(window.innerWidth, window.innerHeight * (16 / 9));
   const stageOffsetX = (window.innerWidth - stageWidth) / 2;
 
   const startX = hasActive ? activeCategory.rect!.left - stageOffsetX : 0;
   const startY = hasActive ? activeCategory.rect!.top : 0;
 
-  // Il pannello si aprirà esattamente a 40px di distanza dal punto cliccato sul manichino
+  // Il tracciato NON va scalato per l'altezza dello schermo: il pannello a cui
+  // si aggancia è in `rem`, e scalare solo la linea la fa sporgere oltre.
   const laserLength = 100;
-
-  // NB: il tracciato del laser NON è scalato per l'altezza dello schermo, e non
-  // è una dimenticanza. Il pannello a cui si aggancia è posizionato in `rem`
-  // (`calc(100% - startX + 6.25rem)`) e la sua griglia è in `rem`: scalare solo
-  // la linea la faceva allungare del 33% a 1440p mentre il pannello restava
-  // fermo, e la coda sporgeva oltre il pannello di ~180px.
-  //
-  // La cura completa sarebbe scalare TUTTO il pannello insieme al palco, non
-  // togliere lo scaling alla linea — ma è un lavoro sulla griglia e sulle icone,
-  // non due righe qui. Finché il pannello vive in rem, ci vive anche la linea.
 
   const activeCategorySlots = useMemo(() => {
     if (!hasActive || !activeCategory.id) return null;

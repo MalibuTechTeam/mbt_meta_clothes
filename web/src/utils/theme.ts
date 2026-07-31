@@ -1,21 +1,16 @@
 import type { ThemeConfig } from "../types";
 
-/** 6-char "rrggbb" hex (no leading #) → "r, g, b" triplet for rgba(). */
-export function hexToRgb(hex: string): string {
-  const r = parseInt(hex.slice(0, 2), 16);
-  const g = parseInt(hex.slice(2, 4), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
-  return `${r}, ${g}, ${b}`;
-}
-
 const HEX6 = /^[0-9a-fA-F]{6}$/;
 
+/** "rrggbb" (senza '#') → "r, g, b", per comporre rgba() con qualunque alpha. */
+function hexToRgb(hex: string): string {
+  const channel = (offset: number) => parseInt(hex.slice(offset, offset + 2), 16);
+  return `${channel(0)}, ${channel(2)}, ${channel(4)}`;
+}
+
 /**
- * Scurisce un accento moltiplicandone le componenti.
- * Serve per i riempimenti pieni: un accento brillante come #00e676 non regge
- * né un glifo bianco (contrasto ~1.6:1) né uno nero che si perde nel sottile.
- * Il design originale era fondo scuro + glifo bianco, e per conservarlo serve
- * una versione scurita del colore scelto dall'owner, non una traslucida.
+ * Versione scurita dell'accento, per i riempimenti pieni: su un accento
+ * brillante non si legge né un glifo bianco né uno nero.
  */
 function shade(hex: string, factor: number): string {
   const channel = (offset: number) =>
@@ -24,17 +19,11 @@ function shade(hex: string, factor: number): string {
 }
 
 /**
- * Build the CSS custom-property set from the server theme (config.lua
- * MBT.Theme). App applies these on :root, so laser, hotspot markers, scanner
- * rings and active states all share one accent — changing MBT.Theme.Accent
- * re-tints the whole NUI, glows included. index.css holds the defaults.
- *
- * Stessa convenzione di mbt_emote_menu, di proposito: chi ha già configurato
- * quello sa cosa aspettarsi qui.
+ * Espande config.lua MBT.Theme nelle custom property applicate su :root, così
+ * un solo valore ritinge tutta la UI. Stessa convenzione di mbt_emote_menu.
+ * I default vivono in index.css e restano se il tema è assente o malformato.
  */
-export function buildThemeVars(theme: ThemeConfig): Record<string, string> {
-  // Un valore malformato non deve svuotare la UI: meglio tenere i default di
-  // index.css che dipingere tutto di `NaN`.
+export function buildThemeVars(theme?: ThemeConfig): Record<string, string> {
   if (!theme || typeof theme.Accent !== "string" || !HEX6.test(theme.Accent)) {
     return {};
   }
@@ -51,10 +40,8 @@ export function buildThemeVars(theme: ThemeConfig): Record<string, string> {
   };
 }
 
-/** Applica il tema su :root. No-op se il Lua non ha inviato nulla di valido. */
 export function applyTheme(theme?: ThemeConfig): void {
-  const vars = buildThemeVars(theme as ThemeConfig);
-  for (const [name, value] of Object.entries(vars)) {
+  for (const [name, value] of Object.entries(buildThemeVars(theme))) {
     document.documentElement.style.setProperty(name, value);
   }
 }
