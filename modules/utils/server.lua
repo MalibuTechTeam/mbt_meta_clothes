@@ -144,14 +144,28 @@ function MBT.ServerUtils.GetPlayerSex(src)
     return MBT.NormalizeSex(MBT.GenderModels and MBT.GenderModels[model])
 end
 
---- Check if wearable_props has gloves export available
---- Cached at startup to avoid repeated pcall overhead
-local hasGlovesExport = false
-if GetResourceState('mbt_wearable_props') == 'started' then
-    local ok, result = pcall(function()
-        return exports.mbt_wearable_props:isPlayerWearingGloves(0)
+--- L'export di mbt_wearable_props si risolve al primo uso, non al load: l'ordine
+--- di avvio fra risorse non è garantito, e sondare troppo presto cristallizzava
+--- un "assente" anche quando wearable_props parte subito dopo di noi — cioè
+--- l'integrazione fra il tier free e quello a pagamento restava muta in silenzio.
+local glovesExportReady = nil -- nil = mai sondato, false = export assente
+
+local function isWearingGloves(src)
+    if glovesExportReady == false then return false end
+    if GetResourceState('mbt_wearable_props') ~= 'started' then return false end
+
+    local ok, wearing = pcall(function()
+        return exports.mbt_wearable_props:isPlayerWearingGloves(src)
     end)
-    hasGlovesExport = ok
+    -- Un fallimento CON la risorsa avviata significa export mancante: da lì in
+    -- poi smettiamo di riprovare. Prima no: non sarebbe una risposta, è un "non
+    -- ancora".
+    if not ok then
+        glovesExportReady = false
+        return false
+    end
+    glovesExportReady = true
+    return wearing == true
 end
 
 --- Inject DNA into clothing metadata when a player dresses
@@ -172,10 +186,7 @@ function MBT.ServerUtils.InjectDNA(metadata, src)
     if not dnaSlots[slotType][metadata.index] then return end
 
     -- Check gloves (wearable_props integration) — skip DNA if wearing gloves
-    if hasGlovesExport then
-        local wearing = exports.mbt_wearable_props:isPlayerWearingGloves(src)
-        if wearing then return end
-    end
+    if isWearingGloves(src) then return end
 
     -- Get player identifier for DNA
     local identifier = nil

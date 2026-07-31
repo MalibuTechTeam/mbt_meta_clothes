@@ -314,14 +314,14 @@ local function validateLocales(config, locales, errors, stats)
     end
 end
 
-local function validateStatePairs(pairs, path, errors, stats, requireLabel)
-    if type(pairs) ~= 'table' then
+local function validateStatePairs(statePairs, path, errors, stats, requireLabel)
+    if type(statePairs) ~= 'table' then
         addIssue(errors, path, 'must be an array')
         return
     end
 
     local mappings = {}
-    for index, pair in ipairs(pairs) do
+    for index, pair in ipairs(statePairs) do
         local pairPath = ('%s[%d]'):format(path, index)
         if type(pair) ~= 'table' then
             addIssue(errors, pairPath, 'must be a table')
@@ -371,11 +371,11 @@ local function validateClothingStates(config, errors, stats)
         if type(slotStates) ~= 'table' then
             addIssue(errors, 'MBT.ClothingStates.' .. slotType, 'must be a table')
         else
-            for slotIndex, pairs in pairs(slotStates) do
+            for slotIndex, slotPairs in pairs(slotStates) do
                 if not isInteger(slotIndex) or slotIndex < SLOT_LIMITS[slotType].min or slotIndex > SLOT_LIMITS[slotType].max then
                     addIssue(errors, ('MBT.ClothingStates.%s[%s]'):format(slotType, tostring(slotIndex)), 'uses an invalid slot index')
                 else
-                    validateStatePairs(pairs, ('MBT.ClothingStates.%s[%d]'):format(slotType, slotIndex), errors, stats, true)
+                    validateStatePairs(slotPairs, ('MBT.ClothingStates.%s[%d]'):format(slotType, slotIndex), errors, stats, true)
                 end
             end
         end
@@ -441,6 +441,12 @@ if not report.ok then
     for _, configError in ipairs(report.errors) do
         MBTLog.Error('configuration error: ' .. configError)
     end
+    -- error() da solo interrompe SOLO questo file: gli altri server_scripts si
+    -- caricano lo stesso e la risorsa gira con una config invalida, che è il
+    -- contrario del fail-fast dichiarato nel manifest. StopResource la ferma
+    -- davvero; l'error() resta perché è ciò che impedisce al resto di QUESTO
+    -- file di eseguire prima che lo stop abbia effetto.
+    StopResource(GetCurrentResourceName())
     error(('mbt_meta_clothes configuration validation failed with %d error(s)'):format(#report.errors), 0)
 end
 

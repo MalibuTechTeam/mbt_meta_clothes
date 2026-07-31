@@ -245,20 +245,46 @@ RegisterNetEvent('mbt_meta_clothes:multichar:pauseDetection', function()
     pendingUndress = {}
 end)
 
+--- Un dict inesistente non si carica mai: senza limite il while gira all'infinito
+--- e il cb non arriva. Ma il cb è ciò che sblocca la vestizione, quindi in ogni
+--- uscita deve partire lo stesso — meglio un capo senza animazione che un
+--- giocatore fermo per sempre.
+local ANIM_DICT_TIMEOUT = 3000
+
 ---@param data table
 ---@param cb function
 function MBT.Utils.PlayEmote(data, cb)
-	while not HasAnimDictLoaded(data.Dict) do RequestAnimDict(data.Dict) Wait(100) end
-	if IsPedInAnyVehicle(PlayerPedId()) then data.Flag = 51 end
-	TaskPlayAnim(PlayerPedId(), data.Dict, data.Anim, 3.0, 3.0, data.Dur, data.Flag, 0, false, false, false)
-	local Pause = data.Dur-500 if Pause < 500 then Pause = 500 end
-	Wait(Pause)
-	if cb then cb() end
+    if type(data) ~= 'table' or type(data.Dict) ~= 'string' or type(data.Anim) ~= 'string' then
+        MBT.Warn('PlayEmote: invalid emote data; skipping animation', { dict = data and data.Dict })
+        if cb then cb() end
+        return
+    end
+
+    local duration = tonumber(data.Dur) or 0
+    local deadline = GetGameTimer() + ANIM_DICT_TIMEOUT
+    RequestAnimDict(data.Dict)
+    while not HasAnimDictLoaded(data.Dict) do
+        if GetGameTimer() > deadline then
+            MBT.Warn('PlayEmote: anim dict failed to load', { dict = data.Dict })
+            if cb then cb() end
+            return
+        end
+        RequestAnimDict(data.Dict)
+        Wait(100)
+    end
+
+    if IsPedInAnyVehicle(PlayerPedId()) then data.Flag = 51 end
+    TaskPlayAnim(PlayerPedId(), data.Dict, data.Anim, 3.0, 3.0, duration, data.Flag, 0, false, false, false)
+    Wait(math.max(duration - 500, 500))
+    if cb then cb() end
 end
 
+--- CFX semina il generatore all'avvio: riseminare a ogni chiamata non aggiunge
+--- entropia, la toglie — due chiamate nello stesso frame condividono
+--- GetGameTimer() e quindi il seme.
 ---@param t table
 function MBT.Utils.RandomizeDress(t)
-    math.randomseed(GetGameTimer() * math.random(30123, 90456))
+    if type(t) ~= 'table' or #t == 0 then return nil end
     return t[math.random(1, #t)]
 end
 
