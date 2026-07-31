@@ -40,27 +40,31 @@ const Trousers = ({
   </svg>
 );
 
+// I `label` qui sono identificatori per chi legge la tabella, non testo a
+// schermo: le stringhe visibili arrivano dal Lua (Locales[lang].UI) e sono già
+// tradotte. Restano in inglese come il resto del codice.
+
 // Core slots (always visible)
 export const DRAWABLE_SLOTS: Record<number, SlotDefinition> = {
   8: { label: "Top", icon: Shirt, category: "torso" },
-  4: { label: "Pantaloni", icon: Trousers, category: "legs" },
-  6: { label: "Scarpe", icon: Footprints, category: "feet" },
-  7: { label: "Collana", icon: Gem, category: "accessories" },
+  4: { label: "Pants", icon: Trousers, category: "legs" },
+  6: { label: "Shoes", icon: Footprints, category: "feet" },
+  7: { label: "Chain", icon: Gem, category: "accessories" },
 };
 
 // Extra slots (only visible when mbt_wearable_props is active)
 export const DRAWABLE_SLOTS_WEARABLE: Record<number, SlotDefinition> = {
-  1: { label: "Maschera", icon: Drama, category: "head" },
-  5: { label: "Zaino", icon: Backpack, category: "bags" },
-  9: { label: "Giubbotto", icon: ShieldCheck, category: "armor" },
+  1: { label: "Mask", icon: Drama, category: "head" },
+  5: { label: "Backpack", icon: Backpack, category: "bags" },
+  9: { label: "Body Armor", icon: ShieldCheck, category: "armor" },
 };
 
 export const PROP_SLOTS: Record<number, SlotDefinition> = {
-  0: { label: "Cappello", icon: HatGlasses, category: "head" },
-  1: { label: "Occhiali", icon: Glasses, category: "head" },
-  2: { label: "Orecchini", icon: Ear, category: "head" },
-  6: { label: "Orologio", icon: Watch, category: "accessories" },
-  7: { label: "Bracciale", icon: Sparkles, category: "accessories" },
+  0: { label: "Hat", icon: HatGlasses, category: "head" },
+  1: { label: "Glasses", icon: Glasses, category: "head" },
+  2: { label: "Earrings", icon: Ear, category: "head" },
+  6: { label: "Watch", icon: Watch, category: "accessories" },
+  7: { label: "Bracelet", icon: Sparkles, category: "accessories" },
 };
 
 // Reserved for future wearable_props prop slots
@@ -86,13 +90,13 @@ export const HOTSPOT_META: Record<
   string,
   { icon: React.ComponentType<{ size?: number }>; label: string }
 > = {
-  head: { icon: Smile, label: "Testa & Volto" },
+  head: { icon: Smile, label: "Head & Face" },
   torso: { icon: Shirt, label: "Torso" },
-  accessories: { icon: Watch, label: "Accessori" },
-  armor: { icon: ShieldCheck, label: "Kevlar" },
-  bags: { icon: Backpack, label: "Zaini" },
-  legs: { icon: Trousers, label: "Pantaloni" },
-  feet: { icon: Footprints, label: "Scarpe" },
+  accessories: { icon: Watch, label: "Accessories" },
+  armor: { icon: ShieldCheck, label: "Body Armor" },
+  bags: { icon: Backpack, label: "Bags" },
+  legs: { icon: Trousers, label: "Pants" },
+  feet: { icon: Footprints, label: "Shoes" },
 };
 
 // Clothing layer overlay metadata — one entry per slot that has a PNG layer.
