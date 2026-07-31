@@ -189,9 +189,13 @@ AddEventHandler('playerDropped', function(reason)
     end
 
     MBT.Debugger("=== PLAYER DROPPED ===", src)
-    local wearingState = MBT.PlayerState.GetAll(src)
-    if wearingState then
-        MBT.Debugger("Wearing state at disconnect:", json.encode(wearingState))
+    -- Il guard è su MBT.Debug, non dentro Debugger: gli argomenti si valutano
+    -- prima della chiamata, quindi l'encode girerebbe anche a log spenti.
+    if MBT.Debug then
+        local wearingState = MBT.PlayerState.GetAll(src)
+        if wearingState then
+            MBT.Debugger("Wearing state at disconnect:", json.encode(wearingState))
+        end
     end
 
     MBT.SnapshotServer.Cleanup(src)
@@ -212,9 +216,15 @@ end)
 -- Skin persistence
 -----------------------------------------------------------
 
+-- L'appearance è un blob opaco che inoltriamo a chi ascolta `saveSkin`: non
+-- possiamo validarne lo schema senza legarci a un appearance script preciso.
+-- Il rate limit è quindi l'unico argine — senza, è l'unico ingresso che accetta
+-- una tabella arbitraria e illimitata a frequenza libera.
 RegisterNetEvent('mbt_meta_clothes:storePlayerSkin', function(appearance)
+    local src = source
     if type(appearance) ~= "table" then return end
-    playerSkins[source] = appearance
+    if not MBT.ServerUtils.CheckRateLimit(src, "storePlayerSkin") then return end
+    playerSkins[src] = appearance
 end)
 
 -----------------------------------------------------------

@@ -155,6 +155,7 @@ end
 RegisterNetEvent('mbt_meta_clothes:requestDripInfo', function()
     local src = source
     if not MBT.PlayerState.IsLoaded(src) then return end
+    if not MBT.ServerUtils.CheckRateLimit(src, 'requestDripInfo') then return end
 
     local totalXp = MBT.PlayerState.GetDripXp(src)
     local rate = MBT.Drip.CalculateRate(src)
@@ -169,7 +170,11 @@ RegisterNetEvent('mbt_meta_clothes:requestDripInfo', function()
         progress = progress,
         breakdown = breakdown
     }
-    MBT.Debugger("dripInfo sending:", json.encode(dripData))
+    -- Guard su MBT.Debug: gli argomenti si valutano prima della chiamata, quindi
+    -- senza questo l'encode gira a ogni richiesta anche a log spenti.
+    if MBT.Debug then
+        MBT.Debugger("dripInfo sending:", json.encode(dripData))
+    end
     TriggerClientEvent('mbt_meta_clothes:dripInfo', src, dripData)
 end)
 

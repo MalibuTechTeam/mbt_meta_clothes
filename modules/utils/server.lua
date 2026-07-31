@@ -93,7 +93,12 @@ AddEventHandler('playerDropped', function()
 end)
 
 --- Check proximity between two players (server-side)
+--- Il bucket viene prima delle coordinate: due giocatori in dimensioni diverse
+--- possono stare sullo stesso punto del mondo (shell di appartamenti impilate),
+--- e la sola distanza li darebbe adiacenti pur non vedendosi.
 function MBT.ServerUtils.CheckProximity(src1, src2, maxDistance)
+    if GetPlayerRoutingBucket(src1) ~= GetPlayerRoutingBucket(src2) then return false end
+
     local ped1 = GetPlayerPed(src1)
     local ped2 = GetPlayerPed(src2)
     if not ped1 or ped1 == 0 or not ped2 or ped2 == 0 then return false end
