@@ -376,7 +376,18 @@ export default function App() {
 
   // Laser HUD math
   const hasActive = activeCategory.id !== null && activeCategory.rect !== null;
-  const startX = hasActive ? activeCategory.rect!.left : 0;
+
+  // `rect` arriva da getBoundingClientRect: sono coordinate VIEWPORT. L'SVG e il
+  // pannello vivono però dentro il box 16:9 centrato (`max-w-[177.77vh] mx-auto`),
+  // quindi la loro origine è il bordo sinistro del box, non dello schermo.
+  // Su 16:9 le due coincidono e non si nota; su ultrawide il box è rientrato e
+  // linee e pannello finivano spostati a destra di metà banda laterale, mentre
+  // il manichino — posizionato in percentuale sul box — restava al suo posto.
+  // Verticalmente non serve correzione: il box è alto quanto lo schermo.
+  const stageWidth = Math.min(window.innerWidth, window.innerHeight * (16 / 9));
+  const stageOffsetX = (window.innerWidth - stageWidth) / 2;
+
+  const startX = hasActive ? activeCategory.rect!.left - stageOffsetX : 0;
   const startY = hasActive ? activeCategory.rect!.top : 0;
 
   // Il pannello si aprirà esattamente a 40px di distanza dal punto cliccato sul manichino
