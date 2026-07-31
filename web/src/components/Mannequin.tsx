@@ -41,8 +41,10 @@ const HOTSPOT_TO_LAYERS: Record<string, string[]> = {
   accessories: ["Drawables-7", "Props-6", "Props-7"],
 };
 
-const HOVER_LAYER_FILTER = "drop-shadow(0 0 5px rgba(0,220,255,0.2))";
-const ACTIVE_LAYER_FILTER = "drop-shadow(0 0 7px rgba(0,220,255,0.45))";
+const HOVER_LAYER_FILTER =
+  "drop-shadow(0 0 5px rgba(var(--mbt-accent-rgb),0.2))";
+const ACTIVE_LAYER_FILTER =
+  "drop-shadow(0 0 7px rgba(var(--mbt-accent-rgb),0.45))";
 
 let pedestalWarmed = false;
 
@@ -329,10 +331,15 @@ export default function Mannequin({
               // aperta). Entry è solo fade/scale — con UI aperta il player
               // non esegue dress, quindi l'entry bloom non si vedrebbe mai.
               //
-              // IMPORTANTE: filter usa #00dcff (HEX) invece di rgba()
-              // perché framer-motion ha un bug che sbaglia a parsare le
-              // parentesi nested di rgba dentro drop-shadow, producendo
-              // "Invalid keyframe value for property filter".
+              // IMPORTANTE: filter usa un HEX invece di rgba()/var() perché
+              // framer-motion ha un bug che sbaglia a parsare le parentesi
+              // nested dentro drop-shadow, producendo "Invalid keyframe value
+              // for property filter".
+              //
+              // È l'UNICO colore della UI che non segue MBT.Theme: essendo un
+              // valore animato non può contenere var(--mbt-accent). Resta
+              // allineato a mano al verde di default; cambiando l'accento in
+              // config questo lampo di 350ms sull'undress non lo segue.
               //
               <motion.div
                 key={`layer-${key}`}
@@ -348,7 +355,7 @@ export default function Mannequin({
                   opacity: 0,
                   scale: 0.85,
                   x: "-50%",
-                  filter: "drop-shadow(0 0 18px #00dcffdd)",
+                  filter: "drop-shadow(0 0 18px #00e676dd)",
                 }}
                 transition={{ duration: 0.35, ease: "easeOut" }}
                 style={{
@@ -389,7 +396,7 @@ export default function Mannequin({
               className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[65%] h-24 mbt-pedestal-breath pointer-events-none z-0"
               style={{
                 background:
-                  "radial-gradient(ellipse at 50% 100%, rgba(0,220,255,0.25) 0%, rgba(255,255,255,0.15) 35%, transparent 70%)",
+                  "radial-gradient(ellipse at 50% 100%, rgba(var(--mbt-accent-rgb),0.25) 0%, rgba(255,255,255,0.15) 35%, transparent 70%)",
               }}
             />
 
@@ -398,7 +405,7 @@ export default function Mannequin({
               className="absolute bottom-[0.5%] left-1/2 -translate-x-1/2 w-[42%] h-6 rounded-[100%] blur-[6px] opacity-60 pointer-events-none z-0"
               style={{
                 background:
-                  "radial-gradient(ellipse at center, rgba(0,220,255,0.5) 0%, transparent 70%)",
+                  "radial-gradient(ellipse at center, rgba(var(--mbt-accent-rgb),0.5) 0%, transparent 70%)",
               }}
             />
 
@@ -408,7 +415,7 @@ export default function Mannequin({
               <div
                 className="w-full h-full rounded-[100%] border border-[rgba(var(--mbt-accent-rgb),0.6)] mbt-scanner-ring"
                 style={{
-                  boxShadow: "0 0 12px rgba(0,220,255,0.45)",
+                  boxShadow: "0 0 12px rgba(var(--mbt-accent-rgb),0.45)",
                 }}
               />
             </div>
@@ -418,7 +425,7 @@ export default function Mannequin({
               <div
                 className="w-full h-full rounded-[100%] border border-[rgba(var(--mbt-accent-rgb),0.5)] mbt-scanner-ring-delay"
                 style={{
-                  boxShadow: "0 0 12px rgba(0,220,255,0.4)",
+                  boxShadow: "0 0 12px rgba(var(--mbt-accent-rgb),0.4)",
                 }}
               />
             </div>
@@ -463,7 +470,7 @@ export default function Mannequin({
               ? "#ef4444"
               : "#ffffff"
             : isActive
-              ? "#3b82f6"
+              ? "var(--mbt-accent)"
               : "#ffffff";
 
           return (
