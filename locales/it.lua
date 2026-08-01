@@ -114,7 +114,9 @@ Locales['it'] = {
     -----------------------------------------------------------
     -- Drip Reputation
     -----------------------------------------------------------
-    ["drip_info"]    = "🔥 Drip: %s (Lv.%d) | XP: %d | Rate: +%d/tick",
+    -- Corpo della notifica: il titolo dice già "Drip" e l'icona è 'fire', quindi
+    -- niente emoji né prefisso ripetuto qui.
+    ["drip_info"]    = "%s (Lv.%d) | XP: %d | Rate: +%d/tick",
     ["drip_label"]   = "Drip",
     ["drip_unknown"] = "Sconosciuto",
 

@@ -742,14 +742,17 @@ AddEventHandler('mbt_meta_clothes:dripInfo', function(data)
         progress = data.progress
     })
 
-    -- Show in chat
+    -- Serve un canale anche a menu chiuso, ma non chat:addMessage: presuppone la
+    -- risorsa `chat`, che molti server sostituiscono o rimuovono, e lì spariva
+    -- senza un warning. MBT.Notification degrada fino al feed nativo.
     local lvl = data.level or MBT.Locale["drip_unknown"]
     local lvlIdx = data.levelIndex or 1
     local xp = data.xp or 0
     local rate = data.rate or 0
-    local msg = MBT.Locale["drip_info"]:format(lvl, lvlIdx, xp, rate)
-    TriggerEvent('chat:addMessage', {
-        color = { 0, 200, 200 },
-        args = { MBT.Locale["drip_label"], msg }
+    MBT.Notification({
+        title = MBT.Locale["drip_label"],
+        description = MBT.Locale["drip_info"]:format(lvl, lvlIdx, xp, rate),
+        type = 'info',
+        icon = 'fire',
     })
 end)
