@@ -176,9 +176,21 @@ Implement `MBT.CustomInventory` in `config.lua`. Startup validation will tell yo
 
 ## Credits
 
-Developed by **Malibu Tech Team**.
+Developed by the **Malibu Tech Team**.
 
-Founded with my brother **Gianmarco** *(DarkSideofTheCode)*.
+### Gianmarco — *DarkSideofTheCode*
+
+MalibuTech was founded with my brother Gianmarco. He was the scripter: most of the catalogue is his, and so were the ideas and the pace.
+
+He shaped the first version of Meta Clothes in December 2022. One of his commits is called *"Dynamic framework loading"* — it took the resource off a single hardcoded core and made it choose at runtime instead. That decision is the reason this resource has ever spoken more than one framework, and the reason adding QBox support in 2.0.0 meant dropping in a folder rather than rebuilding anything.
+
+The code around it has been rewritten many times since. The shape of it is still his.
+
+`DarkSideofTheCode` was his name in the FiveM community. It stays on his work.
+
+---
+
+Thanks to the FiveM community for continuous feedback and testing.
 
 ---
 
