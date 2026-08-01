@@ -9,7 +9,7 @@ local SLOT_LIMITS = {
     Drawables = { min = 0, max = 11 },
     Props = { min = 0, max = 7 },
 }
-local FRAMEWORK_RESOURCES = { 'es_extended', 'qb-core', 'ox_core' }
+local FRAMEWORK_RESOURCES = { 'es_extended', 'qb-core', 'ox_core', 'qbx_core' }
 local INVENTORY_RESOURCES = { 'ox_inventory', 'qb-inventory' }
 
 local function isInteger(value)
@@ -35,11 +35,24 @@ local function validateRuntimeBridge(config, errors, stats)
     local inventories = startedResources(INVENTORY_RESOURCES)
     local hasCustomInventory = type(config.CustomInventory) == 'function'
 
+    -- Alcuni server QBox tengono acceso uno shim qb-core per risorse legacy.
+    -- Non sono due framework in conflitto: qbx_core è l'autorità, e il bridge
+    -- qb/ si disattiva da solo quando lo vede. Senza questo, la coppia
+    -- risulterebbe "due framework attivi" e fermerebbe la risorsa.
+    if #frameworks > 1 then
+        local hasQbox, filtered = false, {}
+        for _, name in ipairs(frameworks) do
+            if name == 'qbx_core' then hasQbox = true end
+            if name ~= 'qb-core' then filtered[#filtered + 1] = name end
+        end
+        if hasQbox then frameworks = filtered end
+    end
+
     stats.framework = frameworks[1] or 'none'
     stats.inventory = inventories[1] or (hasCustomInventory and 'custom' or 'none')
 
     if #frameworks == 0 then
-        addIssue(errors, 'runtime.framework', 'start one supported framework before mbt_meta_clothes: es_extended, qb-core, or ox_core')
+        addIssue(errors, 'runtime.framework', 'start one supported framework before mbt_meta_clothes: es_extended, qb-core, qbx_core, or ox_core')
     elseif #frameworks > 1 then
         addIssue(errors, 'runtime.framework', ('multiple supported frameworks are active: %s'):format(table.concat(frameworks, ', ')))
     end
@@ -53,7 +66,7 @@ local function validateRuntimeBridge(config, errors, stats)
         if not hasCustomInventory then
             addIssue(errors, 'runtime.inventory', 'start ox_inventory or qb-inventory before mbt_meta_clothes, or configure MBT.CustomInventory')
         elseif frameworks[1] == 'ox_core' then
-            addIssue(errors, 'runtime.inventory', 'the ox_core bridge requires ox_inventory; MBT.CustomInventory is supported by the ESX and QBCore bridges')
+            addIssue(errors, 'runtime.inventory', 'the ox_core bridge requires ox_inventory; MBT.CustomInventory is supported by the ESX, QBCore and QBox bridges')
         end
         return
     end

@@ -7,7 +7,7 @@ Required:
 - FiveM server artifact 6116 or newer
 - OneSync
 - `oxmysql`
-- one supported framework: `es_extended`, `qb-core`, or `ox_core`
+- one supported framework: `es_extended`, `qb-core`, `qbx_core`, or `ox_core`
 - one supported inventory for that framework
 
 Optional:
@@ -23,6 +23,7 @@ Optional:
 | --- | --- | --- | --- |
 | ESX | Yes | No | Yes |
 | QBCore | Yes | Yes | Yes |
+| QBox | Yes | No | Yes |
 | OX Core | Yes | No | No |
 
 Only one framework and one inventory implementation may be active. A custom
@@ -52,6 +53,16 @@ ensure qb-core
 ensure qb-inventory
 ensure mbt_meta_clothes
 ```
+
+```cfg
+ensure oxmysql
+ensure qbx_core
+ensure ox_inventory
+ensure mbt_meta_clothes
+```
+
+QBox servers that keep a `qb-core` compatibility shim running are handled
+automatically: `qbx_core` takes precedence and the qb-core bridge stands down.
 
 If the framework or inventory is restarted, restart `mbt_meta_clothes`
 afterward so its bridge, hooks, and usable-item handlers are registered against

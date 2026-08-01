@@ -1,8 +1,8 @@
-# MBT Meta Clothes — Server-Authoritative Clothing as Inventory Items
+# MBT Meta Clothes
 
 <p align="center">
   <img src="https://img.shields.io/badge/FiveM-Ready-00e676?style=for-the-badge&logo=fivem&logoColor=white" alt="FiveM Ready" />
-  <img src="https://img.shields.io/badge/Framework-ESX%20%7C%20QBCore%20%7C%20OX%20Core-blue?style=for-the-badge" alt="Framework" />
+  <img src="https://img.shields.io/badge/Framework-ESX%20%7C%20QBCore%20%7C%20QBox%20%7C%20OX%20Core-blue?style=for-the-badge" alt="Framework" />
   <img src="https://img.shields.io/badge/Version-2.0.0-informational?style=for-the-badge" alt="Version" />
   <img src="https://img.shields.io/badge/Lua-5.4-purple?style=for-the-badge&logo=lua" alt="Lua 5.4" />
   <img src="https://img.shields.io/badge/React-TypeScript-61DAFB?style=for-the-badge&logo=react" alt="React + TS" />
@@ -10,75 +10,47 @@
 </p>
 
 <p align="center">
-  <img src=".github/release-assets/hero.png" alt="MBT Meta Clothes" />
+  <img src=".github/release-assets/hero.png" alt="The MBT Meta Clothes mannequin interface, with clothing hotspots around the player model" />
 </p>
 
-**mbt_meta_clothes** turns equipped GTA clothing components into real inventory items. Players undress through a React NUI, hand clothes over, get robbed of them, and find every garment exactly where they left it after a relog — because the server, not the client, decides what anyone is wearing.
+<p align="center"><strong>Take your clothes off, and they become real items in your inventory.</strong></p>
 
-Free and open to hobby servers. Built with the same engineering standards as our paid resources.
+Players undress through an interactive mannequin, hand garments to each other, get robbed of them, and find everything exactly where they left it after a relog. Free, for any ESX, QBCore, QBox, or OX Core server.
 
 ---
 
 ## Preview
 
 <p align="center">
-  <img src=".github/release-assets/v2.0.0-menu.png" alt="Clothing menu" />
+  <img src=".github/release-assets/v2.0.0-menu.png" alt="The clothing menu open in game: the mannequin sits on the right, the player stands undressed on the street" />
 </p>
+
+<p align="center"><em>The menu open in game — the mannequin mirrors what the player is actually wearing.</em></p>
 
 ---
 
-## Features
+## What players get
 
-### Core
+- **Every garment is an inventory item.** Take off a jacket and it lands in your inventory, with its exact model, texture and colour. Give it away, sell it, lose it in a fight.
+- **An interactive mannequin**, not a wall of dropdowns. Click the part of the body you want to change.
+- **Tops stay coherent.** Shirts, undershirts and torso variants move together, so nobody ends up half-dressed by accident.
+- **Rob other players** of what they are wearing — one garment or the whole outfit — when they are down, ragdolled, or have their hands up.
+- **Outfits earn reputation.** Wear good clothes and your drip level rises over time.
+- **Clothes remember who wore them**, which gives investigative roleplay something to work with.
+- **Keybind or commands.** `J` to open the menu, or `/shirt`, `/hat`, `/shoes` for quick changes.
 
-- **Clothes as inventory items** — every garment you take off becomes a real item with metadata, and putting it back on restores the exact drawable, texture, and palette
-- **React + TypeScript NUI** — an interactive mannequin with hotspots, not a list of dropdowns
-- **Configurable accent colour** — one hex value in `config.lua` themes the entire interface
-- **Torso kits** — tops, undershirts, and torso variations move together as one coherent item instead of leaving players half-dressed
-- **Chat commands and keybind** — open the menu with `J` (rebindable) or use per-slot commands
+---
 
-### Server authority and anti-cheat
+## What server owners get
 
-Every state-changing path is validated server-side. This is the part most clothing resources get wrong.
-
-- **Items are derived from server state, never from the client payload** — a forged event cannot make the server hand out an item the player was not wearing
-- **Acknowledged snapshot protocol** — session, revision, and ACK on every mutation; stale or out-of-order client writes are rejected, not merged
-- **Per-event rate limiting** on every inbound network event
-- **Routing-bucket-aware proximity** — theft validates dimension *and* distance, so players in separate instances cannot reach each other
-- **Theft validated twice** — on begin and on complete, with a signed token, a minimum duration, and a grace window
-- **Victim consent is replicated** — a thief cannot forge the state bag that marks a target as robbable
-- **Inventory metadata is sanitised** — a crafted item can never introduce an arbitrary inventory item, a negative drip value, or a `NaN`
-- **Configuration validated at boot** — an invalid config stops the resource with an actionable error instead of running half-broken
-
-### Persistence and compatibility
-
-- **State survives relogs, character switches, and resource restarts**
-- **Framework-agnostic lifecycle** — hooks into the standard framework events, so it works with any multicharacter script rather than a hardcoded list
-- **Coexists with appearance scripts** — illenium-appearance, skinchanger, qb-clothing and friends apply first; corrections land within a single frame, so players never see a garment they took off
-- **Write-behind saves** with periodic flushing of dirty state
-
-### Clothing theft *(optional)*
-
-- Steal a single garment or everything at once
-- Requires the target to be down, ragdolled, or with hands up — all configurable
-- Progress bars, victim animations, and an anti-grief cap on animation length
-- Works with `ox_target`, `qb-target`, or `qtarget` — auto-detected
-
-### Drip Reputation *(optional)*
-
-- Outfits accumulate XP over time based on what the player is wearing
-- Per-slot weights and per-drawable values, both configurable
-- Named levels with progress, exposed as state bags (`mbt_dripLevel`, `mbt_dripTitle`, `mbt_dripXp`, `mbt_slotsWorn`) for other resources to read
-
-### DNA *(optional)*
-
-- Tracks who wore each garment, FIFO-capped and time-expiring
-- Useful for investigative roleplay: a jacket remembers its previous owners
-
-### Localization
-
-- English and Italian included; every UI string comes from the active locale
-- Add a language by dropping a file in `locales/`
+- **Players cannot duplicate clothes.** The server decides what you are wearing and hands back only that. A faked event gets nothing.
+- **A cheater cannot rob someone who is not robbable**, cannot rob from across the map, and cannot reach into an apartment or a private instance from outside it.
+- **A modified item cannot turn into a different item**, and cannot break the drip economy with impossible values.
+- **Nothing is lost when the connection stutters.** Every change is confirmed, and a late or out-of-order message from a client is rejected rather than merged.
+- **A broken config stops the resource** with a clear error, instead of running half-working until someone notices.
+- **It gets along with your appearance script.** illenium-appearance, skinchanger, qb-clothing and others apply first; we correct within a single frame. If a player logged out without a shirt, they come back without a shirt — and nobody sees a flash of the wrong outfit.
+- **It works with any multicharacter script**, because it listens to the framework's own events instead of a hardcoded list of resources.
+- **English and Italian included**, and adding a language is one file.
 
 ---
 
@@ -87,7 +59,7 @@ Every state-changing path is validated server-side. This is the part most clothi
 | Requirement | Notes |
 | --- | --- |
 | **oxmysql** | Required |
-| **One framework** | `es_extended`, `qb-core`, or `ox_core` |
+| **One framework** | `es_extended`, `qb-core`, `qbx_core`, or `ox_core` |
 | **One inventory** | `ox_inventory`, `qb-inventory`, or a custom adapter |
 | **A target script** | Optional — `ox_target`, `qb-target`, or `qtarget` |
 | **ox_lib / mbt_visual** | Optional — notifications fall back to the native GTA feed |
@@ -103,7 +75,7 @@ Exactly one supported framework and one inventory must be active. Startup valida
 3. Start the resource **after** your framework and inventory:
 
 ```cfg
-ensure es_extended      # or qb-core / ox_core
+ensure es_extended      # or qb-core / qbx_core / ox_core
 ensure ox_inventory     # or qb-inventory
 ensure mbt_meta_clothes
 ```
@@ -123,7 +95,7 @@ Everything lives in `config.lua`. The options you will actually touch:
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `MBT.Debug` | `true` | Debug logging and the lifecycle tracer. **Set to `false` in production.** |
+| `MBT.Debug` | `true` | Debug logging. **Set to `false` in production.** |
 | `MBT.Language` | `'en'` | `'en'`, `'it'`, or your own file in `locales/` |
 | `MBT.MenuKey` | `'J'` | Keybind to open the menu |
 | `MBT.Theme.Accent` | `'00e676'` | UI accent colour, hex **without** `#` |
@@ -144,17 +116,17 @@ Everything lives in `config.lua`. The options you will actually touch:
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `MBT.DripEnabled` | `true` | Enable XP accumulation |
+| `MBT.DripEnabled` | `true` | Enable reputation from outfits |
 | `MBT.DripInterval` | `300` | Seconds between XP ticks |
-| `MBT.DripLevels` | *(list)* | Named levels and their XP thresholds |
+| `MBT.DripLevels` | *(list)* | Named levels and their thresholds |
 | `MBT.DripSlotWeights` | *(table)* | Points per slot — a jacket can outweigh an earring |
 | `MBT.DnaEnabled` | `true` | Track who wore each item |
-| `MBT.DnaMaxEntries` | `3` | FIFO cap per item |
-| `MBT.DnaExpiryHours` | `48` | Hours before DNA expires |
+| `MBT.DnaMaxEntries` | `3` | How many previous owners a garment remembers |
+| `MBT.DnaExpiryHours` | `48` | Hours before that memory fades |
 
 ### Integration points
 
-`MBT.ProgressBar` and `MBT.Notification` are plain Lua functions you can replace with your own implementation. Both ship with a guarded fallback chain (`mbt_visual` → `ox_lib` → native), so the resource stays dependency-free out of the box.
+`MBT.ProgressBar` and `MBT.Notification` are plain Lua functions you can replace with your own. Both ship with a fallback chain (`mbt_visual` → `ox_lib` → native GTA feed), so the resource works without any of them installed.
 
 ---
 
@@ -163,12 +135,26 @@ Everything lives in `config.lua`. The options you will actually touch:
 | Command | Description |
 | --- | --- |
 | `/shirt`, `/jacket` | Toggle the torso kit |
-| `/trousers`, `/shoes`, `/chain` | Toggle individual drawables |
-| `/hat`, `/glasses`, `/ears`, `/watch` | Toggle props |
+| `/trousers`, `/shoes`, `/chain` | Toggle individual garments |
+| `/hat`, `/glasses`, `/ears`, `/watch` | Toggle accessories |
 | `/hair` | Toggle hair |
 | `/tuck <slot>` | Cycle a slot's configured clothing states |
 | `/steal` | Open the theft menu on the nearest eligible player |
 | `/drip` | Show your current drip level and XP |
+
+---
+
+## Under the hood
+
+For anyone reading the code before trusting it on their server.
+
+- **Server-authoritative state.** Returned items are derived from the server's own record of what a player is wearing. The client's item name, slot, and drawable are never trusted.
+- **Acknowledged snapshot protocol.** Every mutation carries a session and a revision, and is confirmed. Stale or out-of-order client writes are rejected, not merged.
+- **Theft is validated twice** — on begin and on complete — with a token, a minimum duration, and a grace window. Proximity checks routing bucket as well as distance. Eligibility comes from the victim's own replicated state, which a thief cannot forge.
+- **Per-event rate limiting** on every inbound network event.
+- **Metadata sanitised on the way in.** Item metadata can select among the names configured for that exact slot, and nothing else; numeric values are bounded and checked for `NaN` and infinity.
+- **Configuration validated at boot**, stopping the resource on an invalid config.
+- **106 self-test cases** across 8 suites, runnable from the server console.
 
 ---
 
@@ -178,10 +164,10 @@ Everything lives in `config.lua`. The options you will actually touch:
 It hooks into the standard framework lifecycle events rather than any specific multicharacter resource, so it works with `esx_multicharacter`, `qb_multicharacter`, and anything else that fires them.
 
 **Will it fight with my appearance script?**
-No. Appearance scripts apply first and we correct afterwards, within a single frame. If a player logged out without a shirt, they come back without a shirt — and nobody sees a flash of the wrong outfit.
+No. Appearance scripts apply first and we correct afterwards, within a single frame.
 
 **Can players duplicate clothing?**
-The server derives every returned item from its own authoritative state. It never trusts an item name, a slot, or a drawable sent by the client.
+No. The server hands back only what its own records say the player was wearing.
 
 **I use a custom inventory.**
 Implement `MBT.CustomInventory` in `config.lua`. Startup validation will tell you if the signature is wrong.
