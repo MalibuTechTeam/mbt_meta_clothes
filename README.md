@@ -1,4 +1,4 @@
-# MBT Meta Clothes
+# MBT Meta Clothes — Clothing as Inventory Items for FiveM
 
 <p align="center">
   <img src="https://img.shields.io/badge/FiveM-Ready-00e676?style=for-the-badge&logo=fivem&logoColor=white" alt="FiveM Ready" />
@@ -180,11 +180,17 @@ Developed by the **Malibu Tech Team**.
 
 ### Gianmarco — *DarkSideofTheCode*
 
-MalibuTech was founded with my brother Gianmarco. He was the scripter: most of the catalogue is his, and so were the ideas and the pace.
+MalibuTech was founded with my brother Gianmarco. He was the scripter — most of what carries the `mbt_` name is his, and so were the ideas, and the pace. I helped him keep it standing.
 
-He shaped the first version of Meta Clothes in December 2022. One of his commits is called *"Dynamic framework loading"* — it took the resource off a single hardcoded core and made it choose at runtime instead. That decision is the reason this resource has ever spoken more than one framework, and the reason adding QBox support in 2.0.0 meant dropping in a folder rather than rebuilding anything.
+Meta Clothes started with him, in December 2022. He isn't here for this one.
 
-The code around it has been rewritten many times since. The shape of it is still his.
+Two of his decisions from that first version are still load-bearing, after everything around them has been rewritten:
+
+**He took the resource off a single framework.** The first manifest loaded `ox_core` directly, welded in at startup. He pulled those lines out and made the resource choose its core at runtime instead. The mechanism looks nothing like his today — one folder per framework, each standing itself up — but it is the same decision, and it is why adding QBox in 2.0.0 meant writing a folder instead of rebuilding a resource.
+
+**He took our own resource out of the config.** Notifications used to be a hardcoded call to `mbt_notification`, ours. He commented it out and left `-- Put your notify here` in its place, and in the same commit changed the default language from Italian to English. Two Italians releasing to a community that mostly wasn't — he moved the defaults toward the people downloading it, away from us. That is still why this resource needs none of our other scripts to run.
+
+The code around all of it has been rewritten many times since. The shape of it is still his.
 
 `DarkSideofTheCode` was his name in the FiveM community. It stays on his work.
 
