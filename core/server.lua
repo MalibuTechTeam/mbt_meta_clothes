@@ -383,6 +383,9 @@ local function processStealSelections(thiefSource, targetServerId, selections)
 end
 
 local function validateStealContext(thiefSource, targetServerId)
+    -- Il controllo client-side è solo cortesia: un client modificato manderebbe
+    -- beginSteal lo stesso. Questa è la riga che spegne davvero la feature.
+    if MBT.StealEnabled == false then return false end
     if thiefSource == targetServerId then return false end
     if not MBT.ServerUtils.IsValidPlayer(targetServerId) then return false end
     if not MBT.ServerUtils.IsPlayerAlive(thiefSource) then return false end

@@ -24,6 +24,9 @@ end
 
 --- Check if target entity can be stolen from (hands up, dead, or ragdoll).
 --- Hands-up animations are configurable via MBT.HandsUpAnims in config.lua.
+--- Esposta perché la usa anche il comando /steal: prima ne teneva una copia con
+--- l'animazione mani alzate scritta a mano, quindi MBT.HandsUpAnims valeva sul
+--- percorso target e non su quello a comando.
 local function canStealFrom(entity)
     if IsPedDeadOrDying(entity, false) or IsPedRagdoll(entity) then
         return true
@@ -35,6 +38,8 @@ local function canStealFrom(entity)
     end
     return false
 end
+
+MBT.TargetModule.CanStealFrom = canStealFrom
 
 local function startEligibilityTracker()
     if eligibilityTrackerStarted then return end
@@ -55,8 +60,8 @@ end
 
 --- Register the steal dress target on all players
 function MBT.TargetModule.Setup()
+    if MBT.StealEnabled == false then return end
     startEligibilityTracker()
-    if not MBT.TargetEnabled then return end
 
     activeTarget = detectTarget()
     if not activeTarget then

@@ -622,7 +622,10 @@ RegisterCommand("watch", function() if canToggle() then MBT.Utils.HandleProps(6)
 RegisterCommand("hair", function() if canToggle() then MBT.Utils.ToggleHair() end end, false)
 
 -- Steal command (fallback for servers without target scripts)
+-- Fallback quando nessuno script di target è avviato: stessa idoneità e stessa
+-- distanza dell'interazione target, solo raggiunta da comando.
 RegisterCommand("steal", function()
+    if MBT.StealEnabled == false then return end
     if not canToggle() then return end
     local myPed = PlayerPedId()
     local myCoords = GetEntityCoords(myPed)
@@ -634,14 +637,9 @@ RegisterCommand("steal", function()
             local targetPed = GetPlayerPed(playerId)
             if targetPed and targetPed ~= 0 then
                 local dist = #(myCoords - GetEntityCoords(targetPed))
-                if dist < closestDist then
-                    local canSteal = IsEntityPlayingAnim(targetPed, "missminuteman_1ig_2", "handsup_base", 3)
-                        or IsPedDeadOrDying(targetPed, false)
-                        or IsPedRagdoll(targetPed)
-                    if canSteal then
-                        closestPed = targetPed
-                        closestDist = dist
-                    end
+                if dist < closestDist and MBT.TargetModule.CanStealFrom(targetPed) then
+                    closestPed = targetPed
+                    closestDist = dist
                 end
             end
         end

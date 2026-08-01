@@ -7,7 +7,6 @@ MBT.Debug                = true -- Enable debug prints in server/client console
 MBT.Language             = 'en'  -- Language: 'en', 'it' (add your own in locales/)
 MBT.MenuKey              = "J"   -- Keybind to open the clothing menu
 MBT.ActionCooldown       = 1500  -- ms between actions (prevents animation spam)
-MBT.TargetEnabled        = true  -- Auto-detects ox_target, qb-target, or qtarget
 
 -----------------------------------------------------------
 -- Theme
@@ -29,6 +28,13 @@ MBT.Theme                = {
 -----------------------------------------------------------
 -- Stealing
 -----------------------------------------------------------
+-- Spegne il furto su ENTRAMBI i percorsi: opzione target e comando /steal.
+-- Server PVE o RP che considerano il furto vestiti una forma di griefing lo
+-- mettono a false e la feature sparisce, non a metà.
+MBT.StealEnabled         = true
+
+-- Nessun toggle per il target: se ox_target, qb-target o qtarget è avviato la
+-- risorsa registra l'interazione da sola, altrimenti resta il comando /steal.
 MBT.StealDistance        = 5.0   -- Max distance (meters) to steal from a player
 MBT.TargetDistance       = 2.0   -- ox_target / qb-target interaction distance
 MBT.StealDuration        = 1500  -- ms progress bar for single item steal
