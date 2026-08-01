@@ -62,7 +62,7 @@ Players undress through an interactive mannequin, hand garments to each other, g
 | **One framework** | `es_extended`, `qb-core`, `qbx_core`, or `ox_core` |
 | **One inventory** | `ox_inventory`, `qb-inventory`, or a custom adapter |
 | **A target script** | Optional — `ox_target`, `qb-target`, or `qtarget` |
-| **ox_lib / mbt_visual** | Optional — notifications fall back to the native GTA feed |
+| **A notification resource** | Optional — pick a preset in `config.lua`, or leave notifications silent |
 
 Exactly one supported framework and one inventory must be active. Startup validation rejects missing, ambiguous, or incompatible combinations with an explicit error.
 
@@ -126,7 +126,7 @@ Everything lives in `config.lua`. The options you will actually touch:
 
 ### Integration points
 
-`MBT.ProgressBar` and `MBT.Notification` are plain Lua functions you can replace with your own. Both ship with a fallback chain (`mbt_visual` → `ox_lib` → native GTA feed), so the resource works without any of them installed.
+`MBT.ProgressBar` and `MBT.Notification` are plain Lua functions you can replace with your own. Every notification preset — `ox_lib`, the native GTA feed, ESX, QBCore — ships commented out: uncomment the one your server actually runs. Until you do, notifications are silent. The resource needs none of them to work.
 
 ---
 
@@ -184,13 +184,7 @@ MalibuTech was founded with my brother Gianmarco. He was the scripter — most o
 
 Meta Clothes started with him, in December 2022. He isn't here for this one.
 
-Two of his decisions from that first version are still load-bearing, after everything around them has been rewritten:
-
-**He took the resource off a single framework.** The first manifest loaded `ox_core` directly, welded in at startup. He pulled those lines out and made the resource choose its core at runtime instead. The mechanism looks nothing like his today — one folder per framework, each standing itself up — but it is the same decision, and it is why adding QBox in 2.0.0 meant writing a folder instead of rebuilding a resource.
-
-**He took our own resource out of the config.** Notifications used to be a hardcoded call to `mbt_notification`, ours. He commented it out and left `-- Put your notify here` in its place, and in the same commit changed the default language from Italian to English. Two Italians releasing to a community that mostly wasn't — he moved the defaults toward the people downloading it, away from us. That is still why this resource needs none of our other scripts to run.
-
-The code around all of it has been rewritten many times since. The shape of it is still his.
+The code has been rewritten many times since. The shape of it is still his.
 
 `DarkSideofTheCode` was his name in the FiveM community. It stays on his work.
 

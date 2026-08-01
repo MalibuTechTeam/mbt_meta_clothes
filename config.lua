@@ -192,32 +192,20 @@ MBT.Notification         = function(data)
         title = data.title or "Clothes",
         description = data.description,
         type = data.type or "info",
-        icon = data.icon or "shirt",
+        icon = data.icon or "shirt",   
         duration = data.duration or 4000
     }
 
     -- Preset for mbt_visual
-    if GetResourceState('mbt_visual') == 'started' then
-        local notified = pcall(function()
-            exports.mbt_visual:notify(payload)
-        end)
-        if notified then return end
-        MBT.Warn("mbt_visual notification failed; falling back")
-    end
+    -- exports.mbt_visual:notify(payload)
 
-    -- Prefer ox_lib when available, but keep the resource dependency-free.
-    if GetResourceState('ox_lib') == 'started' then
-        local notified = pcall(function()
-            exports.ox_lib:notify(payload)
-        end)
-        if notified then return end
-        MBT.Warn("ox_lib notification failed; using native GTA feed")
-    end
+    -- Preset ox_lib 
+    -- exports.ox_lib:notify(payload)
 
     -- Native client fallback: always available, regardless of framework.
-    BeginTextCommandThefeedPost("STRING")
-    AddTextComponentSubstringPlayerName(data.description or data.title or "Notification")
-    EndTextCommandThefeedPostTicker(false, true)
+    -- BeginTextCommandThefeedPost("STRING")
+    -- AddTextComponentSubstringPlayerName(data.description or data.title or "Notification")
+    -- EndTextCommandThefeedPostTicker(false, true)
 
     -- Preset for ESX Standard
     -- ESX.ShowNotification(data.description or data.title)
@@ -255,17 +243,10 @@ MBT.GenderModels         = {
     [`mp_f_freemode_01`] = "female",
 }
 
------------------------------------------------------------
--- wearable_props Integration
--- Maps drawable component slot indices to mbt_wearable_props item types.
--- When a player clicks one of these slots in the NUI, the action is
--- delegated to mbt_wearable_props:removeWearable().
--- Armor slot (9) is a special case: the actual tier is read from statebags.
------------------------------------------------------------
 MBT.WearablePropsSlots   = {
     [1] = "mask",
     [5] = "bag",
-    [9] = "smallarmor",  -- overridden at runtime by mbt_isWearingHeavyarmor/mbt_isWearingMedarmor statebags
+    [9] = "smallarmor",
 }
 
 MBT.Drawables            = {
