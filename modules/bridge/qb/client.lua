@@ -1,7 +1,7 @@
 if GetResourceState('qb-core') ~= 'started' then return end
--- Su QBox l'autorità è qbx_core: alcuni server tengono acceso uno shim
--- qb-core per risorse legacy, e senza questa uscita si attiverebbero due
--- bridge sullo stesso player.
+-- On QBox the authority is qbx_core: some servers keep a qb-core shim running
+-- for legacy resources, and without this early return two bridges would activate
+-- on the same player.
 if GetResourceState('qbx_core') == 'started' then return end
 
 QBCore = exports['qb-core']:GetCoreObject()
@@ -14,7 +14,7 @@ AddEventHandler('QBCore:Client:OnPlayerLoaded', function()
     MBT.Trace.OwnAlpha(0)
     SetEntityAlpha(PlayerPedId(), 0, false)
     -- Watchdog: se entro 5s nessun restoreWearing/requestPedScan resetta alpha,
-    -- forza la visibilità per non lasciare il player invisibile (multichar
+    -- force visibility so the player is not left invisible (multichar
     -- fast-switch o eventi di rete persi).
     if MBT.Utils.SchedulePedVisibilityWatchdog then
         MBT.Utils.SchedulePedVisibilityWatchdog("QBCore:Client:OnPlayerLoaded")

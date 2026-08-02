@@ -1,8 +1,8 @@
 if GetResourceState('qbx_core') ~= 'started' then return end
 
--- QBox non espone GetCoreObject: si lavora con gli export diretti di qbx_core.
--- Il pcall protegge dal caso in cui la risorsa risulti 'started' ma gli export
--- non siano ancora registrati.
+-- QBox does not expose GetCoreObject: we work with the direct qbx_core exports.
+-- The pcall guards the case where the resource reports 'started' but its
+-- exports are not registered yet.
 local function getPlayer(src)
     local ok, player = pcall(function() return exports.qbx_core:GetPlayer(src) end)
     if ok and player then return player end
@@ -11,8 +11,8 @@ end
 
 local isOXInventory = GetResourceState('ox_inventory'):find('start')
 
--- QBox richiede ox_inventory: nessun ramo qb-inventory qui, solo OX e il
--- fallback custom per chi ha un inventario proprio.
+-- QBox requires ox_inventory: no qb-inventory branch here, only OX plus the
+-- custom fallback for servers running their own inventory.
 local function addItem(src, itemName, count, metadata)
     if isOXInventory then
         local success, response = exports.ox_inventory:AddItem(src, itemName, count, metadata)
@@ -54,9 +54,9 @@ end
 -----------------------------------------------------------
 -- Multicharacter switch — server-side handlers
 --
--- QBox emette i nomi legacy di QBCore *e* i propri. Ascoltiamo entrambi
--- perché la compatibilità legacy è dichiarata ma non garantita a vita, e un
--- doppio arrivo non fa danno: PushStateToClient è già debounced.
+-- QBox fires the legacy QBCore names *and* its own. We listen to both,
+-- because the legacy compatibility is documented but not guaranteed forever,
+-- and a double arrival is harmless: PushStateToClient is already debounced.
 -----------------------------------------------------------
 
 local function onLoaded(player)

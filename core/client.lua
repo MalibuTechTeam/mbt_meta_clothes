@@ -87,13 +87,13 @@ AddEventHandler('onClientResourceStart', function(resourceName)
     MBT.Utils.StartHybridDetection()
 end)
 
--- Uno stop non deve mai lasciare nascosto un PED che abbiamo nascosto noi: i
--- timer muoiono con l'istanza e il percorso di restart rifiuta di proposito la
--- ownership dell'alpha, quindi non lo rivelerebbe più nessuno.
+-- A stop must never leave a PED hidden that we hid ourselves: the timers die
+-- with the instance and the restart path deliberately refuses alpha ownership,
+-- so nobody would ever reveal it again.
 --
--- Copre solo lo stop ordinato. Per sopravvivere a un crash servirebbe un marker
--- esterno allo stato Lua, che però non saprebbe distinguere il nostro alpha 0
--- dal fade di un'altra risorsa e calpesterebbe la sua transizione.
+-- This covers an orderly stop only. Surviving a crash would need a marker
+-- outside Lua state, which could not tell our alpha 0 from another resource's
+-- fade and would trample its transition.
 AddEventHandler('onResourceStop', function(resourceName)
     if resourceName ~= GetCurrentResourceName() then return end
     if MBT.Utils.CancelPedVisibilityWait then MBT.Utils.CancelPedVisibilityWait() end
@@ -102,8 +102,8 @@ AddEventHandler('onResourceStop', function(resourceName)
         MBT.Debugger('resource stop: no ped to reveal')
         return
     end
-    -- L'alpha PRIMA del reset dice se il PED era davvero nascosto da noi: senza
-    -- questo non si distingue "recupero riuscito" da "finestra mancata".
+    -- The alpha BEFORE the reset tells whether the PED really was hidden by us:
+    -- without it, "recovered" and "missed the window" look identical.
     local alphaBefore = GetEntityAlpha(ped)
     MBT.Trace.OwnAlpha(255)
     ResetEntityAlpha(ped)
@@ -129,8 +129,8 @@ AddEventHandler('mbt_meta_clothes:requestPedScan', function(context, lifecycle)
             MBT.Utils.SchedulePedVisibilityWatchdog('requestPedScan')
         end
     end
-    -- New player: lascia che l'appearance script applichi il SUO skin,
-    -- POI scansiona il PED per popolare il nostro state.
+    -- New player: let the appearance script apply ITS skin first, THEN scan the
+    -- PED to populate our state.
 
     -- Resume detection immediately so the appearance script can apply its skin.
     -- Spawn/switch remains hidden; hot resource recovery preserves current alpha.
@@ -140,9 +140,9 @@ AddEventHandler('mbt_meta_clothes:requestPedScan', function(context, lifecycle)
     MBT.SnapshotClient.Resume('character')
     MBT.SnapshotClient.SetRestoreProtection(false)
 
-    -- I 2.5s danno all'appearance script il tempo di applicare il vero outfit.
-    -- Senza, il scan cattura il modello nudo appena spawnato e lo salva come
-    -- baseline: da lì in poi il player rilogga nudo per sempre.
+    -- The 2.5s give the appearance script time to apply the real outfit. Without
+    -- it the scan captures the freshly spawned naked model and stores it as the
+    -- baseline: from then on the player relogs naked forever.
     MBT.SnapshotClient.ForceInitialScan(2500)
 
     if not shouldObscure then
@@ -206,9 +206,9 @@ local function applyWearingState(wearingState)
     MBT.Utils.UpdatePlayerClothes()
 end
 
--- Ogni restore incrementa la generation, e i re-apply ritardati la controllano
--- prima di scrivere. Senza questo guard, in un fast-switch char1→char2→char1 i
--- re-apply del primo character atterrerebbero sul secondo.
+-- Every restore bumps the generation, and delayed re-applies check it before
+-- writing. Without this guard, in a char1->char2->char1 fast switch the first
+-- character's re-applies would land on the second.
 RegisterNetEvent('mbt_meta_clothes:restoreWearing')
 AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, context, lifecycle)
     MBT.Trace.Mark('restoreWearing', { lifecycle = lifecycle, context = context ~= nil })
@@ -235,7 +235,7 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, contex
     local shouldObscure = MBT.PedVisibility.ShouldObscure(lifecycle)
     MBT.SnapshotClient.Resume('character')
 
-    -- Bump generation: invalida ogni re-apply pendente del restore precedente
+    -- Bump the generation: invalidates every re-apply left from the last restore
     restoreGeneration = restoreGeneration + 1
     local myGen = restoreGeneration
     pendingInitialReveal = nil
@@ -256,9 +256,9 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, contex
     applyWearingState(wearingState)
     MBT.Trace.Mark('apply:done')
 
-    -- Riparte con la baseline sullo stato ATTESO, non sul PED corrente: quello
-    -- che l'appearance script ha messo di troppo resta così un diff da
-    -- correggere invece di essere congelato come normale.
+    -- Restart with the baseline on the EXPECTED state, not on the current PED:
+    -- whatever the appearance script put on top stays a diff to correct, instead
+    -- of being frozen in as normal.
     if MBT.Utils.ResumeHybridDetection then
         MBT.Utils.ResumeHybridDetection(wearingState)
     end
@@ -270,9 +270,9 @@ AddEventHandler('mbt_meta_clothes:restoreWearing', function(wearingState, contex
         return
     end
 
-    -- Reveal condition-based: il PED deve coincidere continuativamente con lo
-    -- stato autorevole. Un apply tardivo di qualunque skin script resetta la
-    -- finestra e viene corretto prima che il PED torni visibile.
+    -- Condition-based reveal: the PED must match the authoritative state without
+    -- interruption. A late apply from any skin script resets the window and gets
+    -- corrected before the PED becomes visible again.
     Citizen.CreateThread(function()
         local startedAt = GetGameTimer()
         local stableSince
@@ -376,8 +376,8 @@ function MBT.Utils.SendSlotUpdate(slotType, slotIndex, isWearing)
     SendNUIMessage(update)
 end
 
--- Lo stato autorevole lo possiede già il server: queste funzioni applicano solo
--- il visuale che il server ha appena confermato, non lo ripersistono.
+-- The server already owns the authoritative state: these functions only apply
+-- the visuals the server just confirmed, they do not persist them again.
 local function applyDress(data)
     local meta = normalizeMetadata(data)
     MBT.Debugger("applyDress: slot", meta.index, "drawable", meta.drawable, "texture", meta.texture, "type", meta.type)
@@ -536,9 +536,9 @@ RegisterCommand("toggleUndress", function()
         -- Determine sex as numeric (0=male, 1=female) for NUI mannequin image
         local sexNumeric = (sex == "female") and 1 or 0
 
-        -- Quali slot hanno un ClothingState. Hair è escluso perché ha struttura
-        -- flat, non per-slot. Il filtro sul sesso è necessario: senza, un maschio
-        -- con drawable X risulterebbe toggleabile per via di uno stato female.
+        -- Which slots have a ClothingState. Hair is excluded because its shape is
+        -- flat, not per-slot. Filtering by sex is required: without it a male with
+        -- drawable X would look toggleable because of a female-only state.
         local toggleableSlots = { Drawables = {}, Props = {} }
         if MBT.ClothingStates then
             for _, slotType in ipairs({ "Drawables", "Props" }) do
@@ -553,7 +553,7 @@ RegisterCommand("toggleUndress", function()
                                 currentDrawable = GetPedPropIndex(ped, slotIndex)
                             end
                             for _, state in ipairs(states) do
-                                -- Match solo se sesso combacia (o se lo stato non specifica sesso)
+                                -- Match only when the sex agrees (or the state does not specify one)
                                 local sexMatches = (not state.sex) or state.sex == sex
                                 if sexMatches and (state.from == currentDrawable or state.to == currentDrawable) then
                                     toggleableSlots[slotType][tostring(slotIndex)] = true
@@ -584,8 +584,8 @@ RegisterCommand("toggleUndress", function()
             wearableProps = resourceState,
             toggleableSlots = toggleableSlots,
             hairToggleable = hairToggleable,
-            -- UI labels dal locale attivo (hotspots, slot names, steal strings).
-            -- Un solo source of truth per lingua: il Lua pilota, React consuma.
+            -- UI labels from the active locale (hotspots, slot names, steal strings).
+            -- One source of truth per language: Lua drives, React consumes.
             labels = MBT.Locale.UI or {},
             theme = MBT.Theme,
         })
@@ -622,8 +622,8 @@ RegisterCommand("watch", function() if canToggle() then MBT.Utils.HandleProps(6)
 RegisterCommand("hair", function() if canToggle() then MBT.Utils.ToggleHair() end end, false)
 
 -- Steal command (fallback for servers without target scripts)
--- Fallback quando nessuno script di target è avviato: stessa idoneità e stessa
--- distanza dell'interazione target, solo raggiunta da comando.
+-- Fallback for when no target script is running: same eligibility and same
+-- distance as the target interaction, only reached by command.
 RegisterCommand("steal", function()
     if MBT.StealEnabled == false then return end
     if not canToggle() then return end
@@ -740,9 +740,9 @@ AddEventHandler('mbt_meta_clothes:dripInfo', function(data)
         progress = data.progress
     })
 
-    -- Serve un canale anche a menu chiuso, ma non chat:addMessage: presuppone la
-    -- risorsa `chat`, che molti server sostituiscono o rimuovono, e lì spariva
-    -- senza un warning. MBT.Notification degrada fino al feed nativo.
+    -- We need a channel even with the menu closed, but not chat:addMessage: it
+    -- assumes the `chat` resource, which many servers replace or remove, and there
+    -- it vanished without a warning. MBT.Notification degrades to the native feed.
     local lvl = data.level or MBT.Locale["drip_unknown"]
     local lvlIdx = data.levelIndex or 1
     local xp = data.xp or 0

@@ -10,16 +10,16 @@ MBT.ActionCooldown       = 1500  -- ms between actions (prevents animation spam)
 
 -----------------------------------------------------------
 -- Theme
--- Stessa convenzione di mbt_emote_menu: hex SENZA '#'. Viene inviato alla NUI
--- all'apertura e trasformato in custom properties CSS, così un solo valore
--- ritinge laser, anelli, marcatori del manichino e stati attivi.
+-- Same convention as mbt_emote_menu: hex WITHOUT '#'. It is sent to the NUI on
+-- open and expanded into CSS custom properties, so a single value re-tints the
+-- laser, the rings, the mannequin markers and every active state.
 --
--- Oggi meta_clothes espone solo l'accento: le altre chiavi di emote_menu
--- (Background, Card, Text…) non sono qui perché la sua UI non le usa ancora, e
--- una config che non fa niente è peggio di una config assente.
+-- For now meta_clothes exposes the accent only. The other emote_menu keys
+-- (Background, Card, Text…) are absent because this UI does not use them yet,
+-- and a setting that does nothing is worse than no setting at all.
 --
--- Il rosso della modalità furto NON è tematizzabile di proposito: lì il colore
--- distingue "sto rubando" da "sto vestendomi", non è decorazione.
+-- The red of steal mode is deliberately NOT themeable: there the colour tells
+-- "I am robbing someone" from "I am getting dressed". It is meaning, not decoration.
 -----------------------------------------------------------
 MBT.Theme                = {
     Accent = '00e676', -- Brand green
@@ -28,13 +28,13 @@ MBT.Theme                = {
 -----------------------------------------------------------
 -- Stealing
 -----------------------------------------------------------
--- Spegne il furto su ENTRAMBI i percorsi: opzione target e comando /steal.
--- Server PVE o RP che considerano il furto vestiti una forma di griefing lo
--- mettono a false e la feature sparisce, non a metà.
+-- Turns clothing theft off on BOTH paths: the target option and the /steal
+-- command. PVE servers, or RP servers that consider it griefing, set this to
+-- false and the feature disappears whole, not halfway.
 MBT.StealEnabled         = true
 
--- Nessun toggle per il target: se ox_target, qb-target o qtarget è avviato la
--- risorsa registra l'interazione da sola, altrimenti resta il comando /steal.
+-- No target toggle: if ox_target, qb-target or qtarget is running the resource
+-- registers the interaction by itself, otherwise the /steal command covers it.
 MBT.StealDistance        = 5.0   -- Max distance (meters) to steal from a player
 MBT.TargetDistance       = 2.0   -- ox_target / qb-target interaction distance
 MBT.StealDuration        = 1500  -- ms progress bar for single item steal
@@ -82,13 +82,13 @@ MBT.PedRevealTimeout      = 4500 -- bounded wait; the 5s visibility watchdog rem
 -- Hybrid snapshot synchronization. The client polls locally but submits only
 -- stable full-state changes; the server remains authoritative for metadata.
 MBT.SnapshotPollInterval        = 1000
--- 0 = ogni frame. Durante la finestra di restore protection un appearance
--- script può rimettere un capo che il giocatore aveva tolto (illenium, skinchanger,
--- qb-clothing, chiunque): il tempo che passa fra la sua scrittura e la nostra
--- correzione è esattamente il "lampo" che si vede — e che vedono anche gli altri
--- giocatori, perché i vestiti viaggiano in rete mentre l'alpha no.
--- Controllare a ogni frame costa ~11 letture native e riduce quella finestra da
--- 500ms a un frame. Non ci lega a nessuno script: guardiamo il PED, non gli eventi.
+-- 0 = every frame. During the restore-protection window an appearance script
+-- (illenium, skinchanger, qb-clothing, anyone) can put back a garment the player
+-- had taken off. The gap between their write and our correction is exactly the
+-- "flash" you see — and that other players see too, because clothing travels over
+-- the network while alpha does not.
+-- Checking every frame costs ~11 native reads and shrinks that window from 500ms
+-- to a single frame. It ties us to no particular script: we watch the PED, not events.
 MBT.SnapshotRestorePollInterval = 0
 MBT.SnapshotDebounce            = 400
 MBT.SnapshotAckTimeout          = 2000

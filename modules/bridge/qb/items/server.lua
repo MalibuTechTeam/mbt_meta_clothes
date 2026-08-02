@@ -1,7 +1,7 @@
 if GetResourceState('qb-core') ~= 'started' then return end
--- Su QBox l'autorità è qbx_core: alcuni server tengono acceso uno shim
--- qb-core per risorse legacy, e senza questa uscita si attiverebbero due
--- bridge sullo stesso player.
+-- On QBox the authority is qbx_core: some servers keep a qb-core shim running
+-- for legacy resources, and without this early return two bridges would activate
+-- on the same player.
 if GetResourceState('qbx_core') == 'started' then return end
 if GetResourceState('qb-inventory') ~= 'started' then return end
 

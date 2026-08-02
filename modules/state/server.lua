@@ -14,7 +14,7 @@ local PlayerRevisions = {}
 local PlayerSaveGenerations = {}
 local PlayerHasBaseline = {}
 local PlayerDripXp = {}
-local PlayerJustSwitched = {} -- true quando CheckCharacterSwitch ha rilevato uno switch
+local PlayerJustSwitched = {} -- true when CheckCharacterSwitch has detected a switch
 local initialized = false
 
 local function markDirty(src)
@@ -125,9 +125,10 @@ function MBT.PlayerState.IsSaveGuardCurrent(expectedIdentifier, expectedGenerati
 end
 
 function MBT.PlayerState.SetSlot(src, slotType, slotIndex, metadata)
-    -- Safety net multicharacter: se il character è cambiato senza che gli event
+    -- Multicharacter safety net: if the character changed without the lifecycle
     -- framework siano scattati (alcuni multichar non emettono esx:playerLoaded
-    -- server-side), rileviamo lo switch qui e reload prima di scrivere.
+    -- events firing (some multichar resources only propagate server-side), we
+    -- detect the switch here and reload before writing.
     if MBT.PlayerState.CheckCharacterSwitch(src) then
         MBT.PlayerState.Load(src)
     end
@@ -300,9 +301,9 @@ function MBT.PlayerState.Save(src, identifier)
     local dripXp = PlayerDripXp[src] or 0
     local saveGeneration = PlayerSaveGenerations[src] or 0
 
-    -- Usare la variante sincrona (.await) garantisce che il save completi
-    -- prima che il resource muoia in onResourceStop. MySQL.insert async
-    -- fire-and-forget può perdersi se la risorsa si ferma subito dopo.
+    -- Using the synchronous variant (.await) guarantees the save completes
+    -- before the resource dies in onResourceStop. A fire-and-forget async
+    -- MySQL.insert can be lost if the resource stops right afterwards.
     MySQL.insert.await(
         "INSERT INTO mbt_player_wearing (identifier, wearing_data, drip_xp) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE wearing_data = VALUES(wearing_data), drip_xp = VALUES(drip_xp), updated_at = CURRENT_TIMESTAMP",
         { identifier, data, dripXp }
@@ -323,12 +324,12 @@ function MBT.PlayerState.Save(src, identifier)
     end
 end
 
---- Rileva switch di character (multicharacter): se il src ha già stato caricato
---- ma l'identifier è cambiato, salva lo stato vecchio sul suo DB row e resetta
---- le cache. Da chiamare PRIMA di Load() in modo che lo stato del nuovo char
+--- Detect a character switch (multicharacter): if this src already has loaded
+--- state but the identifier changed, save the old state to its own DB row and
+--- reset the caches. Call this BEFORE Load() so the new character state
 --- venga caricato pulito.
 --- @param src number Player source
---- @return boolean switched True se è stato rilevato uno switch
+--- @return boolean switched True when a switch was detected
 function MBT.PlayerState.CheckCharacterSwitch(src)
     if not getPlayerIdentifier then return false end
     local oldId = PlayerIdentifiers[src]
@@ -339,7 +340,7 @@ function MBT.PlayerState.CheckCharacterSwitch(src)
 
     MBT.Debugger("CheckCharacterSwitch: src", src, "identifier cambiato da", oldId, "a", newId, "- salvo e resetto")
 
-    -- Salva lo stato del vecchio character sulla sua chiave corretta
+    -- Save the outgoing character state under its own correct key
     if DirtyPlayers[src] and PlayerWearing[src] then
         MBT.PlayerState.Save(src, oldId)
     end
@@ -352,16 +353,16 @@ function MBT.PlayerState.CheckCharacterSwitch(src)
     PlayerSaveGenerations[src] = nil
     PlayerHasBaseline[src] = nil
     PlayerDripXp[src] = nil
-    -- Flag: il prossimo playerReady è dovuto a switch, NON deve fare PED scan
-    -- (il PED potrebbe avere ancora i drawable del char precedente se
-    -- l'appearance script non ha già applicato il nuovo skin)
+    -- Flag: the next playerReady comes from a switch and must NOT run a PED scan
+    -- (the PED may still carry the previous character drawables if the
+    -- appearance script has not applied the new skin yet)
     PlayerJustSwitched[src] = true
     return true
 end
 
---- Query/consume del flag "ha appena fatto switch". Ritorna true una sola volta
---- per switch — il flag viene azzerato dalla prima chiamata in modo che il
---- successivo playerReady (primo login dopo drop completo) torni a comportarsi
+--- Query and consume the "just switched" flag. Returns true only once per
+--- switch: the first call clears it, so the next playerReady (a first login
+--- after a full drop) goes back to behaving
 --- come new-player normale.
 function MBT.PlayerState.ConsumeSwitchFlag(src)
     local was = PlayerJustSwitched[src] == true
@@ -376,10 +377,10 @@ function MBT.PlayerState.Load(src, identifier)
         end
     end
     if not identifier then
-        -- IDENTIFIER NIL — non azzerare lo stato. Il caller ha la sua logica di
-        -- retry: azzerare qui perderebbe il PlayerWearing del char precedente,
-        -- magari non ancora salvato, e manderemmo un restoreWearing vuoto.
-        -- Init a vuoto SOLO se non esiste ancora nulla (prima chiamata vera).
+        -- NIL IDENTIFIER — do not clear the state. The caller has its own retry
+        -- logic: clearing here would lose the previous character PlayerWearing,
+        -- possibly unsaved, and we would send an empty restoreWearing.
+        -- Initialise empty ONLY when nothing exists yet (a genuine first call).
         if not PlayerWearing[src] then
             MBT.PlayerState.InitPlayer(src)
         end
@@ -465,10 +466,10 @@ end
 
 function MBT.PlayerState.SaveAllDirty()
     -- Save yielda su MySQL.insert.await. Un playerDropped durante lo yield
-    -- chiama Cleanup, che rimuove da DirtyPlayers una chiave DIVERSA da quella
-    -- corrente: in Lua rimuovere una chiave non-corrente durante pairs() è
-    -- undefined e può alzare "invalid key to 'next'", abortendo il salvataggio
-    -- di tutti i giocatori rimanenti. Fissiamo la lista prima di cedere.
+    -- calls Cleanup, which removes a key from DirtyPlayers OTHER than the current
+    -- one. In Lua, removing a non-current key during pairs() is undefined and can
+    -- raise "invalid key to 'next'", aborting the save for every remaining player.
+    -- So we snapshot the list before yielding.
     local pending = {}
     for src, dirty in pairs(DirtyPlayers) do
         if dirty then pending[#pending + 1] = src end
@@ -476,8 +477,8 @@ function MBT.PlayerState.SaveAllDirty()
 
     local count = 0
     for _, src in ipairs(pending) do
-        -- Ricontrolla: nel frattempo il player può essere uscito e Cleanup
-        -- averlo già salvato.
+        -- Re-check: meanwhile the player may have left and Cleanup may have
+        -- already saved them.
         if DirtyPlayers[src] then
             MBT.PlayerState.Save(src)
             count = count + 1
@@ -491,14 +492,15 @@ end
 -----------------------------------------------------------
 -- Push state to client (load + decide branch + trigger client event)
 -----------------------------------------------------------
--- Il push può essere guidato sia dal client (playerReady) sia dal server
--- (bridge): serve per i multichar che non propagano la catena client-side, dove
--- altrimenti il PED resterebbe in pausa fino al watchdog. Il debounce da 500ms
--- assorbe il caso in cui firino entrambi per lo stesso load.
+-- The push can be driven by the client (playerReady) or by the server (bridge):
+-- the latter covers multichar resources that do not propagate the client-side
+-- chain, where the PED would otherwise stay paused until the watchdog. The 500ms
+-- debounce
+-- absorbs the case where both fire for the same load.
 local lastPushAt = {} -- [src] = GetGameTimer()
 
---- Carica lo stato del player dal DB (se non già fatto), decide quale branch
---- prendere (restoreWearing existing/empty oppure requestPedScan) e triggera
+--- Load the player state from the DB (if not already done), pick the branch
+--- (restoreWearing existing/empty, or requestPedScan) and trigger
 --- il client event corrispondente. Idempotente con debounce 500ms.
 --- @param src number Player source
 --- @param attempt number Internal: counter retry (default 1)
@@ -508,19 +510,19 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force, lifecycle)
     if not src or src <= 0 then return end
     attempt = attempt or 1
 
-    -- Alcuni multichar emettono esx:onPlayerJoined prima che l'identifier sia
+    -- Some multichar resources fire esx:onPlayerJoined before the identifier is
     -- popolato: proseguire con nil significherebbe non rilevare lo switch,
     -- azzerare PlayerWearing e mandare un restoreWearing vuoto — player nudo.
     -- Retry fisso a 200ms, max 8 tentativi; poi si lascia perdere, tanto un
-    -- evento successivo rilancerà il push.
+    -- a later event will drive the push again.
     if not getPlayerIdentifier or not getPlayerIdentifier(src) then
         if attempt >= 8 then
             local detail = { source = src, attempts = attempt, elapsedMs = attempt * 200 }
-            -- Il recovery del restart cicla su TUTTI i connessi, compresi quelli
-            -- fermi nel selector senza character: lì l'identifier assente è lo
-            -- stato normale e il push arriverà col loro playerLoaded. Warnare
-            -- significherebbe un allarme per ogni giocatore nel selector a ogni
-            -- restart della risorsa.
+            -- Restart recovery loops over EVERY connected player, including those
+            -- sitting in the selector without a character: there a missing
+            -- identifier is the normal state and the push will arrive with their
+            -- playerLoaded. Warning here would mean one alarm per player in the
+            -- selector on every resource restart.
             if lifecycle == MBT.PedVisibility.ResourceRestart then
                 MBT.Debugger('PushStateToClient: no character yet; deferring to next lifecycle trigger', detail)
             else
@@ -529,7 +531,7 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force, lifecycle)
             return
         end
         Citizen.SetTimeout(200, function()
-            -- Verifica che il player non si sia disconnesso nel frattempo
+            -- Make sure the player has not disconnected in the meantime
             if GetPlayerName(src) then
                 MBT.PlayerState.PushStateToClient(src, attempt + 1, force, lifecycle)
             end
@@ -539,7 +541,7 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force, lifecycle)
 
     local now = GetGameTimer()
     if not force and lastPushAt[src] and (now - lastPushAt[src]) < 500 then
-        -- Debounce: skip silenziosamente. Già pushato di recente.
+        -- Debounce: skip silently, we pushed recently.
         return
     end
     lastPushAt[src] = now
@@ -563,10 +565,10 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force, lifecycle)
         })
         TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, wearingState, context, lifecycle)
     else
-        -- Player nuovo e char nuovo prendono la stessa strada: requestPedScan.
+        -- A new player and a new character take the same route: requestPedScan.
         -- Un restoreWearing vuoto applicherebbe i default di MBT.Drawables e
-        -- combatterebbe contro l'appearance script che sta mettendo il vero skin.
-        -- Lo scan invece lo lascia lavorare e legge il risultato quando è stabile.
+        -- would fight the appearance script that is applying the real skin.
+        -- The scan instead lets it work and reads the result once it is stable.
         local justSwitched = MBT.PlayerState.ConsumeSwitchFlag(src)
         MBT.Debugger('PushStateToClient: requesting initial PED scan', {
             source = src,
@@ -581,7 +583,7 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force, lifecycle)
     end
 end
 
---- Cleanup del debounce quando il player si disconnette
+--- Clear the debounce when the player disconnects
 AddEventHandler('playerDropped', function()
     lastPushAt[source] = nil
 end)

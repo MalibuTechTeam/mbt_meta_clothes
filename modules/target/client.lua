@@ -24,9 +24,9 @@ end
 
 --- Check if target entity can be stolen from (hands up, dead, or ragdoll).
 --- Hands-up animations are configurable via MBT.HandsUpAnims in config.lua.
---- Esposta perché la usa anche il comando /steal: prima ne teneva una copia con
---- l'animazione mani alzate scritta a mano, quindi MBT.HandsUpAnims valeva sul
---- percorso target e non su quello a comando.
+--- Exposed because the /steal command uses it too: it used to keep its own copy
+--- with the hands-up animation hardcoded, so MBT.HandsUpAnims applied to the
+--- target path and not to the command one.
 local function canStealFrom(entity)
     if IsPedDeadOrDying(entity, false) or IsPedRagdoll(entity) then
         return true

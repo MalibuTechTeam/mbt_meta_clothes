@@ -29,13 +29,13 @@ end
 -- Multicharacter switch — server-side handlers
 -----------------------------------------------------------
 
--- ox:playerLoaded fires server-side quando un character viene caricato
+-- ox:playerLoaded fires server-side when a character is loaded
 -- (compreso multicharacter switch).
 AddEventHandler('ox:playerLoaded', function(src)
     MBT.PlayerState.PushStateToClient(src)
 end)
 
--- Pre-logout: salva lo stato del character che sta uscendo prima che
+-- Pre-logout: save the state of the outgoing character before
 -- l'Ox player venga distrutto.
 AddEventHandler('ox:playerLogout', function(src)
     TriggerClientEvent('mbt_meta_clothes:multichar:pauseDetection', src)

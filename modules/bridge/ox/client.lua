@@ -13,7 +13,7 @@ AddEventHandler('ox:playerLoaded', function(data)
     MBT.Trace.OwnAlpha(0)
     SetEntityAlpha(PlayerPedId(), 0, false)
     -- Watchdog: se entro 5s nessun restoreWearing/requestPedScan resetta alpha,
-    -- forza la visibilità per non lasciare il player invisibile (multichar
+    -- force visibility so the player is not left invisible (multichar
     -- fast-switch o eventi di rete persi).
     if MBT.Utils.SchedulePedVisibilityWatchdog then
         MBT.Utils.SchedulePedVisibilityWatchdog("ox:playerLoaded")

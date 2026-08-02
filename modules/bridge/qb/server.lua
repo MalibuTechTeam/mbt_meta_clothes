@@ -1,7 +1,7 @@
 if GetResourceState('qb-core') ~= 'started' then return end
--- Su QBox l'autorità è qbx_core: alcuni server tengono acceso uno shim
--- qb-core per risorse legacy, e senza questa uscita si attiverebbero due
--- bridge sullo stesso player.
+-- On QBox the authority is qbx_core: some servers keep a qb-core shim running
+-- for legacy resources, and without this early return two bridges would activate
+-- on the same player.
 if GetResourceState('qbx_core') == 'started' then return end
 
 QBCore = exports['qb-core']:GetCoreObject()
@@ -54,7 +54,7 @@ end
 -- Multicharacter switch — server-side handlers
 -----------------------------------------------------------
 
--- QBCore:Server:PlayerLoaded fires server-side con il Player già pronto.
+-- QBCore:Server:PlayerLoaded fires server-side with the Player already ready.
 -- Qui getPlayerIdentifier(src) restituisce SEMPRE il citizenid corretto.
 AddEventHandler('QBCore:Server:PlayerLoaded', function(Player)
     local src = Player and Player.PlayerData and Player.PlayerData.source
@@ -62,7 +62,7 @@ AddEventHandler('QBCore:Server:PlayerLoaded', function(Player)
     MBT.PlayerState.PushStateToClient(src)
 end)
 
--- Pre-unload: salva lo stato del character che sta uscendo
+-- Pre-unload: save the state of the character on its way out
 AddEventHandler('QBCore:Server:OnPlayerUnload', function(src)
     TriggerClientEvent('mbt_meta_clothes:multichar:pauseDetection', src)
     if MBT.PlayerState.IsLoaded(src) then
