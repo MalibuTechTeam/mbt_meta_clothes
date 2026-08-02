@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  /* Default del tema. Il Lua li sovrascrive con MBT.Theme all'apertura del
-     menu (vedi utils/theme.ts); questi restano se il messaggio non arriva o
-     porta un valore malformato. Verde MalibuTech, stesso di mbt_emote_menu. */
+  /* Theme defaults. Lua overrides them with MBT.Theme when the menu opens (see
+     utils/theme.ts); these stay if the message never arrives or carries a
+     malformed value. MalibuTech green, the same as mbt_emote_menu. */
   --mbt-accent: #00e676;
-  /* Tripletta RGB per comporre qualunque opacità: rgba(var(--mbt-accent-rgb), 0.4) */
+  /* RGB triplet for composing any opacity: rgba(var(--mbt-accent-rgb), 0.4) */
   --mbt-accent-rgb: 0, 230, 118;
   --mbt-accent-strong: rgba(0, 230, 118, 0.82);
-  /* Versioni scurite per i riempimenti pieni, dove serve un glifo bianco
-     leggibile: sull'accento pieno il bianco non si legge e il nero si perde. */
+  /* Darkened variants for solid fills, where a readable white glyph is needed:
+     on the full accent, white does not read and black gets lost. */
   --mbt-accent-dark: rgb(0, 143, 73);
   --mbt-accent-deep: rgb(0, 97, 50);
   --mbt-accent-glow: rgba(0, 230, 118, 0.25);
@@ -58,9 +58,9 @@ body {
   animation: mbt-hotspot-pulse-active 2s ease-in-out infinite;
 }
 
-/* Scanner ring che si espande dal centro e sfuma — effetto HUD sci-fi.
-   Anima SOLO scale: il posizionamento/centramento è gestito dal wrapper
-   esterno, così non c'è conflitto tra transform di Tailwind e keyframe. */
+/* Scanner ring expanding from the centre and fading out — a sci-fi HUD effect.
+   Animates scale ONLY: positioning and centring are handled by the outer
+   wrapper, so Tailwind transforms and keyframes never conflict. */
 @keyframes mbt-scanner-sweep {
   0% {
     transform: scale(0.6);
@@ -85,7 +85,7 @@ body {
   animation-delay: 1.75s;
 }
 
-/* Pulse "breathing" — respirazione lenta della base */
+/* Slow "breathing" pulse of the pedestal */
 @keyframes mbt-pedestal-breath {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.7; }

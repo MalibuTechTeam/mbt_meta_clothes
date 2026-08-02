@@ -59,11 +59,11 @@ interface MannequinProps {
   hairToggleable?: boolean;
   stealMode?: boolean;
   stealItems?: StealItem[];
-  // Usa la logica centrale di App per capire se uno slot è indossato.
-  // Necessaria per mask/bag/armor che non stanno nella wearing table ma in extraState.
+  // Uses App's central logic to decide whether a slot is worn.
+  // Needed for mask/bag/armor, which live in extraState rather than the wearing table.
   isSlotWorn?: (slotType: "Drawables" | "Props", slotIndex: number) => boolean;
-  // Dizionario UI dal Lua. Se non è ancora arrivato valgono i fallback inline
-  // definiti più sotto, uno per hotspot.
+  // UI dictionary from Lua. Until it arrives, the inline fallbacks defined
+  // further down apply, one per hotspot.
   labels?: UILabels;
   onCategoryClick: (id: string, rect: { left: number; top: number }) => void;
   onClose: () => void;
@@ -274,7 +274,7 @@ export default function Mannequin({
           </motion.div>
         )}
 
-        {/* Immagine base del mannequin */}
+        {/* Base mannequin image */}
         <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none" />
 
         <img
@@ -286,14 +286,14 @@ export default function Mannequin({
         />
 
         {/* Clothing Layers (Visual Overlays).
-            initial={false} → i capi già indossati alla prima apertura UI
-            appaiono istantaneamente (niente flash). Solo i capi aggiunti/
-            rimossi DOPO (dress/undress con UI aperta) animano con bloom. */}
+            initial={false} → garments already worn when the UI first opens
+            appear instantly (no flash). Only garments added or removed
+            AFTERWARDS (dress/undress with the UI open) animate with a bloom. */}
         <AnimatePresence initial={false}>
           {Object.entries(LAYER_META).map(([key, meta]) => {
             const [slotType, slotIndexStr] = key.split("-");
-            // Usa isSlotWorn se disponibile (gestisce mask/bag/armor da extraState),
-            // fallback al check diretto su wearing per compatibilità.
+            // Use isSlotWorn when available (it handles mask/bag/armor from
+            // extraState), falling back to a direct wearing check.
             const worn = isSlotWorn
               ? isSlotWorn(
                   slotType as "Drawables" | "Props",
@@ -306,34 +306,36 @@ export default function Mannequin({
             const isLayerHovered =
               hoveredSlot !== null &&
               (HOTSPOT_TO_LAYERS[hoveredSlot] || []).includes(key);
-            // Lo slot attivo riceve un overlay di glow separato, così l'opacità
-            // si anima senza ricalcolare il filtro a ogni frame.
+            // The active slot gets its own glow overlay, so opacity animates
+            // without recomputing the filter on every frame.
             const isLayerActive =
               activeCategory !== null &&
               (HOTSPOT_TO_LAYERS[activeCategory] || []).includes(key);
-            // Ombra sotto il capo per farlo "poggiare", rim light bianca in alto
-            // per staccarlo dal fondo, glow d'accento se lo slot è in hover.
-            // Il filtro resta assente durante l'entrata del mannequin: rasterizzare
-            // un'ombra grande per ogni layer trasparente costa una comparsa ritardata.
+            // A shadow beneath the garment so it "sits", a white rim light on top
+            // to lift it off the background, an accent glow while the slot is
+            // hovered. The filter stays absent during the mannequin's entrance:
+            // rasterising a large shadow for every transparent layer costs a
+            // visibly delayed appearance.
             const layerFilter = isLayerHovered
               ? HOVER_LAYER_FILTER
               : undefined;
             const layerSrc = `./layers/${meta.path}_${gender}.png`;
             return (
-              // Bloom solo in uscita: con la UI aperta il player non si veste,
-              // quindi un bloom in entrata non si vedrebbe mai.
+              // Bloom on exit only: with the UI open the player never gets
+              // dressed, so an entrance bloom would never be seen.
               //
-              // Il colore è un HEX e non var(--mbt-accent): framer-motion non
-              // parsa le parentesi nested dentro drop-shadow. È l'unico colore
-              // della UI che non segue MBT.Theme, e va allineato a mano.
+              // The colour is a HEX literal, not var(--mbt-accent): framer-motion
+              // does not parse nested parentheses inside drop-shadow. It is the
+              // only colour in the UI that does not follow MBT.Theme, and it has
+              // to be kept in sync by hand.
               <motion.div
                 key={`layer-${key}`}
-                // Niente filter in initial/animate: crearlo al primo paint
-                // forza il browser a creare un GPU compositing layer, che
-                // ha un costo visibile come "comparsa ritardata" del capo
-                // rispetto al mannequin. Filter solo nell'exit (bloom
-                // undress) dove è l'utente a innescare l'animazione e il
-                // costo di creazione si maschera nella transizione.
+                // No filter in initial/animate: creating it on the first paint
+                // forces the browser to create a GPU compositing layer, whose
+                // cost shows up as the garment "appearing late" relative to the
+                // mannequin. Filter only on exit (the undress bloom), where the
+                // user triggers the animation and the creation cost hides
+                // inside the transition.
                 initial={{ opacity: 0, scale: 0.95, x: "-50%" }}
                 animate={{ opacity: 1, scale: 1, x: "-50%" }}
                 exit={{
@@ -375,7 +377,7 @@ export default function Mannequin({
             un periodo di idle; le aperture successive riusano lo stato scaldato. */}
         {pedestalReady && (
           <>
-            {/* Layer 1: luce radiale d'ambiente che respira. */}
+            {/* Layer 1: breathing radial ambient light. */}
             <div
               className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[65%] h-24 mbt-pedestal-breath pointer-events-none z-0"
               style={{
@@ -394,7 +396,7 @@ export default function Mannequin({
             />
 
             {/* Layer 3: scanner ring 1.
-                Wrapper esterno: posizionamento statico. Inner: solo scale. */}
+                Outer wrapper: static positioning. Inner: scale only. */}
             <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[38%] h-4 pointer-events-none z-0">
               <div
                 className="w-full h-full rounded-[100%] border border-[rgba(var(--mbt-accent-rgb),0.6)] mbt-scanner-ring"
@@ -404,7 +406,7 @@ export default function Mannequin({
               />
             </div>
 
-            {/* Layer 4: scanner ring 2 — sfasato nel tempo per continuità */}
+            {/* Layer 4: scanner ring 2 — time-offset for continuity */}
             <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[38%] h-4 pointer-events-none z-0">
               <div
                 className="w-full h-full rounded-[100%] border border-[rgba(var(--mbt-accent-rgb),0.5)] mbt-scanner-ring-delay"
@@ -420,10 +422,10 @@ export default function Mannequin({
         {visibleHotspots.map((spot) => {
           const isActive = activeCategory === spot.id;
           const isSelected = stealMode && selectedToSteal.has(spot.id);
-          // Step A: lo slot è "occupato" se almeno uno dei layer mappati a
-          // questo hotspot è indossato. Usato per ridurre l'opacità del dot
-          // (l'item stesso è già segnale di "qui c'è qualcosa" — il dot
-          // serve di più sugli slot vuoti come CTA "qui puoi mettere qualcosa")
+          // Step A: the slot counts as "occupied" if at least one layer mapped
+          // to this hotspot is worn. Used to dim the dot — the garment itself
+          // already signals "there is something here", so the dot is more useful
+          // on empty slots, as a "you can put something here" cue.
           const hotspotLayers = HOTSPOT_TO_LAYERS[spot.id] || [];
           const isOccupied =
             !stealMode &&
@@ -436,8 +438,8 @@ export default function Mannequin({
                   )
                 : !!wearing[slotType as keyof typeof wearing]?.[slotIndexStr];
             });
-          // Dim solo se occupato E non attivo (non voglio nascondere lo slot
-          // su cui l'utente ha cliccato). Hover restaura full via Tailwind.
+          // Dim only when occupied AND not active — we do not want to hide the
+          // slot the user just clicked. Hover restores full opacity via Tailwind.
           const isDimmed = isOccupied && !isActive;
           const accentColor = stealMode
             ? isSelected

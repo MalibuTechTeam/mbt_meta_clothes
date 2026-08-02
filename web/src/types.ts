@@ -45,7 +45,7 @@ export interface ToggleableSlots {
 }
 
 // NUI message types from Lua
-/** config.lua MBT.Theme — colori in hex SENZA '#', come in mbt_emote_menu. */
+/** config.lua MBT.Theme — hex colours WITHOUT '#', as in mbt_emote_menu. */
 export interface ThemeConfig {
   Accent: string;
 }
@@ -64,7 +64,7 @@ export interface NUIMessageUI {
   hairToggleable?: boolean;
   drip?: DripState;
   labels?: UILabels;
-  /** Tema dal server (config.lua MBT.Theme). */
+  /** Theme from the server (config.lua MBT.Theme). */
   theme?: ThemeConfig;
 }
 
@@ -122,14 +122,14 @@ export interface NUIMessageStealMenu {
   wearing?: WearingState;
   sex?: 0 | 1;
   labels?: UILabels;
-  /** Tema dal server (config.lua MBT.Theme). */
+  /** Theme from the server (config.lua MBT.Theme). */
   theme?: ThemeConfig;
 }
 
 /**
- * Dizionario stringhe UI inviato dal Lua (dal locale attivo) ad ogni
- * apertura della NUI. Unica fonte di verità per le traduzioni frontend.
- * Lato Lua vive in Locales[lang].UI (vedi locales/en.lua, locales/it.lua).
+ * UI string dictionary sent by Lua (from the active locale) on every NUI open.
+ * Single source of truth for frontend translations.
+ * On the Lua side it lives in Locales[lang].UI (see locales/en.lua, it.lua).
  */
 export interface UILabels {
   hotspots: {

@@ -40,9 +40,9 @@ const Trousers = ({
   </svg>
 );
 
-// I `label` qui sono identificatori per chi legge la tabella, non testo a
-// schermo: le stringhe visibili arrivano dal Lua (Locales[lang].UI) e sono già
-// tradotte. Restano in inglese come il resto del codice.
+// The `label` fields here are identifiers for whoever reads the table, not text
+// on screen: visible strings come from Lua (Locales[lang].UI) and are already
+// translated. They stay in English like the rest of the code.
 
 // Core slots (always visible)
 export const DRAWABLE_SLOTS: Record<number, SlotDefinition> = {
@@ -138,7 +138,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
     zIndex: 24,
   },
   "Props-6": {
-    // sotto il jacket (zIndex 18) — la giacca copre i polsi
+    // below the jacket (zIndex 18) — the jacket covers the wrists
     path: "watch",
     availableFor: ["male"],
     top: "4%",
@@ -147,7 +147,7 @@ export const LAYER_META: Record<string, LayerMeta> = {
     zIndex: 17,
   },
   "Props-7": {
-    // sotto il jacket (zIndex 18) — la giacca copre i polsi
+    // below the jacket (zIndex 18) — the jacket covers the wrists
     path: "bracelet",
     availableFor: ["male"],
     top: "39%",

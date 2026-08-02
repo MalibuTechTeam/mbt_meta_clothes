@@ -34,8 +34,8 @@ import type {
   UILabels,
 } from "./types";
 
-// Fallback per il frame fra primo render e primo messaggio NUI. In inglese:
-// un server non-italiano non deve vedere italiano nemmeno per un istante.
+// Fallback for the frame between first render and first NUI message. In English:
+// a non-Italian server must not see Italian even for an instant.
 const DEFAULT_LABELS: UILabels = {
   hotspots: {
     head: "Head & Face",
@@ -80,10 +80,10 @@ import {
 
 export default function App() {
   const [visible, setVisible] = useState(false);
-  // Contatore incrementato ad ogni apertura della UI — usato come parte della
-  // key del wrapper motion così se l'utente chiude e riapre velocemente,
-  // AnimatePresence non può invertire l'exit in corso (che impedirebbe il
-  // replay dell'animazione initial). Nuova key = unmount + remount forzati.
+  // Counter bumped on every UI open — used as part of the motion wrapper key, so
+  // that if the user closes and reopens quickly, AnimatePresence cannot reverse
+  // the exit in flight (which would prevent the initial animation from replaying).
+  // A new key means a forced unmount + remount.
   const [openCount, setOpenCount] = useState(0);
   const [activeCategory, setActiveCategory] = useState<ActiveCategory>({
     id: null,
@@ -115,13 +115,13 @@ export default function App() {
   const [hairToggleable, setHairToggleable] = useState(false);
   const [stealMode, setStealMode] = useState(false);
   const [stealItems, setStealItems] = useState<StealItem[]>([]);
-  // In steal mode il mannequin mostra i vestiti della vittima, non i nostri.
+  // In steal mode the mannequin shows the victim's clothes, not ours.
   const [stealWearing, setStealWearing] = useState<WearingState>({
     Drawables: {},
     Props: {},
   });
   const [stealSex, setStealSex] = useState<0 | 1>(0);
-  // Riletto a ogni apertura, così la lingua cambia a runtime senza restart.
+  // Re-read on every open, so the language can change at runtime with no restart.
   const [labels, setLabels] = useState<UILabels>(DEFAULT_LABELS);
 
   const handleExitUI = useCallback(() => {
@@ -159,7 +159,7 @@ export default function App() {
           d.status === true || d.status === "true" || d.status === 1;
         setVisible(isVisible);
         if (isVisible) {
-          setOpenCount((c) => c + 1); // forza remount per replayare initial anim
+          setOpenCount((c) => c + 1); // force a remount to replay the initial anim
           setStealMode(false); // Normal UI reset
           setActiveCategory({ id: null, rect: null }); // FIX: Clear stale category on open
           if (d.wearing) setWearing(d.wearing);
@@ -188,7 +188,7 @@ export default function App() {
         const isVisible = d.status === true;
         setVisible(isVisible);
         if (isVisible) {
-          setOpenCount((c) => c + 1); // forza remount per replayare initial anim
+          setOpenCount((c) => c + 1); // force a remount to replay the initial anim
           setStealMode(true);
           setActiveCategory({ id: null, rect: null }); // FIX: Clear stale category on open
           if (d.items) setStealItems(d.items);
@@ -373,17 +373,17 @@ export default function App() {
   // Laser HUD math
   const hasActive = activeCategory.id !== null && activeCategory.rect !== null;
 
-  // `rect` è in coordinate viewport, ma SVG e pannello vivono nel box 16:9
-  // centrato (`max-w-[177.77vh] mx-auto`): su ultrawide le due origini non
-  // coincidono. In verticale il box è alto quanto lo schermo, nessun offset.
+  // `rect` is in viewport coordinates, but the SVG and the panel live inside the
+  // centred 16:9 box (`max-w-[177.77vh] mx-auto`): on ultrawide the two origins
+  // do not coincide. Vertically the box is as tall as the screen, so no offset.
   const stageWidth = Math.min(window.innerWidth, window.innerHeight * (16 / 9));
   const stageOffsetX = (window.innerWidth - stageWidth) / 2;
 
   const startX = hasActive ? activeCategory.rect!.left - stageOffsetX : 0;
   const startY = hasActive ? activeCategory.rect!.top : 0;
 
-  // Il tracciato NON va scalato per l'altezza dello schermo: il pannello a cui
-  // si aggancia è in `rem`, e scalare solo la linea la fa sporgere oltre.
+  // The path must NOT be scaled by screen height: the panel it attaches to is in
+  // `rem`, and scaling only the line makes it stick out past the panel.
   const laserLength = 100;
 
   const activeCategorySlots = useMemo(() => {
@@ -400,8 +400,8 @@ export default function App() {
   }, [hasActive, activeCategory.id, extraState.wearableProps]);
   const activeMeta =
     hasActive && activeCategory.id ? HOTSPOT_META[activeCategory.id] : null;
-  // Label localizzato della categoria attiva — preferisce labels dal Lua,
-  // fallback al label hardcoded di HOTSPOT_META (ancora italiano di base).
+  // Localised label of the active category — prefers the labels sent by Lua,
+  // falling back to the hardcoded HOTSPOT_META label.
   const activeMetaLabel =
     activeCategory.id &&
     labels.hotspots[activeCategory.id as keyof UILabels["hotspots"]]
@@ -519,20 +519,20 @@ export default function App() {
             transition={{ duration: 0.3 }}
             className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden"
           >
-            {/* Backdrop a TUTTO schermo. Il contenuto resta nel box 16:9 qui
-                sotto, ma lo sfondo no: tenendolo dentro al box il gradiente
-                finiva sul bordo dei 16:9 e su ultrawide si vedeva una cucitura
-                verticale netta, con il gioco che riappariva a destra.
+            {/* FULL-screen backdrop. The content below stays inside the 16:9
+                box, but the background must not: keeping it inside meant the
+                gradient ended at the 16:9 edge, and on ultrawide you could see
+                a hard vertical seam with the game reappearing to the right.
 
-                Le tappe sono ancorate al box con unità vh invece che in
-                percentuale: 88.88vh è metà di un riquadro 16:9, quindi
-                calc(50% ± 88.88vh) sono esattamente i suoi bordi. Su 16:9 quei
-                calc valgono 0% e 100% e il risultato è identico a prima; su
-                ultrawide il gradiente segue il box e la striscia oltre il bordo
-                viene riempita del colore finale.
+                The stops are anchored to the box in vh units rather than
+                percentages: 88.88vh is half of a 16:9 frame, so
+                calc(50% ± 88.88vh) lands exactly on its edges. On 16:9 those
+                calcs resolve to 0% and 100% and the result is identical to
+                before; on ultrawide the gradient follows the box and the strip
+                beyond the edge is filled with the final colour.
 
-                Resta dentro la stessa AnimatePresence per non perdere la
-                sincronia di opacità con il resto della UI. */}
+                It stays inside the same AnimatePresence so its opacity keeps in
+                sync with the rest of the UI. */}
             <motion.div
               variants={{
                 hidden: { opacity: 0 },
@@ -551,8 +551,8 @@ export default function App() {
             <div className="relative w-full h-full max-w-[177.77vh] mx-auto pointer-events-none">
               <Mannequin
                 activeCategory={activeCategory.id}
-                // In stealMode mostriamo il VICTIM (wearing+sex ricevuti dal
-                // server all'apertura dello steal menu), altrimenti il ladro.
+                // In stealMode we show the VICTIM (wearing+sex received from
+                // the server when the steal menu opened), otherwise the thief.
                 wearing={stealMode ? stealWearing : wearing}
                 sex={stealMode ? stealSex : sex}
                 drip={drip}
@@ -561,9 +561,9 @@ export default function App() {
                 hairToggleable={hairToggleable}
                 stealMode={stealMode}
                 stealItems={stealItems}
-                // In stealMode NON passiamo isSlotWorn (che legge extraState
-                // del ladro). Il render userà il fallback sul wearing prop
-                // diretto — che è già il victim wearing.
+                // In stealMode we do NOT pass isSlotWorn (it reads the thief's
+                // extraState). The render falls back to the wearing prop
+                // directly — which is already the victim's wearing state.
                 isSlotWorn={stealMode ? undefined : isSlotWorn}
                 labels={labels}
                 onClose={handleExitUI}
