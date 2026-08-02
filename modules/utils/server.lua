@@ -93,9 +93,9 @@ AddEventHandler('playerDropped', function()
 end)
 
 --- Check proximity between two players (server-side)
---- Il bucket viene prima delle coordinate: due giocatori in dimensioni diverse
---- possono stare sullo stesso punto del mondo (shell di appartamenti impilate),
---- e la sola distanza li darebbe adiacenti pur non vedendosi.
+--- The bucket comes before the coordinates: two players in different dimensions
+--- can stand on the same point of the world (stacked apartment shells), and
+--- distance alone would call them adjacent even though they cannot see each other.
 function MBT.ServerUtils.CheckProximity(src1, src2, maxDistance)
     if GetPlayerRoutingBucket(src1) ~= GetPlayerRoutingBucket(src2) then return false end
 
@@ -114,10 +114,10 @@ function MBT.ServerUtils.IsValidPlayer(src)
     return src and GetPlayerPing(src) > 0
 end
 
---- Il ladro deve essere vivo. Il client lo controlla già, ma quel gate è
---- forgiabile: la salute la leggiamo dal ped di rete lato server.
---- Le manette NON sono osservabili server-side (sono stato di framework), quindi
---- quel controllo resta solo client-side.
+--- The thief must be alive. The client already checks this, but that gate is
+--- forgeable: we read health from the networked ped on the server.
+--- Handcuffs are NOT observable server-side (they are framework state), so that
+--- check stays client-side only.
 function MBT.ServerUtils.IsPlayerAlive(src)
     local ped = GetPlayerPed(src)
     if not ped or ped == 0 then return false end
@@ -144,11 +144,11 @@ function MBT.ServerUtils.GetPlayerSex(src)
     return MBT.NormalizeSex(MBT.GenderModels and MBT.GenderModels[model])
 end
 
---- L'export di mbt_wearable_props si risolve al primo uso, non al load: l'ordine
---- di avvio fra risorse non è garantito, e sondare troppo presto cristallizzava
---- un "assente" anche quando wearable_props parte subito dopo di noi — cioè
---- l'integrazione fra il tier free e quello a pagamento restava muta in silenzio.
-local glovesExportReady = nil -- nil = mai sondato, false = export assente
+--- The mbt_wearable_props export resolves on first use, not at load: resource
+--- start order is not guaranteed, and probing too early froze an "absent" answer
+--- even when wearable_props started right after us — meaning the integration
+--- between the free and paid tiers stayed silently dead.
+local glovesExportReady = nil -- nil = never probed, false = export absent
 
 local function isWearingGloves(src)
     if glovesExportReady == false then return false end
@@ -157,9 +157,9 @@ local function isWearingGloves(src)
     local ok, wearing = pcall(function()
         return exports.mbt_wearable_props:isPlayerWearingGloves(src)
     end)
-    -- Un fallimento CON la risorsa avviata significa export mancante: da lì in
-    -- poi smettiamo di riprovare. Prima no: non sarebbe una risposta, è un "non
-    -- ancora".
+    -- A failure WITH the resource started means the export is missing: from then
+    -- on we stop retrying. Not before, though: that would not be an answer, it
+    -- would be a "not yet".
     if not ok then
         glovesExportReady = false
         return false

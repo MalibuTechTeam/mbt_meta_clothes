@@ -245,10 +245,10 @@ RegisterNetEvent('mbt_meta_clothes:multichar:pauseDetection', function()
     pendingUndress = {}
 end)
 
---- Un dict inesistente non si carica mai: senza limite il while gira all'infinito
---- e il cb non arriva. Ma il cb è ciò che sblocca la vestizione, quindi in ogni
---- uscita deve partire lo stesso — meglio un capo senza animazione che un
---- giocatore fermo per sempre.
+--- A dict that does not exist never loads: with no bound the while loop spins
+--- forever and the callback never arrives. But the callback is what unblocks
+--- dressing, so it must fire on every exit path — better a garment with no
+--- animation than a player stuck for good.
 local ANIM_DICT_TIMEOUT = 3000
 
 ---@param data table
@@ -279,9 +279,9 @@ function MBT.Utils.PlayEmote(data, cb)
     if cb then cb() end
 end
 
---- CFX semina il generatore all'avvio: riseminare a ogni chiamata non aggiunge
---- entropia, la toglie — due chiamate nello stesso frame condividono
---- GetGameTimer() e quindi il seme.
+--- CFX seeds the generator at startup: reseeding on every call does not add
+--- entropy, it removes it — two calls in the same frame share GetGameTimer()
+--- and therefore the seed.
 ---@param t table
 function MBT.Utils.RandomizeDress(t)
     if type(t) ~= 'table' or #t == 0 then return nil end
@@ -316,19 +316,19 @@ end
 -----------------------------------------------------------
 -- PED detection & visibility
 -- La detection vera vive in MBT.SnapshotClient (protocollo snapshot
--- acknowledged). Qui restano il coordinator della visibilità e i wrapper
--- che il resto della risorsa e i bridge continuano a chiamare.
+-- acknowledged). What remains here is the visibility coordinator and the
+-- wrappers that the rest of the resource and the bridges still call.
 -----------------------------------------------------------
 
---- Sospende la sincronizzazione durante una transizione multicharacter: i
---- drawable che l'appearance script applica al char nuovo non devono finire
---- nello stato del char vecchio.
+--- Suspend synchronisation during a multicharacter transition: the drawables
+--- the appearance script applies to the new character must not end up in the
+--- old character's state.
 function MBT.Utils.PauseHybridDetection()
     if MBT.SnapshotClient then MBT.SnapshotClient.Pause('legacy') end
 end
 
---- Coordinator generazionale della visibilità. Ogni nuova fase di spawn
---- invalida il watchdog precedente; solo la fase corrente può fare recovery.
+--- Generational visibility coordinator. Every new spawn phase invalidates the
+--- previous watchdog; only the current phase is allowed to recover.
 local pedVisibility = MBT.PedVisibility.New({
     schedule = function(timeoutMs, callback) Citizen.SetTimeout(timeoutMs, callback) end,
     hide = function()
@@ -339,9 +339,9 @@ local pedVisibility = MBT.PedVisibility.New({
     end,
     reveal = function(reason, watchdog)
         local ped = PlayerPedId()
-        -- Il warn va DOPO il check di esistenza: un reveal fallito viene ora
-        -- ritentato ogni 250ms, e loggarlo prima significherebbe spammare la
-        -- console finché il PED non esiste invece di segnalare il recovery.
+        -- The warning belongs AFTER the existence check: a failed reveal is now
+        -- retried every 250ms, and logging before it would spam the console for
+        -- as long as the PED is missing instead of reporting the recovery.
         if not DoesEntityExist(ped) then return false end
         if watchdog then
             MBT.Warn('ped visibility wait expired; auto-recovering visibility', { reason = reason })
@@ -357,14 +357,14 @@ local pedVisibility = MBT.PedVisibility.New({
     end,
 })
 
---- @param reason string|nil Etichetta diagnostica per il log
+--- @param reason string|nil Diagnostic label for the log
 function MBT.Utils.SchedulePedVisibilityWatchdog(reason)
     MBT.Trace.Mark('coordinator:begin', { reason = reason })
-    -- Nasconde UNA volta e arma il reveal di sicurezza. Mai riasserire in loop:
-    -- l'alpha la scrivono anche i multicharacter, e contraddirli ogni 50ms
-    -- produce uno stroboscopio invece di un PED nascosto. Un PED rimpiazzato lo
-    -- rivestiamo entro un frame dalla restore protection, che è più economico
-    -- che litigare con chi lo sta gestendo.
+    -- Hide ONCE and arm the safety reveal. Never re-assert in a loop: the alpha
+    -- is written by multicharacter resources too, and contradicting them every
+    -- 50ms produces a strobe instead of a hidden PED. A replaced PED gets
+    -- re-dressed within one frame of restore protection, which is cheaper than
+    -- fighting whoever is handling it.
     return pedVisibility:Begin(reason, 5000)
 end
 
@@ -372,17 +372,17 @@ function MBT.Utils.CompletePedVisibilityWait(reason)
     return pedVisibility:Complete(reason)
 end
 
---- Abbandona la transizione guardata senza rivelare, invalidandone la
---- generation. Usato allo stop della risorsa, dove il reveal viene fatto
---- direttamente prima che lo stato Lua muoia: serve a impedire che un reveal
---- di sicurezza già programmato scatti su un'istanza che non esiste più.
+--- Abandon the guarded transition without revealing, invalidating its
+--- generation. Used on resource stop, where the reveal is done directly before
+--- Lua state dies: it stops an already scheduled safety reveal from firing on
+--- an instance that no longer exists.
 function MBT.Utils.CancelPedVisibilityWait()
     return pedVisibility:Cancel()
 end
 
---- Riprende dopo una pausa. Con `wearingState` la baseline è lo stato ATTESO e
---- non il PED corrente: quello che l'appearance script ha applicato durante la
---- pausa risulta così un diff da correggere, invece di essere dato per buono.
+--- Resume after a pause. With `wearingState` the baseline is the EXPECTED state
+--- rather than the current PED: whatever the appearance script applied during
+--- the pause shows up as a diff to correct instead of being taken as given.
 function MBT.Utils.ResumeHybridDetection(wearingState)
     if MBT.SnapshotClient then MBT.SnapshotClient.Resume('legacy', wearingState) end
 end
@@ -408,8 +408,8 @@ function MBT.Utils.EnableRestoreProtection(wearingState, durationMs)
 end
 
 --- Avvia il loop di sincronizzazione snapshot.
---- Il nome resta quello storico perché i bridge di ogni framework lo chiamano;
---- la vecchia detection a polling locale è stata sostituita dal protocollo
+--- The historical name is kept because every framework bridge calls it; the old
+--- local polling detection has been replaced by the protocol
 --- acknowledged in MBT.SnapshotClient.
 function MBT.Utils.StartHybridDetection()
     if MBT.SnapshotClient then return MBT.SnapshotClient.Start() end
@@ -419,8 +419,8 @@ end
 -- External API: allow other scripts to mark expected changes
 -- and suppress restore protection for specific slots.
 -- mbt_wearable_props usa suppressSlot/restoreSlot per nascondere e ripristinare
--- cappello/occhiali quando indossi una maschera; expectChange è esposto ma al
--- 2026-07-29 nessuna risorsa MBT lo chiama.
+-- hat/glasses when a mask is worn; expectChange is exposed but as of 2026-07-29
+-- no MBT resource calls it.
 -----------------------------------------------------------
 exports('expectChange', function(slotType, slotIndex)
     MBT.Utils.ExpectChange(slotType, slotIndex)

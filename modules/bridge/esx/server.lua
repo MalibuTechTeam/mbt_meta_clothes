@@ -37,17 +37,17 @@ end
 -----------------------------------------------------------
 -- Multicharacter switch — handler server-side
 --
--- Flusso esx_multicharacter: /relog → esx:playerLogout → onPlayerDropped →
--- esx:playerDropped; scelto il character → esx:playerLoaded col nuovo xPlayer.
--- `esx:onPlayerLogout` è client-side e sul server non scatta.
+-- esx_multicharacter flow: /relog → esx:playerLogout → onPlayerDropped →
+-- esx:playerDropped; once a character is chosen → esx:playerLoaded with the new
+-- xPlayer. `esx:onPlayerLogout` is client-side and never fires on the server.
 --
--- Alcuni multichar (mbt_character in fast-switch) emettono solo
--- esx:onPlayerJoined senza che ES core propaghi esx:playerLoaded: senza un
--- trigger alternativo il load non si chiude e il client resta in pausa.
+-- Some multichar resources (mbt_character in fast-switch) only fire
+-- esx:onPlayerJoined without ES core propagating esx:playerLoaded: without an
+-- alternative trigger the load never closes and the client stays paused.
 -----------------------------------------------------------
 
--- [src] = GetGameTimer() del logout. Serve al watchdog per accorgersi di una
--- pausa scaduta senza il load corrispondente.
+-- [src] = GetGameTimer() at logout. The watchdog uses it to notice a pause that
+-- expired without its matching load.
 local pendingPauseSince = {}
 
 local function logEsxEvent(name, src, extra)
@@ -58,17 +58,18 @@ local function logEsxEvent(name, src, extra)
     })
 end
 
--- Il push lo guida il server, non il playerReady del client: alcuni multichar
--- propagano esx:playerLoaded server-side ma non client-side, e il flow resterebbe
--- bloccato. Se poi arriva anche dal client, il debounce da 500ms lo assorbe.
+-- The server drives the push, not the client's playerReady: some multichar
+-- resources propagate esx:playerLoaded server-side but not client-side, and the
+-- flow would stall. If it also arrives from the client, the 500ms debounce
+-- absorbs it.
 AddEventHandler('esx:playerLoaded', function(src, xPlayer, isNew)
     logEsxEvent("esx:playerLoaded", src, "isNew=" .. tostring(isNew))
     pendingPauseSince[src] = nil
     MBT.PlayerState.PushStateToClient(src)
 end)
 
--- Fallback per chi non propaga esx:playerLoaded. I 50ms danno allo xPlayer il
--- tempo di comparire in ESX.GetPlayerFromId.
+-- Fallback for setups that do not propagate esx:playerLoaded. The 50ms give the
+-- xPlayer time to show up in ESX.GetPlayerFromId.
 AddEventHandler('esx:onPlayerJoined', function(src)
     logEsxEvent("esx:onPlayerJoined", src)
     Citizen.SetTimeout(50, function()
@@ -77,9 +78,9 @@ AddEventHandler('esx:onPlayerJoined', function(src)
     end)
 end)
 
--- Logout (compreso /relog): salva lo stato con l'identifier ancora valido in
--- cache, PRIMA che l'xPlayer venga sostituito dal nuovo character, e mette in
--- pausa il client perché i drawable del char nuovo non finiscano sul vecchio.
+-- Logout (including /relog): save the state while the identifier is still valid
+-- in cache, BEFORE the xPlayer is replaced by the new character, and pause the
+-- client so the new character's drawables do not land on the old one.
 AddEventHandler('esx:playerLogout', function(src)
     logEsxEvent("esx:playerLogout", src)
     TriggerClientEvent('mbt_meta_clothes:multichar:pauseDetection', src)
@@ -88,16 +89,17 @@ AddEventHandler('esx:playerLogout', function(src)
         MBT.PlayerState.Save(src)
     end
     MBT.SnapshotServer.Cleanup(src)
-    -- Se entro 4s nessun load ha resettato pendingPauseSince, la catena del
-    -- multichar si è rotta e il client resta in pausa: lo sblocchiamo. 4s sta
-    -- sotto i 5s del watchdog client, così l'unblock arriva prima dell'auto
-    -- recovery ed è più informativo.
+    -- If no load has cleared pendingPauseSince within 4s, the multichar chain
+    -- broke and the client is stuck paused: we unblock it. 4s sits under the
+    -- client watchdog's 5s, so the unblock lands before auto recovery and is
+    -- more informative.
     Citizen.SetTimeout(4000, function()
         if pendingPauseSince[src] then
-            -- Con un multichar a selector il player resta senza character finché
-            -- non sceglie, anche per un minuto: è attesa legittima. Solo un load
-            -- mancante CON identifier già presente è un guasto vero — da cui il
-            -- livello di log diverso, altrimenti l'allarme scatta a ogni relog.
+            -- With a selector-based multichar the player has no character until
+            -- they pick one, possibly for a minute: that is legitimate waiting.
+            -- Only a missing load WITH an identifier already present is a real
+            -- fault — hence the different log level, otherwise the alarm would
+            -- fire on every relog.
             local detail = { source = src, timeoutMs = 4000 }
             if getPlayerIdentifier and getPlayerIdentifier(src) then
                 MBT.Warn('esx bridge: load event missing after logout; forcing client unblock', detail)
@@ -110,8 +112,8 @@ AddEventHandler('esx:playerLogout', function(src)
     end)
 end)
 
--- Safety net: esx:playerDropped viene emesso anche quando il drop è interno
--- a ESX (es. /relog chiama onPlayerDropped che emette questo event)
+-- Safety net: esx:playerDropped is fired even when the drop is internal to ESX
+-- (e.g. /relog calls onPlayerDropped, which fires this event)
 AddEventHandler('esx:playerDropped', function(src)
     logEsxEvent("esx:playerDropped", src)
     TriggerClientEvent('mbt_meta_clothes:multichar:pauseDetection', src)
@@ -121,7 +123,7 @@ AddEventHandler('esx:playerDropped', function(src)
     MBT.SnapshotServer.Cleanup(src)
 end)
 
--- Drop vero (non /relog interno): evita che pendingPauseSince accumuli voci.
+-- A real drop (not an internal /relog): keeps pendingPauseSince from growing.
 AddEventHandler('playerDropped', function()
     pendingPauseSince[source] = nil
 end)

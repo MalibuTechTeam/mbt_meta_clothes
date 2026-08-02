@@ -2,8 +2,8 @@ if GetResourceState('es_extended') ~= 'started' then return end
 
 ESX = exports.es_extended:getSharedObject()
 
--- Se la risorsa viene riavviata con un player ESX già attivo, il prossimo
--- playerLoaded è uno switch vero e non va scartato.
+-- If the resource restarts while an ESX player is already active, the next
+-- playerLoaded is a genuine switch and must not be discarded.
 local playerReadySent = ESX.IsPlayerLoaded()
 
 AddEventHandler('esx:loadingScreenOff', function()
@@ -14,55 +14,55 @@ AddEventHandler('esx:loadingScreenOff', function()
     MBT.Trace.Begin('esx:loadingScreenOff')
     MBT.Trace.OwnAlpha(0)
     SetEntityAlpha(PlayerPedId(), 0, false)
-    -- Rete di sicurezza: se entro 5s nessuno chiude la transizione, rivela.
+    -- Safety net: if nobody closes the transition within 5s, reveal anyway.
     if MBT.Utils.SchedulePedVisibilityWatchdog then
         MBT.Utils.SchedulePedVisibilityWatchdog("loadingScreenOff")
     end
-    -- playerReady per PRIMO e senza attese: fa partire il push dello stato dal
-    -- server, e ogni millisecondo qui è un millisecondo di outfit sbagliato
-    -- visibile. Un `Wait(2000)` che stava qui costava 2s su 2083 di latenza
-    -- totale, e duplicava il retry sull'identifier che il server ha già.
+    -- playerReady FIRST and with no waiting: it starts the server-side state
+    -- push, and every millisecond here is a millisecond of wrong outfit on
+    -- screen. A `Wait(2000)` that used to sit here cost 2s out of 2083ms of
+    -- total latency, and duplicated an identifier retry the server already has.
     TriggerServerEvent("mbt_meta_clothes:playerReady")
     MBT.Utils.UpdatePlayerClothes()
     MBT.Utils.Target()
     MBT.Utils.StartHybridDetection()
 end)
 
--- Pause/resume pilotati dal server: solo lui sa con certezza quando scattano
--- logout e load, mentre esx:onPlayerLogout client-side non è affidabile su
--- tutti i setup multicharacter.
+-- Pause/resume driven by the server: only the server knows for certain when
+-- logout and load happen, while the client-side esx:onPlayerLogout is not
+-- reliable across every multicharacter setup.
 RegisterNetEvent('mbt_meta_clothes:multichar:pauseDetection')
 AddEventHandler('mbt_meta_clothes:multichar:pauseDetection', function()
     MBT.Trace.Begin('pauseDetection')
     if MBT.Utils.PauseHybridDetection then
         MBT.Utils.PauseHybridDetection()
     end
-    -- Nascondi prima che l'appearance script del char nuovo applichi il suo skin.
+    -- Hide before the new character's appearance script applies its skin.
     MBT.Trace.OwnAlpha(0)
     SetEntityAlpha(PlayerPedId(), 0, false)
 
-    -- Una volta sola, mai in loop: l'alpha la scrivono anche i multicharacter, e
-    -- contraddirli a ripetizione produce uno stroboscopio invece di un PED
-    -- nascosto. I capi sbagliati applicati nel frattempo li corregge la restore
-    -- protection, che reagisce entro un frame.
+    -- Once only, never in a loop: multicharacter resources write the alpha too,
+    -- and contradicting them repeatedly produces a strobe instead of a hidden
+    -- PED. Wrong garments applied in the meantime are fixed by restore
+    -- protection, which reacts within one frame.
 end)
 
--- Scatta solo dai caricamenti successivi al primo: al primo login
--- `playerReadySent` è già true da loadingScreenOff.
+-- Only fires from the second load onwards: on the first login `playerReadySent`
+-- is already true from loadingScreenOff.
 --
--- RegisterNetEvent è obbligatorio — esx:playerLoaded arriva via
--- TriggerClientEvent e senza registrazione FiveM lo droppa in silenzio.
+-- RegisterNetEvent is mandatory — esx:playerLoaded arrives via TriggerClientEvent
+-- and without registration FiveM drops it silently.
 --
--- La detection resta in pausa: il resume lo fa restoreWearing, che è l'unico
--- punto in cui conosciamo lo stato atteso su cui riallineare la baseline.
+-- Detection stays paused: restoreWearing does the resume, because that is the
+-- only point where we know the expected state to realign the baseline to.
 RegisterNetEvent('esx:playerLoaded')
 AddEventHandler('esx:playerLoaded', function()
     if not playerReadySent then
-        -- Primo load dopo l'avvio della risorsa: lo gestisce loadingScreenOff.
+        -- First load after resource start: loadingScreenOff handles that one.
         return
     end
-    -- Nessuna attesa: applichiamo subito, e la restore protection copre per 15s
-    -- qualunque modifica tardiva dell'appearance script.
+    -- No waiting: we apply immediately, and restore protection covers any late
+    -- appearance-script change for 15s.
     MBT.Trace.Begin('esx:playerLoaded')
     MBT.Trace.OwnAlpha(0)
     SetEntityAlpha(PlayerPedId(), 0, false)
