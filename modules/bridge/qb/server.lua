@@ -55,7 +55,7 @@ end
 -----------------------------------------------------------
 
 -- QBCore:Server:PlayerLoaded fires server-side with the Player already ready.
--- Qui getPlayerIdentifier(src) restituisce SEMPRE il citizenid corretto.
+-- Here getPlayerIdentifier(src) ALWAYS returns the correct citizenid.
 AddEventHandler('QBCore:Server:PlayerLoaded', function(Player)
     local src = Player and Player.PlayerData and Player.PlayerData.source
     if not src then return end

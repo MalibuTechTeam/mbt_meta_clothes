@@ -126,7 +126,7 @@ end
 
 function MBT.PlayerState.SetSlot(src, slotType, slotIndex, metadata)
     -- Multicharacter safety net: if the character changed without the lifecycle
-    -- framework siano scattati (alcuni multichar non emettono esx:playerLoaded
+    -- framework events firing (some multichar resources never emit esx:playerLoaded
     -- events firing (some multichar resources only propagate server-side), we
     -- detect the switch here and reload before writing.
     if MBT.PlayerState.CheckCharacterSwitch(src) then
@@ -511,9 +511,9 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force, lifecycle)
     attempt = attempt or 1
 
     -- Some multichar resources fire esx:onPlayerJoined before the identifier is
-    -- popolato: proseguire con nil significherebbe non rilevare lo switch,
+    -- populated: carrying on with nil would mean missing the switch,
     -- azzerare PlayerWearing e mandare un restoreWearing vuoto — player nudo.
-    -- Retry fisso a 200ms, max 8 tentativi; poi si lascia perdere, tanto un
+    -- Fixed 200ms retry, 8 attempts max; then we give up, because a later
     -- a later event will drive the push again.
     if not getPlayerIdentifier or not getPlayerIdentifier(src) then
         if attempt >= 8 then

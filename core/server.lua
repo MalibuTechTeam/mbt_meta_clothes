@@ -220,7 +220,7 @@ end)
 -- we cannot validate its schema without tying ourselves to one specific
 -- appearance script. The rate limit is therefore the only barrier — without it,
 -- this is the only entry point that accepts
--- una tabella arbitraria e illimitata a frequenza libera.
+-- an arbitrary, unbounded table at an unbounded rate.
 RegisterNetEvent('mbt_meta_clothes:storePlayerSkin', function(appearance)
     local src = source
     if type(appearance) ~= "table" then return end

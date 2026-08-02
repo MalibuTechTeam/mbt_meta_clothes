@@ -12,7 +12,7 @@ local function run()
     local resolve = MBT.Drip.ResolveSlotRate
     local cases = 0
 
-    -- Un valore dall'item vince su qualunque configurazione.
+    -- A value coming from the item beats any configuration.
     assertEqual(7, resolve('Drawables', 4, { drawable = 999, dripValue = 7 }),
         'item drip value must win over configuration')
     cases = cases + 1
@@ -41,7 +41,7 @@ local function run()
         'a slot without a drawable earns nothing')
     cases = cases + 1
 
-    -- Uno slot non configurato non contribuisce.
+    -- An unconfigured slot contributes nothing.
     assertEqual(0, resolve('Drawables', 99, { drawable = 1 }),
         'an unconfigured slot earns nothing')
     cases = cases + 1

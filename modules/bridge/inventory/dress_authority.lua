@@ -22,11 +22,11 @@ local function itemNames(slotConfig)
     return configured
 end
 
---- La DNA viaggia legittimamente con l'item — rubi una camicia e la sua storia
+--- DNA legitimately travels with the item — you steal a shirt and its
 --- forensic history comes with it — but it arrives from inventory metadata, so
 --- it is not trusted: it must be shape-checked and bounded. Without this a forged
 --- item can inject an arbitrary forensic chain and grow the JSON without limit
---- persistito per quel giocatore.
+--- persisted for that player.
 local function sanitizeDna(entries, maxEntries)
     if type(entries) ~= 'table' then return nil end
 

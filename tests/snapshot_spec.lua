@@ -728,8 +728,8 @@ local cases = {
             Assert.equal(0, #reveals)
 
             -- The proof that the transition survived the failed Complete is
-            -- il retry stesso: trova ancora la propria generation e rivela. Se
-            -- il Complete l'avesse consumata, il ticket sarebbe stale e qui non
+            -- the retry itself: it still finds its own generation and reveals.
+            -- Had the Complete consumed it, the ticket would be stale and here
             -- nothing would happen — the PED would stay hidden with no owner.
             pedExists = true
             timers[#timers]()
@@ -802,7 +802,7 @@ local cases = {
             client:Tick()
             Assert.equal(0, #fixture.sent)
 
-            -- Dentro la finestra si osserva soltanto: nessun invio.
+            -- Inside the window we only observe: nothing is submitted.
             fixture.advance(1000)
             client:Tick()
             Assert.equal(0, #fixture.sent)

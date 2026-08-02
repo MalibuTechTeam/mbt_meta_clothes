@@ -456,7 +456,7 @@ if not report.ok then
     end
     -- error() on its own stops ONLY this file: the other server_scripts load
     -- anyway and the resource runs with an invalid config, which is the
-    -- contrario del fail-fast dichiarato nel manifest. StopResource la ferma
+    -- opposite of the fail-fast the manifest claims. StopResource is what
     -- actually stops it; the error() stays because it is what keeps the rest of
     -- THIS file from running before the stop takes effect.
     StopResource(GetCurrentResourceName())

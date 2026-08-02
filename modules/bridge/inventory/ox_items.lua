@@ -66,7 +66,7 @@ function MBT.OxItems.RegisterItems(getPlayerSex)
                 MBT.Notification({ title = MBT.Locale["wrong_sex"].title, description = MBT.Locale["wrong_sex"].description .. sexLabel, type = "error", icon = "ban" })
                 return
             end
-            -- Pre-check: almeno uno slot torso è già non-default → notifica senza consumare l'item
+            -- Pre-check: at least one torso slot is already non-default → notify without consuming the item
             if not isTopDressDefault(sexLabel) then
                 MBT.Notification(MBT.Locale["undress"])
                 return
