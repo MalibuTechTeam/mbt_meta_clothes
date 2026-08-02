@@ -393,13 +393,13 @@ function SnapshotClient.New(deps)
         local at = now()
         cleanupExpiringGuards(at)
         if not context or next(pauses) then return end
-        -- Durante l'attesa dello scan iniziale non si invia, ma si OSSERVA.
-        -- Prima questo ramo usciva subito, quindi il cronometro del debounce
-        -- partiva solo DOPO i 2500ms e bruciava un poll intero a ri-registrare
-        -- un candidato che era già stabile: ~1-2s buttati sul ramo DB-miss.
-        -- Misurare la stabilità durante l'attesa permette di spedire al primo
-        -- tick utile, senza rinunciare alla garanzia di non catturare uno stato
-        -- a metà (si invia comunque solo un fingerprint stabile da >= debounce).
+        -- While waiting for the initial scan we do not submit, but we do OBSERVE.
+        -- This branch used to return immediately, so the debounce clock only
+        -- started AFTER the 2500ms and burned a whole poll re-registering a
+        -- candidate that was already stable: ~1-2s wasted on the DB-miss branch.
+        -- Measuring stability during the wait lets us submit on the first useful
+        -- tick, without giving up the guarantee that we never capture a half-way
+        -- state (we still only send a fingerprint stable for >= debounce).
         local awaitingInitial = forceInitialAt ~= nil and at < forceInitialAt
         if restoreActive then
             refreshBaselineModel()
@@ -432,7 +432,7 @@ function SnapshotClient.New(deps)
             candidateSince = at
             return
         end
-        -- Osservazione senza invio: la finestra iniziale non è ancora scaduta.
+        -- Observe without submitting: the initial window has not expired yet.
         if awaitingInitial then return end
         if not candidateSince or at - candidateSince < (MBT.SnapshotDebounce or 400) then return end
 
@@ -505,8 +505,8 @@ local function enforcePed(target, getGuardReason)
             local texture = GetPedTextureVariation(ped, slotIndex)
             local palette = GetPedPaletteVariation(ped, slotIndex)
             if drawable ~= slot.drawable or texture ~= slot.texture or palette ~= (slot.palette or 0) then
-                -- Qualcuno ha scritto su uno slot nostro e lo stiamo correggendo:
-                -- il tempo fra la sua scrittura e questa riga È il lampo visibile.
+                -- Somebody wrote to a slot of ours and we are correcting it:
+                -- the time between their write and this line IS the visible flash.
                 MBT.Trace.Mark('enforce:corrected', {
                     slot = 'Drawables:' .. tostring(slotIndex),
                     was = drawable,

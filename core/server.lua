@@ -54,9 +54,9 @@ end)
 RegisterNetEvent('mbt_meta_clothes:playerReady', function()
     local src = source
     MBT.Debugger('playerReady: client ready', { source = src })
-    -- Logica condivisa con il server bridge esx:playerLoaded — entrambi i flow
-    -- (client manda playerReady oppure server riceve esx:playerLoaded direttamente)
-    -- chiamano la stessa funzione, debounced per evitare doppio push.
+    -- Shared logic with the esx:playerLoaded server bridge — both flows (client
+    -- sends playerReady, or the server receives esx:playerLoaded directly) call
+    -- the same function, debounced to avoid a double push.
     MBT.PlayerState.PushStateToClient(src)
 end)
 
@@ -189,8 +189,8 @@ AddEventHandler('playerDropped', function(reason)
     end
 
     MBT.Debugger("=== PLAYER DROPPED ===", src)
-    -- Il guard è su MBT.Debug, non dentro Debugger: gli argomenti si valutano
-    -- prima della chiamata, quindi l'encode girerebbe anche a log spenti.
+    -- The guard is on MBT.Debug, not inside Debugger: arguments are evaluated
+    -- before the call, so the encode would run even with logging off.
     if MBT.Debug then
         local wearingState = MBT.PlayerState.GetAll(src)
         if wearingState then
@@ -216,9 +216,10 @@ end)
 -- Skin persistence
 -----------------------------------------------------------
 
--- L'appearance è un blob opaco che inoltriamo a chi ascolta `saveSkin`: non
--- possiamo validarne lo schema senza legarci a un appearance script preciso.
--- Il rate limit è quindi l'unico argine — senza, è l'unico ingresso che accetta
+-- The appearance is an opaque blob we forward to whoever listens to `saveSkin`:
+-- we cannot validate its schema without tying ourselves to one specific
+-- appearance script. The rate limit is therefore the only barrier — without it,
+-- this is the only entry point that accepts
 -- una tabella arbitraria e illimitata a frequenza libera.
 RegisterNetEvent('mbt_meta_clothes:storePlayerSkin', function(appearance)
     local src = source
@@ -383,8 +384,8 @@ local function processStealSelections(thiefSource, targetServerId, selections)
 end
 
 local function validateStealContext(thiefSource, targetServerId)
-    -- Il controllo client-side è solo cortesia: un client modificato manderebbe
-    -- beginSteal lo stesso. Questa è la riga che spegne davvero la feature.
+    -- The client-side check is a courtesy only: a modified client would send
+    -- beginSteal regardless. This is the line that truly turns the feature off.
     if MBT.StealEnabled == false then return false end
     if thiefSource == targetServerId then return false end
     if not MBT.ServerUtils.IsValidPlayer(targetServerId) then return false end

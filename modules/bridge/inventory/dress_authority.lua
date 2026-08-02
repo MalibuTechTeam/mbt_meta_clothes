@@ -23,9 +23,9 @@ local function itemNames(slotConfig)
 end
 
 --- La DNA viaggia legittimamente con l'item — rubi una camicia e la sua storia
---- forense viene con lei — ma arriva dalla metadata dell'inventario, quindi non
---- è fidata: va validata in forma e limitata. Senza questo un item forgiato può
---- iniettare una catena forense arbitraria e far crescere senza limite il JSON
+--- forensic history comes with it — but it arrives from inventory metadata, so
+--- it is not trusted: it must be shape-checked and bounded. Without this a forged
+--- item can inject an arbitrary forensic chain and grow the JSON without limit
 --- persistito per quel giocatore.
 local function sanitizeDna(entries, maxEntries)
     if type(entries) ~= 'table' then return nil end
@@ -36,10 +36,10 @@ local function sanitizeDna(entries, maxEntries)
             and type(entry.identifier) == 'string'
             and entry.identifier ~= ''
             and #entry.identifier <= 128 then
-            -- Timestamp assente o non valido → 0, coerente con CleanExpiredDNA
-            -- che già legge `dna.timestamp or 0`. La voce resta ma risulta
-            -- scaduta, invece di sparire in silenzio da uno storico forense che
-            -- potrebbe essere legittimo e solo più vecchio del campo timestamp.
+            -- Missing or invalid timestamp → 0, consistent with CleanExpiredDNA
+            -- which already reads `dna.timestamp or 0`. The entry survives but
+            -- reads as expired, instead of vanishing silently from a forensic
+            -- history that may be legitimate and merely older than the field.
             local timestamp = entry.timestamp
             if type(timestamp) ~= 'number' or timestamp ~= timestamp
                 or timestamp == math.huge or timestamp < 0 then

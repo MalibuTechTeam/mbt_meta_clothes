@@ -35,10 +35,10 @@ local function validateRuntimeBridge(config, errors, stats)
     local inventories = startedResources(INVENTORY_RESOURCES)
     local hasCustomInventory = type(config.CustomInventory) == 'function'
 
-    -- Alcuni server QBox tengono acceso uno shim qb-core per risorse legacy.
-    -- Non sono due framework in conflitto: qbx_core è l'autorità, e il bridge
-    -- qb/ si disattiva da solo quando lo vede. Senza questo, la coppia
-    -- risulterebbe "due framework attivi" e fermerebbe la risorsa.
+    -- Some QBox servers keep a qb-core shim running for legacy resources.
+    -- These are not two conflicting frameworks: qbx_core is the authority, and
+    -- the qb/ bridge stands down by itself when it sees it. Without this, the
+    -- pair would read as "two active frameworks" and stop the resource.
     if #frameworks > 1 then
         local hasQbox, filtered = false, {}
         for _, name in ipairs(frameworks) do
@@ -101,9 +101,9 @@ local function validateTheme(config, errors)
         addIssue(errors, 'MBT.Theme', 'must be a table')
         return
     end
-    -- Stessa convenzione di mbt_emote_menu: sei cifre esadecimali senza '#'.
-    -- Un '#' iniziale è l'errore più probabile di chi copia un colore da un
-    -- picker, quindi vale la pena che il messaggio lo dica.
+    -- Same convention as mbt_emote_menu: six hex digits without '#'. A leading
+    -- '#' is the likeliest mistake when copying a colour out of a picker, so the
+    -- message is worth spelling out.
     if type(theme.Accent) ~= 'string' or not theme.Accent:match('^%x%x%x%x%x%x$') then
         addIssue(errors, 'MBT.Theme.Accent', "must be a 6-digit hex colour without '#', e.g. '00e676'")
     end
@@ -417,7 +417,7 @@ function ConfigValidation.Validate(config, locales)
         validatePositiveNumber(config, key, report.errors, false)
     end
     validatePositiveNumber(config, 'SnapshotDebounce', report.errors, true)
-    -- Zero è legittimo e significa "ogni frame": è il valore che rende la
+    -- Zero is legitimate and means "every frame": it is the value that makes the
     -- correzione di un apply esterno praticamente istantanea.
     validatePositiveNumber(config, 'SnapshotRestorePollInterval', report.errors, true)
     validatePositiveNumber(config, 'DefaultDrip', report.errors, true)
@@ -454,11 +454,11 @@ if not report.ok then
     for _, configError in ipairs(report.errors) do
         MBTLog.Error('configuration error: ' .. configError)
     end
-    -- error() da solo interrompe SOLO questo file: gli altri server_scripts si
-    -- caricano lo stesso e la risorsa gira con una config invalida, che è il
+    -- error() on its own stops ONLY this file: the other server_scripts load
+    -- anyway and the resource runs with an invalid config, which is the
     -- contrario del fail-fast dichiarato nel manifest. StopResource la ferma
-    -- davvero; l'error() resta perché è ciò che impedisce al resto di QUESTO
-    -- file di eseguire prima che lo stop abbia effetto.
+    -- actually stops it; the error() stays because it is what keeps the rest of
+    -- THIS file from running before the stop takes effect.
     StopResource(GetCurrentResourceName())
     error(('mbt_meta_clothes configuration validation failed with %d error(s)'):format(#report.errors), 0)
 end

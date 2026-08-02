@@ -1,13 +1,12 @@
 -----------------------------------------------------------
--- Lifecycle tracer (client, solo con MBT.Debug)
+-- Lifecycle tracer (client, only when MBT.Debug is on)
 --
--- I log normali hanno granularità di un secondo, ma le finestre che dobbiamo
--- rispettare sono da 400ms: serve il millisecondo per misurare invece di
--- indovinare.
+-- Ordinary logs have one-second granularity, but the windows we have to respect
+-- are 400ms wide: we need milliseconds to measure instead of guessing.
 --
--- Risponde a: quanto dura la finestra a schermo nero, dove ci cade dentro il
--- reveal, e soprattutto CHI tocca l'alpha oltre a noi — dichiarando i nostri
--- valori, ogni altro cambiamento è di qualcun altro per esclusione.
+-- It answers: how long the black-screen window lasts, where the reveal falls
+-- inside it, and above all WHO touches the alpha besides us — by declaring our
+-- own writes, every other change belongs to somebody else by elimination.
 -----------------------------------------------------------
 
 MBT.Trace = MBT.Trace or {}
@@ -19,8 +18,8 @@ if not MBT.Debug then
     return
 end
 
--- L'orologio parte dall'avvio della risorsa, così anche gli eventi che
--- precedono la prima transizione hanno tempi relativi leggibili invece di t=+0.
+-- The clock starts at resource boot, so even events that precede the first
+-- transition get readable relative times instead of t=+0.
 local originAt = GetGameTimer()
 local expectedAlpha
 local pendingOurWrite = false
@@ -33,8 +32,8 @@ local function pedAlpha()
     return GetEntityAlpha(ped)
 end
 
---- Ordina le chiavi: due esecuzioni della stessa sequenza devono produrre righe
---- confrontabili a occhio, altrimenti diffare due log diventa impossibile.
+--- Sort the keys: two runs of the same sequence must produce lines that compare
+--- by eye, otherwise diffing two logs becomes impossible.
 local function formatDetail(detail)
     if type(detail) ~= 'table' then
         return detail ~= nil and tostring(detail) or ''
@@ -49,7 +48,7 @@ local function formatDetail(detail)
     return table.concat(parts, ' ')
 end
 
---- Apre una nuova finestra di misura. Da qui in poi i tempi sono relativi.
+--- Open a new measurement window. From here on, times are relative.
 function MBT.Trace.Begin(reason)
     originAt = GetGameTimer()
     MBT.Trace.Mark('BEGIN', { reason = reason })
@@ -68,19 +67,19 @@ function MBT.Trace.Mark(event, detail)
     ))
 end
 
---- Dichiara che stiamo per scrivere noi quel valore di alpha.
---- Attribuire confrontando solo il VALORE non funziona: se noi mettiamo 0 e poi
---- qualcun altro rimette 0, il confronto direbbe "nostro". Serve un annuncio che
---- il watcher consuma: una variazione è nostra solo se l'abbiamo dichiarata
---- dall'ultima variazione osservata.
+--- Declare that we are about to write that alpha value ourselves.
+--- Attributing by VALUE alone does not work: if we set 0 and then somebody else
+--- sets 0 again, the comparison would say "ours". We need an announcement the
+--- watcher consumes: a change is ours only if we declared it since the last
+--- observed change.
 function MBT.Trace.OwnAlpha(value)
     expectedAlpha = value
     pendingOurWrite = true
 end
 
--- Campionamento a ogni frame: una contesa fra due scrittori gira alla cadenza
--- del loop più veloce (50ms nel nostro caso), quindi campionare più lentamente
--- la renderebbe invisibile proprio quando serve vederla.
+-- Sample every frame: a contention between two writers runs at the cadence of
+-- the faster loop (50ms in our case), so sampling any slower would make it
+-- invisible exactly when we need to see it.
 CreateThread(function()
     while true do
         Wait(0)

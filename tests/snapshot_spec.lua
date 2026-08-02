@@ -727,10 +727,10 @@ local cases = {
             Assert.equal(false, (visibility:Complete('stable')))
             Assert.equal(0, #reveals)
 
-            -- La prova che la transizione è sopravvissuta al Complete fallito è
+            -- The proof that the transition survived the failed Complete is
             -- il retry stesso: trova ancora la propria generation e rivela. Se
             -- il Complete l'avesse consumata, il ticket sarebbe stale e qui non
-            -- accadrebbe nulla — il PED resterebbe nascosto senza proprietario.
+            -- nothing would happen — the PED would stay hidden with no owner.
             pedExists = true
             timers[#timers]()
             Assert.equal(1, #reveals)
@@ -772,8 +772,8 @@ local cases = {
                 reveal = function() return revealed end,
             })
 
-            -- Un Complete fallito non tocca la generation, quindi il Begin
-            -- successivo la incrementa di uno solo.
+            -- A failed Complete does not touch the generation, so the next Begin
+            -- increments it by exactly one.
             local first = visibility:Begin('framework', 5000)
             Assert.equal(false, (visibility:Complete('too early')))
             Assert.equal(first + 1, visibility:Begin('snapshot', 5000))
@@ -784,7 +784,7 @@ local cases = {
             Assert.equal(true, (visibility:Complete('stable')))
             Assert.equal(third + 2, visibility:Begin('next', 5000))
 
-            -- Ogni Begin nasconde una volta sola: nessuna riasserzione.
+            -- Every Begin hides exactly once: no re-assertion.
             Assert.equal(4, hides)
         end,
     },
@@ -797,7 +797,7 @@ local cases = {
             client:Resume('startup')
             client:ForceInitialScan(2500)
 
-            -- Prima della finestra non deve partire nulla: se questo tick
+            -- Nothing must be sent before the window: if this tick
             -- inviasse, le asserzioni successive passerebbero a vuoto.
             client:Tick()
             Assert.equal(0, #fixture.sent)
@@ -810,9 +810,10 @@ local cases = {
             client:Tick()
             Assert.equal(0, #fixture.sent)
 
-            -- Scaduta la finestra il fingerprint è già stabile da 2000ms, quindi
-            -- parte SUBITO. Prima serviva un altro poll solo per registrare un
-            -- candidato che non era mai cambiato: ~1s buttato a ogni primo login.
+            -- Once the window expires the fingerprint has already been stable for
+            -- 2000ms, so it goes out IMMEDIATELY. This used to need another poll
+            -- just to register a candidate that had never changed: ~1s wasted on
+            -- every first login.
             fixture.advance(1000)
             client:Tick()
             Assert.equal(1, #fixture.sent)

@@ -1,23 +1,23 @@
 -----------------------------------------------------------
 -- Drip Reputation Engine (server-side)
 --
--- Calcola un "drip rate" dall'outfit indossato e lo somma periodicamente all'XP
--- cumulativo, che non decresce mai. I capi di default valgono 0.
+-- Computes a "drip rate" from the worn outfit and periodically adds it to the
+-- cumulative XP, which never decreases. Default garments are worth 0.
 --
--- I pesi si configurano in MBT.DripSlotWeights, o per singolo drawable con
--- DripValues dentro lo slot. Nessun export: i consumatori leggono gli state bag
--- (mbt_dripLevel, mbt_dripTitle, mbt_dripXp, mbt_slotsWorn).
+-- Weights are configured in MBT.DripSlotWeights, or per drawable with DripValues
+-- inside the slot. No exports: consumers read the state bags (mbt_dripLevel,
+-- mbt_dripTitle, mbt_dripXp, mbt_slotsWorn).
 -----------------------------------------------------------
 
 MBT.Drip = {}
 
 local SLOT_TYPES = { "Drawables", "Props" }
 
--- Un valore drip che arriva dalla metadata dell'item non è fidato: deve essere
--- finito, non negativo e limitato. Senza questo, un item con dripValue enorme,
--- negativo o NaN corrompe l'XP in modo permanente — e "l'XP non decresce mai"
--- smette di essere vero. Il tetto è generoso: serve a escludere l'assurdo, non
--- a limitare un'economia legittima.
+-- A drip value arriving from item metadata is not trusted: it must be finite,
+-- non-negative and bounded. Without this, an item with a huge, negative or NaN
+-- dripValue corrupts the XP permanently — and "XP never decreases" stops being
+-- true. The cap is generous on purpose: it rules out the absurd, it does not
+-- constrain a legitimate economy.
 local MAX_ITEM_DRIP = 1000
 
 local function sanitizeItemDrip(value)
@@ -29,12 +29,12 @@ local function sanitizeItemDrip(value)
     return value
 end
 
---- Risolve i punti drip di un singolo slot indossato.
---- Precedenza: metadata dell'item → DripValues per drawable → DefaultDrip dello
---- slot → MBT.DripSlotWeights → MBT.DefaultDrip.
+--- Resolve the drip points of a single worn slot.
+--- Precedence: item metadata → per-drawable DripValues → the slot's DefaultDrip
+--- → MBT.DripSlotWeights → MBT.DefaultDrip.
 --- @param slotType string "Drawables" | "Props"
 --- @param slotIndex number
---- @param metadata table Metadata dello slot da PlayerState
+--- @param metadata table Slot metadata from PlayerState
 --- @return number rate
 local function resolveSlotRate(slotType, slotIndex, metadata)
     local slots = slotType == "Drawables" and MBT.Drawables or MBT.Props
@@ -53,9 +53,9 @@ local function resolveSlotRate(slotType, slotIndex, metadata)
         return slotConfig["DefaultDrip"]
     end
 
-    -- Pesi per slot da config.lua. Prima di questo non venivano letti da nessuna
-    -- riga della risorsa: ogni capo valeva DefaultDrip, quindi un orecchino
-    -- pesava quanto un giubbotto e la tabella dei pesi era inerte.
+    -- Per-slot weights from config.lua. Before this, no line of the resource read
+    -- them: every garment was worth DefaultDrip, so an earring counted as much as
+    -- a jacket and the weights table was inert.
     local weights = MBT.DripSlotWeights and MBT.DripSlotWeights[slotType]
     local weight = weights and weights[slotIndex]
     if weight ~= nil then return weight end
@@ -63,8 +63,8 @@ local function resolveSlotRate(slotType, slotIndex, metadata)
     return MBT.DefaultDrip or 1
 end
 
--- Esposta perché è una funzione pura e testabile: la catena di precedenza è
--- proprio dove si era rotta (i pesi di config non venivano letti da nessuno).
+-- Exposed because it is a pure, testable function: the precedence chain is
+-- exactly where it had broken (nobody was reading the config weights).
 MBT.Drip.ResolveSlotRate = resolveSlotRate
 
 --- Calculate the instantaneous drip rate from a player's current outfit
@@ -170,8 +170,8 @@ RegisterNetEvent('mbt_meta_clothes:requestDripInfo', function()
         progress = progress,
         breakdown = breakdown
     }
-    -- Guard su MBT.Debug: gli argomenti si valutano prima della chiamata, quindi
-    -- senza questo l'encode gira a ogni richiesta anche a log spenti.
+    -- Guard on MBT.Debug: arguments are evaluated before the call, so without
+    -- this the encode would run on every request even with logging off.
     if MBT.Debug then
         MBT.Debugger("dripInfo sending:", json.encode(dripData))
     end

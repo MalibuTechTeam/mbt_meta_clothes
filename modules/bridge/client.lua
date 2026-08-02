@@ -64,9 +64,9 @@ function MBT.SharedClient.SetupStealDress()
         }
 
         -- Build items list for NUI + victim wearing snapshot
-        -- La NUI usa victimWearing per mostrare cosa indossa la vittima sul
-        -- mannequin durante lo steal mode (altrimenti mostrerebbe i drawable
-        -- del ladro, cosa che confonde totalmente l'utente).
+        -- The NUI uses victimWearing to show what the victim is wearing on the
+        -- mannequin during steal mode (otherwise it would show the thief's own
+        -- drawables, which is thoroughly confusing).
         stealItemsList = {}
         local stealItems = stealItemsList
         local victimWearing = { Drawables = {}, Props = {} }
@@ -78,7 +78,7 @@ function MBT.SharedClient.SetupStealDress()
                 local current = GetPedDrawableVariation(closestPlayer, idx)
                 if not MBT.TableContains(MBT.Drawables[idx]["Default"][targetSex], current) then
                     hasTorso = true
-                    -- Cattura ogni slot torso non-default del victim
+                    -- Capture every non-default torso slot of the victim
                     victimWearing.Drawables[tostring(idx)] = {
                         index = idx,
                         drawable = current,
@@ -154,8 +154,8 @@ function MBT.SharedClient.SetupStealDress()
     end
 
     -- NUI callbacks for steal
-    -- cb(1) viene chiamato subito; la logica steal gira in un Citizen.CreateThread
-    -- per avere pieno supporto a Wait() e animazioni.
+    -- cb(1) is called immediately; the steal logic runs inside a
+    -- Citizen.CreateThread so Wait() and animations are fully supported.
     RegisterNUICallback('handleStealItem', function(data, cb)
         SetNuiFocus(false, false)
         SendNUIMessage({action = "stealMenu", status = false})
@@ -209,7 +209,7 @@ function MBT.SharedClient.SetupStealDress()
                 MBT.Utils.StealAllItems(ped, target, server)
             end)
         else
-            -- Multi-select parziale: UNA animazione patdown + server event per ogni item
+            -- Partial multi-select: ONE patdown animation + a server event per item
             Citizen.CreateThread(function()
                 MBT.Utils.StealMultipleItems(ped, target, server, items)
             end)

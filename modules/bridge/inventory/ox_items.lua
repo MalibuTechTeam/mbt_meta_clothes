@@ -10,7 +10,7 @@ MBT.OxItems = {}
 -- Pre-use slot checks (BEFORE useItem consumes the item)
 -----------------------------------------------------------
 
--- Controlla se uno slot Drawable è al valore default (PED nudo)
+-- Check whether a Drawable slot sits at its default value (bare PED)
 local function isDrawableDefault(slotIndex, sexLabel)
     local idx = tonumber(slotIndex)
     if not idx then return true end
@@ -21,7 +21,7 @@ local function isDrawableDefault(slotIndex, sexLabel)
     return MBT.TableContains(defaults, GetPedDrawableVariation(PlayerPedId(), idx))
 end
 
--- Controlla se uno slot Prop è al valore default (non indossato)
+-- Check whether a Prop slot sits at its default value (not worn)
 local function isPropDefault(slotIndex, sexLabel)
     local idx = tonumber(slotIndex)
     if not idx then return true end
@@ -32,7 +32,7 @@ local function isPropDefault(slotIndex, sexLabel)
     return MBT.TableContains(defaults, GetPedPropIndex(PlayerPedId(), idx))
 end
 
--- Controlla se tutti gli slot del torso kit sono al default
+-- Check whether every torso kit slot sits at its default
 local function isTopDressDefault(sexLabel)
     for _, idx in ipairs(MBT.TorsoKitSlots or {}) do
         local cfg = MBT.Drawables[idx]
@@ -89,7 +89,7 @@ function MBT.OxItems.RegisterItems(getPlayerSex)
                         MBT.Notification({ title = MBT.Locale["wrong_sex"].title, description = MBT.Locale["wrong_sex"].description .. sexLabel, type = "error", icon = "ban" })
                         return
                     end
-                    -- Pre-check: slot già occupato → notifica senza consumare l'item
+                    -- Pre-check: slot already taken → notify without consuming the item
                     local idx = slot.metadata and slot.metadata.index
                     if not isDrawableDefault(idx, sexLabel) then
                         MBT.Notification(MBT.Locale["undress"])
@@ -113,7 +113,7 @@ function MBT.OxItems.RegisterItems(getPlayerSex)
                         MBT.Notification({ title = MBT.Locale["wrong_sex"].title, description = MBT.Locale["wrong_sex"].description .. sexLabel, type = "error", icon = "ban" })
                         return
                     end
-                    -- Pre-check: prop già indossato → notifica senza consumare l'item
+                    -- Pre-check: prop already worn → notify without consuming the item
                     local idx = slot.metadata and slot.metadata.index
                     if not isPropDefault(idx, sexLabel) then
                         MBT.Notification(MBT.Locale["undress"])
