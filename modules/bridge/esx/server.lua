@@ -79,16 +79,25 @@ AddEventHandler('esx:onPlayerJoined', function(src)
 end)
 
 local UNBLOCK_POLL_INTERVAL = 4000
-local UNBLOCK_DEADLINE = 120000
+
+-- The ceiling is short on purpose. `pauseDetection` hides the PED and arms no
+-- client-side watchdog, so this unblock is the ONLY thing that reveals it again
+-- when a multichar does not write the alpha itself (esx_multicharacter does;
+-- others may not). Waiting minutes here would trade a brief flash for a player
+-- invisible in the world — a far worse failure.
+--
+-- 16s is measured, not guessed: a healthy relog through a selector delivered its
+-- authoritative restore at ~9s, so 4s was too eager and 16s clears it with room.
+-- Revealing mid-selection is harmless: the PED is hidden again on the real load.
+local UNBLOCK_DEADLINE = 16000
 
 --- Unblocks a client left paused because the multichar chain never closed.
 ---
 --- Sitting in a character selector is NOT a fault: the player has no character
---- until they choose, which can take a minute. Unblocking there is actively
---- harmful — it sends an empty restoreWearing and reveals the PED wearing
---- whatever the appearance script last applied, which is exactly the flash we
---- spent this whole subsystem removing. So we re-arm while no identifier
---- exists, and only give up at a deadline generous enough for a human.
+--- until they choose. Unblocking there is harmful — it sends an empty
+--- restoreWearing and reveals the PED wearing whatever the appearance script
+--- last applied, which is exactly the flash we spent this whole subsystem
+--- removing. So we re-arm while no identifier exists, up to UNBLOCK_DEADLINE.
 ---
 --- A missing load WITH an identifier already present is a different story:
 --- that chain really did break, and it is worth a warning immediately.
