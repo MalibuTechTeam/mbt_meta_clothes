@@ -106,3 +106,22 @@ CreateThread(function()
         end
     end
 end)
+
+-- Manual probe: prints what the PED is actually wearing right now. The tracer
+-- only reports changes, so a garment that reappears while nothing is being
+-- traced leaves no line — this answers "what is on the body at this instant".
+RegisterCommand('mbt_pedstate', function()
+    local ped = PlayerPedId()
+    if not DoesEntityExist(ped) then
+        print('^1[CLOTH][PROBE]^7 no ped^0')
+        return
+    end
+    local parts = {}
+    for _, slot in ipairs({ 3, 4, 6, 7, 8, 11 }) do
+        parts[#parts + 1] = ('D%d=%d'):format(slot, GetPedDrawableVariation(ped, slot))
+    end
+    for _, slot in ipairs({ 0, 1, 2, 6, 7 }) do
+        parts[#parts + 1] = ('P%d=%d'):format(slot, GetPedPropIndex(ped, slot))
+    end
+    print(('^5[CLOTH][PROBE]^7 t=%+d  %s^0'):format(GetGameTimer() - originAt, table.concat(parts, ' ')))
+end, false)

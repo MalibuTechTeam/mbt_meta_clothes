@@ -150,7 +150,7 @@ function MBT.PlayerState.GetSlot(src, slotType, slotIndex)
 end
 
 function MBT.PlayerState.ClearSlot(src, slotType, slotIndex)
-    -- Safety net multicharacter (vedi nota su SetSlot)
+    -- Multicharacter safety net (see the note on SetSlot)
     if MBT.PlayerState.CheckCharacterSwitch(src) then
         MBT.PlayerState.Load(src)
     end
