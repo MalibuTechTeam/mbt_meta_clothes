@@ -78,38 +78,56 @@ AddEventHandler('esx:onPlayerJoined', function(src)
     end)
 end)
 
+local UNBLOCK_POLL_INTERVAL = 4000
+local UNBLOCK_DEADLINE = 120000
+
+--- Unblocks a client left paused because the multichar chain never closed.
+---
+--- Sitting in a character selector is NOT a fault: the player has no character
+--- until they choose, which can take a minute. Unblocking there is actively
+--- harmful — it sends an empty restoreWearing and reveals the PED wearing
+--- whatever the appearance script last applied, which is exactly the flash we
+--- spent this whole subsystem removing. So we re-arm while no identifier
+--- exists, and only give up at a deadline generous enough for a human.
+---
+--- A missing load WITH an identifier already present is a different story:
+--- that chain really did break, and it is worth a warning immediately.
+local function scheduleUnblockCheck(src, pauseStartedAt)
+    Citizen.SetTimeout(UNBLOCK_POLL_INTERVAL, function()
+        -- A newer logout replaces the timestamp: this check belongs to a chain
+        -- that is no longer current.
+        if pendingPauseSince[src] ~= pauseStartedAt then return end
+
+        local elapsed = GetGameTimer() - pauseStartedAt
+        local detail = { source = src, elapsedMs = elapsed }
+        local hasIdentifier = getPlayerIdentifier and getPlayerIdentifier(src)
+
+        if hasIdentifier then
+            MBT.Warn('esx bridge: load event missing after logout; forcing client unblock', detail)
+        elseif elapsed < UNBLOCK_DEADLINE then
+            return scheduleUnblockCheck(src, pauseStartedAt)
+        else
+            MBT.Warn('esx bridge: no character chosen before the selector deadline; unblocking client', detail)
+        end
+
+        pendingPauseSince[src] = nil
+        TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, { Drawables = {}, Props = {} })
+    end)
+end
+
 -- Logout (including /relog): save the state while the identifier is still valid
 -- in cache, BEFORE the xPlayer is replaced by the new character, and pause the
 -- client so the new character's drawables do not land on the old one.
 AddEventHandler('esx:playerLogout', function(src)
     logEsxEvent("esx:playerLogout", src)
     TriggerClientEvent('mbt_meta_clothes:multichar:pauseDetection', src)
-    pendingPauseSince[src] = GetGameTimer()
+    local pauseStartedAt = GetGameTimer()
+    pendingPauseSince[src] = pauseStartedAt
     if MBT.PlayerState.IsLoaded(src) then
         MBT.PlayerState.Save(src)
     end
     MBT.SnapshotServer.Cleanup(src)
-    -- If no load has cleared pendingPauseSince within 4s, the multichar chain
-    -- broke and the client is stuck paused: we unblock it. 4s sits under the
-    -- client watchdog's 5s, so the unblock lands before auto recovery and is
-    -- more informative.
-    Citizen.SetTimeout(4000, function()
-        if pendingPauseSince[src] then
-            -- With a selector-based multichar the player has no character until
-            -- they pick one, possibly for a minute: that is legitimate waiting.
-            -- Only a missing load WITH an identifier already present is a real
-            -- fault — hence the different log level, otherwise the alarm would
-            -- fire on every relog.
-            local detail = { source = src, timeoutMs = 4000 }
-            if getPlayerIdentifier and getPlayerIdentifier(src) then
-                MBT.Warn('esx bridge: load event missing after logout; forcing client unblock', detail)
-            else
-                MBT.Debugger('esx bridge: no character after logout (selector); unblocking client', detail)
-            end
-            pendingPauseSince[src] = nil
-            TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, { Drawables = {}, Props = {} })
-        end
-    end)
+    scheduleUnblockCheck(src, pauseStartedAt)
 end)
 
 -- Safety net: esx:playerDropped is fired even when the drop is internal to ESX

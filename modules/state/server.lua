@@ -430,7 +430,12 @@ function MBT.PlayerState.Load(src, identifier)
     else
         MBT.PlayerState.InitPlayer(src)
         PlayerHasBaseline[src] = false
-        MBT.Debugger('PlayerState.Load: DB miss', {
+        -- Info, not Debug: a miss sends this player down the PED-scan branch,
+        -- which adopts whatever the appearance script put on as the new truth.
+        -- For a genuinely new identifier that is correct and happens once. For
+        -- an existing player it means their saved outfit was just replaced —
+        -- and at MBT.Debug = false nobody would ever see it happen.
+        MBT.Info('PlayerState.Load: DB miss — falling back to a PED scan', {
             source = src,
             identifier = identifier,
             switched = PlayerJustSwitched[src] == true,
@@ -566,7 +571,7 @@ function MBT.PlayerState.PushStateToClient(src, attempt, force, lifecycle)
         TriggerClientEvent('mbt_meta_clothes:restoreWearing', src, wearingState, context, lifecycle)
     else
         -- A new player and a new character take the same route: requestPedScan.
-        -- Un restoreWearing vuoto applicherebbe i default di MBT.Drawables e
+        -- An empty restoreWearing would apply the MBT.Drawables defaults and
         -- would fight the appearance script that is applying the real skin.
         -- The scan instead lets it work and reads the result once it is stable.
         local justSwitched = MBT.PlayerState.ConsumeSwitchFlag(src)
