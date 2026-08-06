@@ -194,6 +194,13 @@ Thanks to the FiveM community for continuous feedback and testing.
 
 ---
 
+## Links
+
+- 📖 **Documentation:** [malibutechteam.com/docs](https://malibutechteam.com/docs/mbt-meta-clothes/overview)
+- 📦 **MBT Meta Clothes on MalibuTech:** [malibutechteam.com](https://malibutechteam.com/scripts/5655569)
+- 💬 **Support & updates:** [MalibuTech Discord](https://discord.gg/6scYba9AMy)
+
+---
 ## License
 
 This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
