@@ -57,9 +57,24 @@ jobs:
           rm -rf ./temp ./mbt_meta_clothes.zip
           mkdir -p "${release_root}/web"
 
-          cp ./README.md ./config.lua ./fxmanifest.lua "${release_root}/"
-          cp -r ./core ./data ./item_image ./locales ./modules ./tests "${release_root}/"
+          cp ./README.md ./LICENSE.md ./config.lua ./fxmanifest.lua "${release_root}/"
+          cp -r ./core ./data ./item_image ./locales ./modules "${release_root}/"
+          # Only the installation guide: docs/superpowers holds internal plans and specs.
+          mkdir -p "${release_root}/docs"
+          cp ./docs/installation.md "${release_root}/docs/"
           cp -r ./web/dist "${release_root}/web/"
+
+          # tests/ is a development instrument and ships nowhere. Its manifest
+          # entries have to go with it: leaving them behind makes the resource
+          # log a missing-file warning for every spec on boot. Stripped from the
+          # copy, so the repo keeps its self-tests intact.
+          sed -i -e "/tests\/.*_spec\.lua/d" \
+                 -e "/Deterministic server-console self-tests/d" \
+                 "${release_root}/fxmanifest.lua"
+          if grep -q "_spec\.lua" "${release_root}/fxmanifest.lua"; then
+            echo "release manifest still references a spec file" >&2
+            exit 1
+          fi
 
           bun .github/actions/validate-release.mjs \
             "${release_root}" "${GITHUB_REF_NAME#v}"
