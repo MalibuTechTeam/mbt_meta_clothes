@@ -61,7 +61,7 @@ Players undress through an interactive mannequin, hand garments to each other, g
 | **oxmysql** | Required |
 | **One framework** | `es_extended`, `qb-core`, `qbx_core`, or `ox_core` |
 | **One inventory** | `ox_inventory`, `qb-inventory`, or a custom adapter |
-| **A target script** | Optional — `ox_target`, `qb-target`, or `qtarget`, auto-detected. Without one, theft runs off the `/steal` command |
+| **A target script** | Optional — `ox_target`, `qb-target`, or `qtarget`, auto-detected. Without one, theft runs off the `/stealclothes` command |
 | **A notification resource** | Optional — pick a preset in `config.lua`, or leave notifications silent |
 
 Exactly one supported framework and one inventory must be active. Startup validation rejects missing, ambiguous, or incompatible combinations with an explicit error.
@@ -105,7 +105,7 @@ Everything lives in `config.lua`. The options you will actually touch:
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `MBT.StealEnabled` | `true` | Clothing theft on or off — covers the target option and `/steal` alike |
+| `MBT.StealEnabled` | `true` | Clothing theft on or off — covers the target option and `/stealclothes` alike |
 | `MBT.StealDistance` | `5.0` | Max distance in metres |
 | `MBT.StealDuration` | `1500` | Progress bar for a single garment |
 | `MBT.StealAllDuration` | `2500` | Progress bar for stealing everything |
@@ -139,7 +139,7 @@ Everything lives in `config.lua`. The options you will actually touch:
 | `/hat`, `/glasses`, `/ears`, `/watch` | Toggle accessories |
 | `/hair` | Toggle hair |
 | `/tuck <slot>` | Cycle a slot's configured clothing states |
-| `/steal` | Open the theft menu on the nearest eligible player |
+| `/stealclothes` | Open the theft menu on the nearest eligible player |
 | `/drip` | Show your current drip level and XP |
 
 ---

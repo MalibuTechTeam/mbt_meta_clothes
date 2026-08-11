@@ -624,7 +624,7 @@ RegisterCommand("hair", function() if canToggle() then MBT.Utils.ToggleHair() en
 -- Steal command (fallback for servers without target scripts)
 -- Fallback for when no target script is running: same eligibility and same
 -- distance as the target interaction, only reached by command.
-RegisterCommand("steal", function()
+RegisterCommand("stealclothes", function()
     if MBT.StealEnabled == false then return end
     if not canToggle() then return end
     local myPed = PlayerPedId()

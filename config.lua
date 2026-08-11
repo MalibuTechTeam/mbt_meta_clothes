@@ -3,7 +3,7 @@ MBT                      = MBT or {}
 -----------------------------------------------------------
 -- General Settings
 -----------------------------------------------------------
-MBT.Debug                = true -- Enable debug prints in server/client console
+MBT.Debug                = false -- Enable debug prints in server/client console
 MBT.Language             = 'en'  -- Language: 'en', 'it' (add your own in locales/)
 MBT.MenuKey              = "J"   -- Keybind to open the clothing menu
 MBT.ActionCooldown       = 1500  -- ms between actions (prevents animation spam)
@@ -28,13 +28,13 @@ MBT.Theme                = {
 -----------------------------------------------------------
 -- Stealing
 -----------------------------------------------------------
--- Turns clothing theft off on BOTH paths: the target option and the /steal
--- command. PVE servers, or RP servers that consider it griefing, set this to
+-- Turns clothing theft off on BOTH paths: the target option and the
+-- /stealclothes command. PVE servers, or RP servers that consider it griefing, set this to
 -- false and the feature disappears whole, not halfway.
 MBT.StealEnabled         = true
 
 -- No target toggle: if ox_target, qb-target or qtarget is running the resource
--- registers the interaction by itself, otherwise the /steal command covers it.
+-- registers the interaction itself, otherwise /stealclothes covers it.
 MBT.StealDistance        = 5.0   -- Max distance (meters) to steal from a player
 MBT.TargetDistance       = 2.0   -- ox_target / qb-target interaction distance
 MBT.StealDuration        = 1500  -- ms progress bar for single item steal
