@@ -1,0 +1,11 @@
+schema_version: 1
+product_id: mbt-meta-clothes
+kind: fivem-script
+owner: malibutech
+repository: MalibuTechTeam/mbt_meta_clothes
+runtime_resource_name: mbt_meta_clothes
+commercial_model: free
+store_id: "5655569"
+documentation_slug: mbt-meta-clothes
+display_name: MBT Meta Clothes
+lifecycle: in-development

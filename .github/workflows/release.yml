@@ -79,6 +79,27 @@ jobs:
           bun .github/actions/validate-release.mjs \
             "${release_root}" "${GITHUB_REF_NAME#v}"
 
+          # --- MBT.Debug gate -------------------------------------------------
+          # The PACKAGED default is fail-closed, whatever the development
+          # config.lua says. Keeping MBT.Debug = true while working is correct
+          # and intended: the tests need it. What must not be possible is for it
+          # to reach a release, and until now that depended on someone
+          # remembering before the tag. It has escaped three times since 2022,
+          # once because a `git add -A` put it back to true.
+          #
+          # If the marker is absent the build FAILS: better not to release than
+          # to release an unknown default. Same contract as
+          # mbt_hud/scripts/build-release.mjs, the model for the catalogue.
+          CFG="${release_root}/config.lua"
+          if grep -qE '^[[:space:]]*MBT\.Debug[[:space:]]*=[[:space:]]*true' "$CFG"; then
+            sed -i -E 's/^([[:space:]]*MBT\.Debug[[:space:]]*=[[:space:]]*)true/\1false/' "$CFG"
+            echo "gate: MBT.Debug was true, rewritten to false in the package"
+          elif ! grep -qE '^[[:space:]]*MBT\.Debug[[:space:]]*=[[:space:]]*false' "$CFG"; then
+            echo "::error::config.lua: MBT.Debug release default not found"
+            exit 1
+          fi
+          grep -E '^[[:space:]]*MBT\.Debug' "$CFG"
+          # --------------------------------------------------------------------
           cd ./temp
           zip -r -q ../mbt_meta_clothes.zip ./mbt_meta_clothes
           cd ..
